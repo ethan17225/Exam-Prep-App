@@ -1,0 +1,26 @@
+<h1 class="page-title">Past Tests</h1>
+
+@if (records().length === 0) {
+  <p class="empty-state">No test history yet. Take an exam to see results here.</p>
+} @else {
+  <div class="history-list">
+    @for (r of records(); track r.id) {
+      <div class="card history-card" (click)="view(r.id)">
+        <div class="history-left">
+          <span class="history-title">{{ r.exam_title }}</span>
+          <span class="history-meta">{{ formatDate(r.taken_at) }} · {{ formatTime(r.time_spent_seconds) }}</span>
+        </div>
+        <div class="history-right">
+          <span class="badge" [class.badge-exam]="r.mode !== 'practice'" [class.badge-practice]="r.mode === 'practice'">
+            {{ r.mode === 'practice' ? 'Practice' : 'Exam' }}
+          </span>
+          <span class="history-score">{{ r.score }}%</span>
+          <span class="badge" [class.badge-pass]="r.passed" [class.badge-fail]="!r.passed">
+            {{ r.passed ? 'PASS' : 'FAIL' }}
+          </span>
+          <button class="btn btn-danger btn-sm" (click)="remove(r.id, $event)">Delete</button>
+        </div>
+      </div>
+    }
+  </div>
+}

@@ -1,0 +1,57 @@
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.history-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: border-color 0.15s;
+
+  &:hover { border-color: #bbb; }
+}
+
+.history-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.history-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.history-meta {
+  font-size: 0.78rem;
+  color: #888;
+}
+
+.history-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.history-score {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.btn-sm {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.78rem;
+}
+
+.badge-exam {
+  background: #eef;
+  color: #44c;
+}
+
+.badge-practice {
+  background: #e6f9ed;
+  color: #0a7;
+}

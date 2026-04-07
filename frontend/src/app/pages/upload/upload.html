@@ -1,0 +1,32 @@
+<h1 class="page-title">Upload Exam</h1>
+
+<div class="card upload-card">
+  <label class="field-label">Exam Title</label>
+  <input type="text" [ngModel]="title()" (ngModelChange)="title.set($event)" placeholder="e.g. Nursing Practice Exam 1" />
+
+  <label class="field-label" style="margin-top: 1rem">Questions JSON</label>
+  <textarea rows="16" [ngModel]="jsonText()" (ngModelChange)="jsonText.set($event)" placeholder='Paste your JSON array here, or use the file picker below...'></textarea>
+
+  <div class="upload-actions">
+    <label class="btn btn-secondary file-btn">
+      Choose File
+      <input type="file" accept=".json" (change)="onFileSelected($event)" hidden />
+    </label>
+    <button class="btn btn-primary" (click)="submit()" [disabled]="loading()">
+      {{ loading() ? 'Creating...' : 'Create Exam' }}
+    </button>
+  </div>
+
+  @if (error()) {
+    <p class="error-msg">{{ error() }}</p>
+  }
+</div>
+
+<div class="format-hint card">
+  <strong>Supported question types:</strong>
+  <ul>
+    <li><code>MCQ</code> — single correct answer (A, B, C, D…)</li>
+    <li><code>SATA</code> — select all that apply (answer is an array, e.g. ["A","C"])</li>
+    <li><code>FIB</code> — fill in the blank (answer is a text string)</li>
+  </ul>
+</div>

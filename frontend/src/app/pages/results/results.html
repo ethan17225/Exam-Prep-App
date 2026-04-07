@@ -1,0 +1,80 @@
+@if (!result()) {
+  <p class="empty-state">Loading results...</p>
+} @else {
+  @let r = result()!;
+
+  <!-- Score card -->
+  <div class="card score-card" [class.passed]="r.passed" [class.failed]="!r.passed">
+    <div class="score-main">
+      <span class="score-pct">{{ r.score }}%</span>
+      <span class="badge" [class.badge-pass]="r.passed" [class.badge-fail]="!r.passed">
+        {{ r.passed ? 'PASSED' : 'FAILED' }}
+      </span>
+    </div>
+    <div class="score-details">
+      <span>{{ r.correct }} / {{ r.total }} correct</span>
+      <span>Time: {{ formattedTime() }}</span>
+      <span>Need 75% to pass</span>
+    </div>
+  </div>
+
+  @if (r.passed) {
+    <div class="card message-card message-passed">
+      <div class="message-icon">🎉</div>
+      <p class="message-main">Woww, bé iu của anh giỏi quá iii</p>
+      <p class="message-sub">Thi xong anh móc cho nhaaa:)</p>
+    </div>
+  } @else {
+    <div class="card message-card message-failed">
+      <div class="message-title">Fighting!!!</div>
+      <div class="message-icon">💪</div>
+      <p class="message-main">Hong shaooo. Bé iu của anh cố lên nhaaaa</p>
+    </div>
+  }
+
+  <div class="result-actions">
+    <button class="btn btn-primary" (click)="retake()">Retake Exam</button>
+    <button class="btn btn-secondary" (click)="goHome()">Back to Exams</button>
+  </div>
+
+  <h2 class="section-title">Review</h2>
+
+  @for (q of r.results; track q.question_number) {
+    <div class="card review-card" [class.correct]="q.is_correct" [class.wrong]="!q.is_correct">
+      <div class="review-header">
+        <span class="review-num">Q{{ q.question_number }}</span>
+        <span class="badge" [class.badge-mcq]="q.type === 'MCQ'" [class.badge-sata]="q.type === 'SATA'" [class.badge-fib]="q.type === 'FIB' || q.type === 'Fill-in-the-blank'">{{ q.type }}</span>
+        <span class="review-status">{{ q.is_correct ? '✓ Correct' : '✗ Incorrect' }}</span>
+      </div>
+
+      <p class="review-question">{{ q.question }}</p>
+
+      @if (q.options) {
+        <div class="review-options">
+          @for (opt of q.options; track opt) {
+            <div
+              class="review-opt"
+              [class.user-pick]="isUserPick(q, opt)"
+              [class.correct-answer]="isCorrectOpt(q, opt)"
+              [class.wrong-pick]="isUserPick(q, opt) && !isCorrectOpt(q, opt)"
+            >
+              {{ opt }}
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="review-fib">
+          <span class="fib-label">Your answer:</span> <strong>{{ formatAnswer(q.user_answer) }}</strong>
+          <br />
+          <span class="fib-label">Correct answer:</span> <strong>{{ formatAnswer(q.correct_answer) }}</strong>
+        </div>
+      }
+
+      @if (q.rationale) {
+        <div class="rationale">
+          <strong>Rationale:</strong> {{ q.rationale }}
+        </div>
+      }
+    </div>
+  }
+}

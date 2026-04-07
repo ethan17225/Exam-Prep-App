@@ -1,0 +1,49 @@
+.upload-card {
+  margin-bottom: 1rem;
+}
+
+.field-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.4rem;
+}
+
+.upload-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  justify-content: flex-end;
+}
+
+.file-btn {
+  cursor: pointer;
+}
+
+.error-msg {
+  margin-top: 0.75rem;
+  color: #c00;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.format-hint {
+  font-size: 0.85rem;
+  color: #666;
+  line-height: 1.6;
+
+  ul {
+    margin-top: 0.4rem;
+    padding-left: 1.2rem;
+  }
+
+  code {
+    background: #f0f0f0;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-size: 0.8rem;
+  }
+}

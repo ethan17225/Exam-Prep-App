@@ -1,0 +1,131 @@
+.back-btn {
+  margin-bottom: 1rem;
+}
+
+.score-card {
+  text-align: center;
+  margin-bottom: 1.25rem;
+
+  &.passed { border-color: #a3e4b8; }
+  &.failed { border-color: #f5b5b5; }
+}
+
+.score-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.score-pct {
+  font-size: 2.5rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.score-details {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  font-size: 0.85rem;
+  color: #777;
+}
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.review-card {
+  margin-bottom: 0.75rem;
+  border-left: 3px solid #ddd;
+
+  &.correct { border-left-color: #4caf50; }
+  &.wrong { border-left-color: #e53935; }
+}
+
+.review-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.review-num {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.review-status {
+  margin-left: auto;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.review-question {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  margin-bottom: 0.75rem;
+}
+
+.review-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.75rem;
+}
+
+.review-opt {
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  border: 1px solid #eee;
+  background: #fafafa;
+
+  &.correct-answer {
+    background: #e6f9ed;
+    border-color: #a3e4b8;
+  }
+
+  &.wrong-pick {
+    background: #fef0f0;
+    border-color: #f5b5b5;
+    text-decoration: line-through;
+  }
+
+  &.user-pick:not(.wrong-pick) {
+    border-color: #a3e4b8;
+  }
+}
+
+.review-fib {
+  font-size: 0.85rem;
+  line-height: 1.7;
+  margin-bottom: 0.75rem;
+}
+
+.fib-label {
+  color: #888;
+}
+
+.badge-exam {
+  background: #eef;
+  color: #44c;
+}
+
+.badge-practice {
+  background: #e6f9ed;
+  color: #0a7;
+}
+
+.rationale {
+  font-size: 0.82rem;
+  color: #555;
+  line-height: 1.55;
+  background: #f9f9f3;
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid #eee;
+}

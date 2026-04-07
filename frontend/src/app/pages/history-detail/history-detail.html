@@ -1,0 +1,65 @@
+@if (!result()) {
+  <p class="empty-state">Loading...</p>
+} @else {
+  @let r = result()!;
+
+  <button class="btn btn-secondary back-btn" (click)="goBack()">← Back to History</button>
+
+  <div class="card score-card" [class.passed]="r.passed" [class.failed]="!r.passed">
+    <div class="score-main">
+      <span class="score-pct">{{ r.score }}%</span>
+      <span class="badge" [class.badge-pass]="r.passed" [class.badge-fail]="!r.passed">
+        {{ r.passed ? 'PASSED' : 'FAILED' }}
+      </span>
+    </div>
+    <div class="score-details">
+      <span>{{ r.exam_title }}</span>
+      <span class="badge" [class.badge-exam]="r.mode !== 'practice'" [class.badge-practice]="r.mode === 'practice'">
+        {{ r.mode === 'practice' ? 'Practice' : 'Exam' }}
+      </span>
+      <span>{{ r.correct }} / {{ r.total }} correct</span>
+      <span>Time: {{ formattedTime() }}</span>
+    </div>
+  </div>
+
+  <h2 class="section-title">Review</h2>
+
+  @for (q of r.results; track q.question_number) {
+    <div class="card review-card" [class.correct]="q.is_correct" [class.wrong]="!q.is_correct">
+      <div class="review-header">
+        <span class="review-num">Q{{ q.question_number }}</span>
+        <span class="badge" [class.badge-mcq]="q.type === 'MCQ'" [class.badge-sata]="q.type === 'SATA'" [class.badge-fib]="q.type === 'FIB' || q.type === 'Fill-in-the-blank'">{{ q.type }}</span>
+        <span class="review-status">{{ q.is_correct ? '✓ Correct' : '✗ Incorrect' }}</span>
+      </div>
+
+      <p class="review-question">{{ q.question }}</p>
+
+      @if (q.options) {
+        <div class="review-options">
+          @for (opt of q.options; track opt) {
+            <div
+              class="review-opt"
+              [class.user-pick]="isUserPick(q, opt)"
+              [class.correct-answer]="isCorrectOpt(q, opt)"
+              [class.wrong-pick]="isUserPick(q, opt) && !isCorrectOpt(q, opt)"
+            >
+              {{ opt }}
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="review-fib">
+          <span class="fib-label">Your answer:</span> <strong>{{ formatAnswer(q.user_answer) }}</strong>
+          <br />
+          <span class="fib-label">Correct answer:</span> <strong>{{ formatAnswer(q.correct_answer) }}</strong>
+        </div>
+      }
+
+      @if (q.rationale) {
+        <div class="rationale">
+          <strong>Rationale:</strong> {{ q.rationale }}
+        </div>
+      }
+    </div>
+  }
+}

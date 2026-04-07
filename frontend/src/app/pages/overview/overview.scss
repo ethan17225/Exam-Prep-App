@@ -1,0 +1,172 @@
+// KPI grid
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.kpi-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 1rem;
+}
+
+.kpi-value {
+  font-size: 1.8rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #111;
+}
+
+.kpi-label {
+  font-size: 0.78rem;
+  color: #888;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+// Empty state
+.empty-dashboard {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #999;
+
+  p { font-size: 1rem; }
+  .empty-sub { font-size: 0.85rem; margin-top: 0.3rem; }
+}
+
+// Charts
+.charts-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.chart-card {
+  padding: 1rem 1.25rem;
+}
+
+.chart-full {
+  margin-bottom: 0.75rem;
+}
+
+.chart-title {
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: #333;
+  margin-bottom: 0.6rem;
+}
+
+.chart-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.chart-wrap-wide {
+  height: 220px;
+}
+
+.chart-wrap-square {
+  height: 180px;
+}
+
+// Mode summary
+.mode-summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  color: #666;
+}
+
+.mode-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+
+  &.exam { background: #4361ee; }
+  &.practice { background: #0a7; }
+}
+
+// Mode badges
+.badge-exam {
+  background: #eef;
+  color: #44c;
+}
+
+.badge-practice {
+  background: #e6f9ed;
+  color: #0a7;
+}
+
+// Recent activity
+.recent-card {
+  margin-bottom: 1rem;
+}
+
+.recent-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.recent-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background 0.1s;
+
+  &:last-child { border-bottom: none; }
+  &:hover { background: #fafafa; margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; border-radius: 6px; }
+}
+
+.recent-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.recent-title {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.recent-meta {
+  font-size: 0.75rem;
+  color: #999;
+}
+
+.recent-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.recent-score {
+  font-weight: 700;
+  font-size: 0.95rem;
+
+  &.score-pass { color: #0a7; }
+  &.score-fail { color: #c00; }
+}
+
+// Responsive
+@media (max-width: 640px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .charts-row {
+    grid-template-columns: 1fr;
+  }
+}

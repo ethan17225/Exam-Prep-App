@@ -1,0 +1,193 @@
+@if (questions().length === 0) {
+  <p class="empty-state">Loading exam...</p>
+} @else {
+  <!-- Top bar -->
+  <div class="exam-topbar">
+    <div class="exam-topbar-left">
+      <span class="exam-name">{{ examTitle() }}</span>
+      @if (mode() === 'practice') {
+        <span class="mode-badge practice">Practice</span>
+      } @else {
+        <span class="mode-badge exam">Exam</span>
+      }
+      <span class="progress-text">{{ answeredCount() }}/{{ totalQuestions() }} answered</span>
+    </div>
+    <div class="exam-topbar-right">
+      <span class="timer" [class.timer-warning]="timerWarning()" [class.timer-danger]="timerDanger()">
+        {{ formattedTime() }}
+      </span>
+      <button class="btn btn-secondary btn-sm" (click)="toggleNav()">
+        {{ showNav() ? 'Hide' : 'Questions' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Progress bar -->
+  <div class="progress-bar-track">
+    <div class="progress-bar-fill" [style.width.%]="progress()"></div>
+  </div>
+
+  <!-- Question navigator panel -->
+  @if (showNav()) {
+    <div class="q-nav-panel card">
+      <div class="q-nav-grid">
+        @for (q of questions(); track q.number; let i = $index) {
+          <button
+            class="q-nav-btn"
+            [class.answered]="isAnswered(q.number)"
+            [class.flagged]="isFlagged(q.number)"
+            [class.current]="isOnCurrentPage(i)"
+            (click)="goTo(i)"
+          >
+            {{ q.number }}
+          </button>
+        }
+      </div>
+      <div class="q-nav-legend">
+        <span><span class="dot dot-answered"></span> Answered</span>
+        <span><span class="dot dot-flagged"></span> Flagged</span>
+        <span><span class="dot dot-current"></span> Current Page</span>
+      </div>
+    </div>
+  }
+
+  <!-- Page info -->
+  <div class="page-info">
+    Page {{ currentPage() + 1 }} of {{ totalPages() }}
+    &mdash; Questions {{ pageStartNum() }}–{{ pageEndNum() }}
+  </div>
+
+  <!-- Questions for current page -->
+  @for (q of pageQuestions(); track q.number) {
+    <div
+      class="card question-card"
+      [class.revealed-correct]="isRevealed(q.number) && isQuestionCorrect(q)"
+      [class.revealed-wrong]="isRevealed(q.number) && !isQuestionCorrect(q)"
+    >
+      <div class="question-header">
+        <div class="question-badges">
+          <span class="badge"
+            [class.badge-mcq]="q.type === 'MCQ'"
+            [class.badge-sata]="q.type === 'SATA'"
+            [class.badge-fib]="q.type === 'FIB' || q.type === 'Fill-in-the-blank'">
+            {{ q.type }}
+          </span>
+          <span class="topic-label">{{ q.topic }}</span>
+        </div>
+        <button class="flag-btn" [class.flagged]="isFlagged(q.number)" (click)="toggleFlag(q.number)" title="Flag for review">
+          {{ isFlagged(q.number) ? '⚑' : '⚐' }}
+        </button>
+      </div>
+
+      <p class="question-number">Question {{ q.number }} of {{ totalQuestions() }}</p>
+      <p class="question-text">{{ q.question }}</p>
+
+      @if (q.type === 'SATA') {
+        <p class="sata-hint">Select all that apply</p>
+      }
+
+      @if (isTextInput(q)) {
+        <!-- FIB / Text input -->
+        <div class="fib-input">
+          <input
+            type="text"
+            placeholder="Type your answer..."
+            [ngModel]="(getAnswer(q.number) ?? '') + ''"
+            (ngModelChange)="setTextAnswer(q.number, $event)"
+            [disabled]="isFibConfirmed(q.number)"
+          />
+          @if (!isFibConfirmed(q.number)) {
+            <button class="btn btn-primary btn-sm fib-confirm-btn" (click)="confirmFib(q.number)" [disabled]="!isAnswered(q.number)">
+              Confirm
+            </button>
+          }
+        </div>
+
+        @if (isFibConfirmed(q.number)) {
+          <div class="fib-reveal">
+            <div class="fib-correct-answer">
+              <span class="fib-label">Correct answer:</span>
+              <strong>{{ q.answer }}</strong>
+            </div>
+            @if (getFibMark(q.number) === undefined) {
+              <div class="fib-self-grade">
+                <span>Was your answer correct?</span>
+                <button class="btn btn-success btn-sm" (click)="markFib(q.number, true)">Correct</button>
+                <button class="btn btn-danger btn-sm" (click)="markFib(q.number, false)">Incorrect</button>
+              </div>
+            } @else {
+              <div class="fib-grade-result" [class.fib-grade-correct]="getFibMark(q.number)" [class.fib-grade-wrong]="!getFibMark(q.number)">
+                {{ getFibMark(q.number) ? '✓ Marked as correct' : '✗ Marked as incorrect' }}
+              </div>
+            }
+            @if (q.rationale) {
+              <div class="rationale">
+                <strong>Rationale:</strong> {{ q.rationale }}
+              </div>
+            }
+          </div>
+        }
+      } @else if (q.type === 'SATA' && q.options) {
+        <!-- SATA options -->
+        <div class="options-list">
+          @for (opt of q.options; track opt) {
+            <button
+              class="option-btn"
+              [class.selected]="isSataSelected(q.number, opt)"
+              [class.option-correct]="isRevealed(q.number) && isCorrectOption(q, opt)"
+              [class.option-wrong]="isRevealed(q.number) && isSataSelected(q.number, opt) && !isCorrectOption(q, opt)"
+              (click)="toggleSATA(q.number, opt)"
+              [disabled]="isRevealed(q.number)"
+            >
+              <span class="option-indicator">{{ isSataSelected(q.number, opt) ? '☑' : '☐' }}</span>
+              {{ opt }}
+            </button>
+          }
+        </div>
+        @if (mode() === 'practice' && !isRevealed(q.number) && isAnswered(q.number)) {
+          <button class="btn btn-primary btn-sm check-answer-btn" (click)="checkSATAAnswer(q.number)">
+            Check Answer
+          </button>
+        }
+        @if (isRevealed(q.number) && q.rationale) {
+          <div class="rationale">
+            <strong>Rationale:</strong> {{ q.rationale }}
+          </div>
+        }
+      } @else if (q.options) {
+        <!-- MCQ options -->
+        <div class="options-list">
+          @for (opt of q.options; track opt) {
+            <button
+              class="option-btn"
+              [class.selected]="isSelected(q.number, opt)"
+              [class.option-correct]="isRevealed(q.number) && isCorrectOption(q, opt)"
+              [class.option-wrong]="isRevealed(q.number) && isSelected(q.number, opt) && !isCorrectOption(q, opt)"
+              (click)="selectMCQ(q.number, opt)"
+              [disabled]="isRevealed(q.number)"
+            >
+              <span class="option-indicator">{{ isSelected(q.number, opt) ? '●' : '○' }}</span>
+              {{ opt }}
+            </button>
+          }
+        </div>
+        @if (isRevealed(q.number) && q.rationale) {
+          <div class="rationale">
+            <strong>Rationale:</strong> {{ q.rationale }}
+          </div>
+        }
+      }
+    </div>
+  }
+
+  <!-- Bottom navigation -->
+  <div class="bottom-nav">
+    <button class="btn btn-secondary" (click)="prevPage()" [disabled]="currentPage() === 0">← Previous 20</button>
+    <div class="bottom-nav-center">
+      <button class="btn btn-primary" (click)="submit()" [disabled]="submitting()">
+        {{ submitting() ? 'Submitting...' : 'Submit Exam' }}
+      </button>
+    </div>
+    <button class="btn btn-secondary" (click)="nextPage()" [disabled]="currentPage() === totalPages() - 1">Next 20 →</button>
+  </div>
+}

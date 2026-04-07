@@ -1,0 +1,21 @@
+<h1 class="page-title">Available Exams</h1>
+
+@if (exams().length === 0) {
+  <p class="empty-state">No exams available. Go to <strong>Upload</strong> to add one, or seed the database.</p>
+} @else {
+  <div class="exam-list">
+    @for (exam of exams(); track exam.id) {
+      <div class="card exam-card">
+        <div class="exam-info">
+          <span class="exam-title">{{ exam.title }}</span>
+          <span class="exam-meta">{{ exam.total_questions }} questions</span>
+        </div>
+        <div class="exam-actions">
+          <button class="btn btn-primary btn-sm" (click)="start(exam.id, 'exam')">Exam</button>
+          <button class="btn btn-success btn-sm" (click)="start(exam.id, 'practice')">Practice</button>
+          <button class="btn btn-danger btn-sm" (click)="remove(exam.id, $event)">Delete</button>
+        </div>
+      </div>
+    }
+  </div>
+}

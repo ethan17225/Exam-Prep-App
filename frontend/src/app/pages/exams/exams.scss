@@ -1,0 +1,42 @@
+.exam-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.exam-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: border-color 0.15s;
+
+  &:hover {
+    border-color: #bbb;
+  }
+}
+
+.exam-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.exam-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.exam-meta {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.exam-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-sm {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+}

@@ -1,0 +1,90 @@
+<h1 class="page-title">Overview</h1>
+
+<!-- KPI Cards -->
+<div class="kpi-grid">
+  <div class="card kpi-card">
+    <span class="kpi-value">{{ totalExams() }}</span>
+    <span class="kpi-label">Exams Taken</span>
+  </div>
+  <div class="card kpi-card">
+    <span class="kpi-value">{{ averageScore() }}%</span>
+    <span class="kpi-label">Avg Score</span>
+  </div>
+  <div class="card kpi-card">
+    <span class="kpi-value">{{ passRate() }}%</span>
+    <span class="kpi-label">Pass Rate</span>
+  </div>
+  <div class="card kpi-card">
+    <span class="kpi-value">{{ formattedStudyTime() }}</span>
+    <span class="kpi-label">Study Time</span>
+  </div>
+</div>
+
+@if (records().length === 0) {
+  <div class="card empty-dashboard">
+    <p>No exam history yet.</p>
+    <p class="empty-sub">Take an exam or practice session to see your analytics here.</p>
+  </div>
+} @else {
+  <!-- Charts row 1: Score Trend + Mode Breakdown -->
+  <div class="charts-row">
+    <div class="card chart-card chart-wide">
+      <h3 class="chart-title">Score Trend</h3>
+      <div class="chart-wrap chart-wrap-wide">
+        <canvas id="scoreTrendChart"></canvas>
+      </div>
+    </div>
+    <div class="card chart-card">
+      <h3 class="chart-title">Mode Breakdown</h3>
+      <div class="chart-wrap chart-wrap-square">
+        <canvas id="modeChart"></canvas>
+      </div>
+      <div class="mode-summary">
+        <span class="mode-dot exam"></span> {{ examCount() }} Exam
+        <span class="mode-dot practice"></span> {{ practiceCount() }} Practice
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts row 2: Topic Performance -->
+  <div class="card chart-card chart-full">
+    <h3 class="chart-title">Performance by Topic</h3>
+    <div class="chart-wrap" [style.height.px]="topicChartHeight()">
+      <canvas id="topicChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Charts row 3: Score Distribution -->
+  <div class="card chart-card chart-full">
+    <h3 class="chart-title">Score Distribution</h3>
+    <div class="chart-wrap chart-wrap-wide">
+      <canvas id="distChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Recent Activity -->
+  <div class="card recent-card">
+    <h3 class="chart-title">Recent Activity</h3>
+    <div class="recent-list">
+      @for (r of recentRecords(); track r.id) {
+        <div class="recent-row" (click)="viewRecord(r.id)">
+          <div class="recent-info">
+            <span class="recent-title">{{ r.exam_title }}</span>
+            <span class="recent-meta">{{ formatDate(r.taken_at) }} · {{ formatTime(r.time_spent_seconds) }}</span>
+          </div>
+          <div class="recent-right">
+            <span class="badge" [class.badge-exam]="r.mode !== 'practice'" [class.badge-practice]="r.mode === 'practice'">
+              {{ r.mode === 'practice' ? 'Practice' : 'Exam' }}
+            </span>
+            <span class="recent-score" [class.score-pass]="r.passed" [class.score-fail]="!r.passed">
+              {{ r.score }}%
+            </span>
+            <span class="badge" [class.badge-pass]="r.passed" [class.badge-fail]="!r.passed">
+              {{ r.passed ? 'PASS' : 'FAIL' }}
+            </span>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+}
