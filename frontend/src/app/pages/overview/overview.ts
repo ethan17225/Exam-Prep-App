@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { ExamService, ExamResult } from '../../services/exam.service';
 import { Chart, registerables } from 'chart.js';
 
@@ -14,12 +15,15 @@ interface TopicStat {
 
 @Component({
   selector: 'app-overview',
-  imports: [],
+  imports: [FormsModule],
   templateUrl: './overview.html',
   styleUrl: './overview.scss',
 })
 export class OverviewPage implements OnInit, OnDestroy {
   records = signal<ExamResult[]>([]);
+  selectedTopic = signal('');
+  topicSearch = signal('');
+  topicDropdownOpen = signal(false);
   private charts: Chart[] = [];
 
   totalExams = computed(() => this.records().length);
@@ -69,8 +73,18 @@ export class OverviewPage implements OnInit, OnDestroy {
       .sort((a, b) => b.score - a.score);
   });
 
+  filteredTopicStats = computed(() => {
+    const query = this.topicSearch().trim().toLowerCase();
+    if (!query) return this.topicStats();
+    return this.topicStats().filter((t) => t.topic.toLowerCase().includes(query));
+  });
+
   recentRecords = computed(() => this.records().slice(0, 5));
-  topicChartHeight = computed(() => Math.max(this.topicStats().length * 34, 120));
+  selectedTopicStat = computed(() => {
+    const topic = this.selectedTopic();
+    if (!topic) return null;
+    return this.filteredTopicStats().find((s) => s.topic === topic) ?? null;
+  });
 
   constructor(
     private examService: ExamService,
@@ -80,6 +94,10 @@ export class OverviewPage implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.examService.getHistory().subscribe((data) => {
       this.records.set(data);
+      const topics = this.topicStats();
+      if (topics.length > 0) {
+        this.selectedTopic.set(topics[0].topic);
+      }
       setTimeout(() => this.renderCharts(), 0);
     });
   }
@@ -102,6 +120,32 @@ export class OverviewPage implements OnInit, OnDestroy {
     return `${m}m ${s}s`;
   }
 
+  onTopicSearchInput(value: string): void {
+    this.topicSearch.set(value);
+    this.topicDropdownOpen.set(true);
+    const filtered = this.filteredTopicStats();
+    if (filtered.length > 0 && !filtered.some((t) => t.topic === this.selectedTopic())) {
+      this.selectedTopic.set(filtered[0].topic);
+    }
+    if (filtered.length === 0) {
+      this.selectedTopic.set('');
+    }
+  }
+
+  selectTopic(topic: string): void {
+    this.selectedTopic.set(topic);
+    this.topicSearch.set(topic);
+    this.topicDropdownOpen.set(false);
+  }
+
+  onTopicSearchFocus(): void {
+    this.topicDropdownOpen.set(true);
+  }
+
+  closeTopicDropdown(): void {
+    this.topicDropdownOpen.set(false);
+  }
+
   private renderCharts(): void {
     this.charts.forEach((c) => c.destroy());
     this.charts = [];
@@ -109,7 +153,6 @@ export class OverviewPage implements OnInit, OnDestroy {
 
     this.renderScoreTrend();
     this.renderModeBreakdown();
-    this.renderTopicPerformance();
     this.renderScoreDistribution();
   }
 
@@ -190,44 +233,6 @@ export class OverviewPage implements OnInit, OnDestroy {
           cutout: '65%',
           plugins: {
             legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, pointStyle: 'circle' } },
-          },
-        },
-      }),
-    );
-  }
-
-  private renderTopicPerformance(): void {
-    const canvas = document.getElementById('topicChart') as HTMLCanvasElement;
-    if (!canvas) return;
-
-    const stats = this.topicStats().slice(0, 12);
-    if (stats.length === 0) return;
-
-    const colors = stats.map((s) => (s.score >= 75 ? '#0a7' : s.score >= 50 ? '#f90' : '#c00'));
-
-    this.charts.push(
-      new Chart(canvas, {
-        type: 'bar',
-        data: {
-          labels: stats.map((s) => (s.topic.length > 25 ? s.topic.slice(0, 22) + '...' : s.topic)),
-          datasets: [
-            {
-              label: 'Accuracy %',
-              data: stats.map((s) => s.score),
-              backgroundColor: colors,
-              borderRadius: 4,
-              barThickness: 22,
-            },
-          ],
-        },
-        options: {
-          indexAxis: 'y',
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { min: 0, max: 100, ticks: { callback: (v) => `${v}%` }, grid: { color: '#f0f0f0' } },
-            y: { grid: { display: false } },
           },
         },
       }),

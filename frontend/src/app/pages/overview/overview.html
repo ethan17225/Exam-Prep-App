@@ -49,9 +49,51 @@
   <!-- Charts row 2: Topic Performance -->
   <div class="card chart-card chart-full">
     <h3 class="chart-title">Performance by Topic</h3>
-    <div class="chart-wrap" [style.height.px]="topicChartHeight()">
-      <canvas id="topicChart"></canvas>
+    <div class="topic-autocomplete" (click)="$event.stopPropagation()">
+      <input
+        type="text"
+        class="topic-search-input"
+        placeholder="Search or select a topic..."
+        [ngModel]="topicSearch()"
+        (ngModelChange)="onTopicSearchInput($event)"
+        (focus)="onTopicSearchFocus()"
+        (blur)="closeTopicDropdown()"
+      />
+      @if (topicDropdownOpen()) {
+        <div class="topic-dropdown">
+          @if (filteredTopicStats().length === 0) {
+            <div class="topic-dropdown-empty">No topics match.</div>
+          } @else {
+            @for (t of filteredTopicStats(); track t.topic) {
+              <button
+                class="topic-dropdown-item"
+                [class.active]="selectedTopic() === t.topic"
+                (mousedown)="selectTopic(t.topic)"
+              >
+                <span class="topic-dropdown-name">{{ t.topic }}</span>
+                <span class="topic-dropdown-score" [class.topic-score-pass]="t.score >= 75" [class.topic-score-fail]="t.score < 75">{{ t.score }}%</span>
+              </button>
+            }
+          }
+        </div>
+      }
     </div>
+    @if (filteredTopicStats().length === 0 && topicSearch()) {
+      <div class="topic-empty">No topics match your search.</div>
+    } @else if (selectedTopicStat(); as stat) {
+      <div class="topic-detail">
+        <div class="topic-detail-top">
+          <span class="topic-name">{{ stat.topic }}</span>
+          <span class="topic-score" [class.topic-score-pass]="stat.score >= 75" [class.topic-score-fail]="stat.score < 75">
+            {{ stat.score }}%
+          </span>
+        </div>
+        <div class="topic-progress-track">
+          <div class="topic-progress-fill" [style.width.%]="stat.score"></div>
+        </div>
+        <p class="topic-meta">{{ stat.correct }} correct out of {{ stat.total }} questions</p>
+      </div>
+    }
   </div>
 
   <!-- Charts row 3: Score Distribution -->

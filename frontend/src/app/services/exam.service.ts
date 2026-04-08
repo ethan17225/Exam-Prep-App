@@ -35,6 +35,7 @@ export interface SubmissionPayload {
   answers: AnswerSubmission[];
   time_spent_seconds: number;
   mode?: string;
+  question_numbers?: number[];
 }
 
 export interface QuestionResult {
@@ -125,6 +126,10 @@ export class ExamService {
 
   deleteExam(id: string): Observable<{ deleted: boolean }> {
     return this.http.delete<{ deleted: boolean }>(`${this.base}/exams/${id}`);
+  }
+
+  renameExam(id: string, title: string): Observable<ExamSummary> {
+    return this.http.patch<ExamSummary>(`${this.base}/exams/${id}`, { title });
   }
 
   saveProgress(payload: SaveProgressPayload): Observable<InProgressExam> {

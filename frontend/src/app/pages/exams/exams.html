@@ -3,18 +3,61 @@
 @if (exams().length === 0) {
   <p class="empty-state">No exams available. Go to <strong>Upload</strong> to add one, or seed the database.</p>
 } @else {
-  <div class="exam-list">
+  <div class="exam-list" (click)="closeMenu()">
     @for (exam of exams(); track exam.id) {
       <div class="card exam-card">
-        <div class="exam-info">
-          <span class="exam-title">{{ exam.title }}</span>
-          <span class="exam-meta">{{ exam.total_questions }} questions</span>
+        <div class="exam-top-row">
+          <div class="exam-info">
+            @if (editMode()[exam.id] === 'rename') {
+              <div class="inline-rename" (click)="$event.stopPropagation()">
+                <input
+                  class="title-input"
+                  type="text"
+                  [ngModel]="titleDrafts()[exam.id]"
+                  (ngModelChange)="updateTitleDraft(exam.id, $event)"
+                />
+                <button class="btn btn-primary btn-sm" (click)="saveTitle(exam, $event)" [disabled]="loadingRename()[exam.id]">
+                  {{ loadingRename()[exam.id] ? 'Saving...' : 'Save' }}
+                </button>
+              </div>
+              @if (renameError()[exam.id]) {
+                <span class="rename-error">{{ renameError()[exam.id] }}</span>
+              }
+            } @else {
+              <span class="exam-title">{{ exam.title }}</span>
+            }
+            <span class="exam-meta">{{ exam.total_questions }} questions</span>
+          </div>
+          <div class="exam-actions">
+            <button class="btn btn-primary btn-sm" (click)="start(exam, 'exam')">Exam</button>
+            <button class="btn btn-success btn-sm" (click)="start(exam, 'practice')">Practice</button>
+            <div class="menu-wrap" (click)="$event.stopPropagation()">
+              <button class="btn btn-secondary btn-sm menu-btn" (click)="toggleMenu(exam.id, $event)" aria-label="More options">⋮</button>
+              @if (menuOpen() === exam.id && !editMode()[exam.id]) {
+                <div class="menu-panel card">
+                  <button class="menu-option" (mousedown)="pickMenuOption(exam.id, 'rename')">Rename Exam</button>
+                  <button class="menu-option" (mousedown)="pickMenuOption(exam.id, 'count')">Modify Number of Questions</button>
+                </div>
+              }
+            </div>
+            <button class="btn btn-danger btn-sm" (click)="remove(exam.id, $event)">Delete</button>
+          </div>
         </div>
-        <div class="exam-actions">
-          <button class="btn btn-primary btn-sm" (click)="start(exam.id, 'exam')">Exam</button>
-          <button class="btn btn-success btn-sm" (click)="start(exam.id, 'practice')">Practice</button>
-          <button class="btn btn-danger btn-sm" (click)="remove(exam.id, $event)">Delete</button>
-        </div>
+        @if (editMode()[exam.id] === 'count') {
+          <div class="inline-count" (click)="$event.stopPropagation()">
+            <label for="count-{{ exam.id }}">Questions to take:</label>
+            <input
+              id="count-{{ exam.id }}"
+              class="count-input"
+              type="number"
+              [min]="1"
+              [max]="exam.total_questions"
+              [ngModel]="questionCounts()[exam.id]"
+              (ngModelChange)="updateQuestionCount(exam, $event)"
+            />
+            <span class="count-hint">of {{ exam.total_questions }}</span>
+          </div>
+        }
       </div>
     }
   </div>

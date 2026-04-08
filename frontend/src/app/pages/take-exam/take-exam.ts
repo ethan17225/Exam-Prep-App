@@ -30,6 +30,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
   private timerInterval: ReturnType<typeof setInterval> | null = null;
   private examId = '';
   private resumeId: string | null = null;
+  private selectedQuestionCount: number | null = null;
 
   totalQuestions = computed(() => this.questions().length);
   answeredCount = computed(() => this.answers().size);
@@ -68,6 +69,10 @@ export class TakeExamPage implements OnInit, OnDestroy {
     const modeParam = this.route.snapshot.queryParamMap.get('mode');
     if (modeParam === 'practice') this.mode.set('practice');
     this.resumeId = this.route.snapshot.queryParamMap.get('resume');
+    const countParam = Number(this.route.snapshot.queryParamMap.get('count'));
+    if (Number.isFinite(countParam) && countParam > 0) {
+      this.selectedQuestionCount = Math.floor(countParam);
+    }
 
     this.examService.getExam(this.examId, true).subscribe((exam) => {
       this.examTitle.set(exam.title);
@@ -78,7 +83,11 @@ export class TakeExamPage implements OnInit, OnDestroy {
           this.startTimer();
         });
       } else {
-        this.questions.set(this.shuffle(exam.questions));
+        const shuffled = this.shuffle(exam.questions);
+        const takeCount = this.selectedQuestionCount
+          ? Math.min(Math.max(this.selectedQuestionCount, 1), shuffled.length)
+          : shuffled.length;
+        this.questions.set(shuffled.slice(0, takeCount));
         this.startTimer();
       }
     });
@@ -343,6 +352,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
         answers: subs,
         time_spent_seconds: timeSpent,
         mode: this.mode(),
+        question_numbers: this.questions().map((q) => q.number),
       })
       .subscribe({
         next: (result) => {

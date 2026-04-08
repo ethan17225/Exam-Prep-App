@@ -49,6 +49,10 @@ class ExamCreate(BaseModel):
     questions: list[QuestionIn]
 
 
+class ExamTitleUpdate(BaseModel):
+    title: str
+
+
 class AnswerSubmission(BaseModel):
     question_number: int
     answer: str | list[str]
@@ -59,6 +63,7 @@ class ExamSubmission(BaseModel):
     answers: list[AnswerSubmission]
     time_spent_seconds: int
     mode: str = "exam"
+    question_numbers: list[int] | None = None
 
 
 class SaveProgressPayload(BaseModel):
@@ -134,6 +139,31 @@ def get_exam(exam_id: str, include_answers: bool = False, db: Session = Depends(
     return {"id": exam.id, "title": exam.title, "questions": questions}
 
 
+@app.patch("/api/exams/{exam_id}")
+def update_exam_title(exam_id: str, payload: ExamTitleUpdate, db: Session = Depends(get_db)):
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(404, "Exam not found")
+
+    new_title = payload.title.strip()
+    if not new_title:
+        raise HTTPException(400, "Title cannot be empty")
+
+    exam.title = new_title
+    db.query(History).filter(History.exam_id == exam_id).update({"exam_title": new_title})
+    db.query(InProgressExam).filter(InProgressExam.exam_id == exam_id).update({"exam_title": new_title})
+    db.commit()
+    db.refresh(exam)
+
+    total_questions = db.query(Question).filter(Question.exam_id == exam_id).count()
+    return {
+        "id": exam.id,
+        "title": exam.title,
+        "total_questions": total_questions,
+        "created_at": exam.created_at.isoformat(),
+    }
+
+
 @app.post("/api/exams/{exam_id}/submit")
 def submit_exam(exam_id: str, submission: ExamSubmission, db: Session = Depends(get_db)):
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
@@ -144,16 +174,30 @@ def submit_exam(exam_id: str, submission: ExamSubmission, db: Session = Depends(
     results = []
     correct_count = 0
 
-    for q in exam.questions:
+    selected_questions = exam.questions
+    if submission.question_numbers:
+        selected_set = set(submission.question_numbers)
+        selected_questions = [q for q in exam.questions if q.number in selected_set]
+        if not selected_questions:
+            raise HTTPException(400, "No valid questions selected")
+
+    for q in selected_questions:
         user_answer = answer_map.get(q.number)
         expected = q.answer
+
+        is_fib = q.type in ("FIB", "Fill-in-the-blank") or not q.options
 
         if q.type == "SATA":
             expected_set = set(expected) if isinstance(expected, list) else {expected}
             user_set = set(user_answer) if isinstance(user_answer, list) else ({user_answer} if user_answer else set())
             is_correct = expected_set == user_set
-        elif q.type == "FIB":
-            is_correct = str(user_answer or "").strip().lower() == str(expected).strip().lower()
+        elif is_fib:
+            user_str = str(user_answer or "").strip().lower()
+            expected_str = str(expected).strip().lower()
+            try:
+                is_correct = float(user_str) == float(expected_str)
+            except (ValueError, TypeError):
+                is_correct = user_str == expected_str
         else:
             is_correct = str(user_answer or "").strip() == str(expected).strip()
 
@@ -172,7 +216,7 @@ def submit_exam(exam_id: str, submission: ExamSubmission, db: Session = Depends(
             "rationale": q.rationale or "",
         })
 
-    total = len(exam.questions)
+    total = len(selected_questions)
     score = correct_count / total if total else 0
     passed = score >= PASS_THRESHOLD
 
@@ -216,13 +260,14 @@ def save_progress(payload: SaveProgressPayload, db: Session = Depends(get_db)):
         existing.question_order = payload.question_order
         existing.remaining_seconds = payload.remaining_seconds
         existing.current_page = payload.current_page
+        existing.total_questions = len(payload.question_order)
         existing.answered_count = len(payload.answers)
         existing.saved_at = datetime.now()
         db.commit()
         db.refresh(existing)
         return _in_progress_to_dict(existing)
 
-    total = db.query(Question).filter(Question.exam_id == payload.exam_id).count()
+    total = len(payload.question_order)
     record = InProgressExam(
         id=str(uuid4())[:8],
         exam_id=payload.exam_id,

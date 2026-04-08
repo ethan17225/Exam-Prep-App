@@ -58,9 +58,19 @@
               [class.correct-answer]="isCorrectOpt(q, opt)"
               [class.wrong-pick]="isUserPick(q, opt) && !isCorrectOpt(q, opt)"
             >
+              @if (isCorrectOpt(q, opt)) {
+                <span class="opt-indicator opt-correct">✓</span>
+              } @else if (isUserPick(q, opt)) {
+                <span class="opt-indicator opt-wrong">✗</span>
+              }
               {{ opt }}
             </div>
           }
+        </div>
+        <div class="review-answer-summary">
+          <span class="fib-label">Your answer:</span> <strong>{{ formatAnswer(q.user_answer) }}</strong>
+          <span class="answer-sep">|</span>
+          <span class="fib-label">Correct answer:</span> <strong>{{ formatAnswer(q.correct_answer) }}</strong>
         </div>
       } @else {
         <div class="review-fib">

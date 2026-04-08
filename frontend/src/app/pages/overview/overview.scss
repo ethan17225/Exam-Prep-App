@@ -75,6 +75,120 @@
   height: 180px;
 }
 
+.topic-autocomplete {
+  position: relative;
+  margin-bottom: 0.9rem;
+}
+
+.topic-search-input {
+  width: 100%;
+}
+
+.topic-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.topic-dropdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0.55rem 0.8rem;
+  border: none;
+  background: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: left;
+
+  &:hover { background: #f5f5f5; }
+  &.active { background: #eef2ff; font-weight: 600; }
+}
+
+.topic-dropdown-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topic-dropdown-score {
+  font-weight: 600;
+  font-size: 0.8rem;
+  margin-left: 0.75rem;
+  flex-shrink: 0;
+}
+
+.topic-dropdown-empty {
+  padding: 0.7rem 0.8rem;
+  font-size: 0.82rem;
+  color: #999;
+}
+
+.topic-empty {
+  font-size: 0.85rem;
+  color: #777;
+  padding: 0.8rem;
+  border: 1px dashed #ddd;
+  border-radius: 8px;
+  background: #fcfcfc;
+}
+
+.topic-detail {
+  border: 1px solid #f0f0f0;
+  border-radius: 10px;
+  padding: 0.85rem 0.9rem;
+}
+
+.topic-detail-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.topic-name {
+  font-weight: 600;
+  color: #333;
+}
+
+.topic-score {
+  font-weight: 700;
+
+  &.topic-score-pass { color: #0a7; }
+  &.topic-score-fail { color: #c00; }
+}
+
+.topic-progress-track {
+  margin-top: 0.6rem;
+  height: 8px;
+  background: #f0f0f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.topic-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4361ee, #0a7);
+}
+
+.topic-meta {
+  margin-top: 0.55rem;
+  margin-bottom: 0;
+  font-size: 0.8rem;
+  color: #777;
+}
+
 // Mode summary
 .mode-summary {
   display: flex;

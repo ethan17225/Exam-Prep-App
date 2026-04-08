@@ -23,43 +23,83 @@
   </div>
 
   <h2 class="section-title">Review</h2>
-
-  @for (q of r.results; track q.question_number) {
-    <div class="card review-card" [class.correct]="q.is_correct" [class.wrong]="!q.is_correct">
-      <div class="review-header">
-        <span class="review-num">Q{{ q.question_number }}</span>
-        <span class="badge" [class.badge-mcq]="q.type === 'MCQ'" [class.badge-sata]="q.type === 'SATA'" [class.badge-fib]="q.type === 'FIB' || q.type === 'Fill-in-the-blank'">{{ q.type }}</span>
-        <span class="review-status">{{ q.is_correct ? '✓ Correct' : '✗ Incorrect' }}</span>
+  <div class="review-toolbar">
+    <div class="review-toolbar-left">
+      <button class="btn btn-secondary btn-sm" (click)="toggleWrongOnly()">
+        {{ showWrongOnly() ? 'Show All Questions' : 'Show Wrong Only' }}
+      </button>
+      <div class="type-pills">
+        <button class="type-pill" [class.active]="selectedType() === 'all'" (click)="setTypeFilter('all')">All</button>
+        <button class="type-pill pill-mcq" [class.active]="selectedType() === 'MCQ'" (click)="setTypeFilter('MCQ')">MCQ</button>
+        <button class="type-pill pill-sata" [class.active]="selectedType() === 'SATA'" (click)="setTypeFilter('SATA')">SATA</button>
+        <button class="type-pill pill-fib" [class.active]="selectedType() === 'FIB'" (click)="setTypeFilter('FIB')">FIB</button>
       </div>
-
-      <p class="review-question">{{ q.question }}</p>
-
-      @if (q.options) {
-        <div class="review-options">
-          @for (opt of q.options; track opt) {
-            <div
-              class="review-opt"
-              [class.user-pick]="isUserPick(q, opt)"
-              [class.correct-answer]="isCorrectOpt(q, opt)"
-              [class.wrong-pick]="isUserPick(q, opt) && !isCorrectOpt(q, opt)"
-            >
-              {{ opt }}
-            </div>
-          }
-        </div>
-      } @else {
-        <div class="review-fib">
-          <span class="fib-label">Your answer:</span> <strong>{{ formatAnswer(q.user_answer) }}</strong>
-          <br />
-          <span class="fib-label">Correct answer:</span> <strong>{{ formatAnswer(q.correct_answer) }}</strong>
-        </div>
-      }
-
-      @if (q.rationale) {
-        <div class="rationale">
-          <strong>Rationale:</strong> {{ q.rationale }}
-        </div>
-      }
     </div>
+    <span class="review-count">
+      {{ filteredResults().length }} question{{ filteredResults().length === 1 ? '' : 's' }}
+      @if (showWrongOnly() || selectedType() !== 'all') {
+        <span> shown</span>
+      }
+    </span>
+  </div>
+
+  @if (filteredResults().length === 0) {
+    <div class="card empty-filter">
+      No incorrect questions in this attempt.
+    </div>
+  } @else {
+    @for (q of filteredResults(); track q.question_number) {
+      <div class="card review-card" [class.correct]="q.is_correct" [class.wrong]="!q.is_correct">
+        <div class="review-header">
+          <span class="review-num">Q{{ q.question_number }}</span>
+          <span class="badge" [class.badge-mcq]="q.type === 'MCQ'" [class.badge-sata]="q.type === 'SATA'" [class.badge-fib]="q.type === 'FIB' || q.type === 'Fill-in-the-blank'">{{ q.type }}</span>
+          <span class="review-status">{{ q.is_correct ? '✓ Correct' : '✗ Incorrect' }}</span>
+        </div>
+
+        <p class="review-question">{{ q.question }}</p>
+
+        @if (q.options) {
+          <div class="review-options">
+            @for (opt of q.options; track opt) {
+              <div
+                class="review-opt"
+                [class.sata-correct-only]="isSata(q) && isCorrectOpt(q, opt) && !isUserPick(q, opt)"
+                [class.sata-correct-picked]="isSata(q) && isCorrectOpt(q, opt) && isUserPick(q, opt)"
+                [class.correct-answer]="!isSata(q) && isCorrectOpt(q, opt)"
+                [class.wrong-pick]="isUserPick(q, opt) && !isCorrectOpt(q, opt)"
+              >
+                @if (isSata(q) && isCorrectOpt(q, opt) && isUserPick(q, opt)) {
+                  <span class="opt-indicator opt-correct">✓</span>
+                } @else if (isSata(q) && isCorrectOpt(q, opt) && !isUserPick(q, opt)) {
+                  <span class="opt-indicator opt-yellow">✓</span>
+                } @else if (isCorrectOpt(q, opt)) {
+                  <span class="opt-indicator opt-correct">✓</span>
+                } @else if (isUserPick(q, opt)) {
+                  <span class="opt-indicator opt-wrong">✗</span>
+                }
+                {{ opt }}
+              </div>
+            }
+          </div>
+          <div class="review-answer-summary">
+            <span class="fib-label">Your answer:</span> <strong>{{ formatAnswer(q.user_answer) }}</strong>
+            <span class="answer-sep">|</span>
+            <span class="fib-label">Correct answer:</span> <strong>{{ formatAnswer(q.correct_answer) }}</strong>
+          </div>
+        } @else {
+          <div class="review-fib">
+            <span class="fib-label">Your answer:</span> <strong>{{ formatAnswer(q.user_answer) }}</strong>
+            <br />
+            <span class="fib-label">Correct answer:</span> <strong>{{ formatAnswer(q.correct_answer) }}</strong>
+          </div>
+        }
+
+        @if (q.rationale) {
+          <div class="rationale">
+            <strong>Rationale:</strong> {{ q.rationale }}
+          </div>
+        }
+      </div>
+    }
   }
 }
