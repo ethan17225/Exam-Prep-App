@@ -7,6 +7,7 @@ export const routes: Routes = [
   { path: 'exams', loadComponent: () => import('./pages/exams/exams').then(m => m.ExamsPage) },
   { path: 'in-progress', loadComponent: () => import('./pages/in-progress/in-progress').then(m => m.InProgressPage) },
   { path: 'exam/:id', loadComponent: () => import('./pages/take-exam/take-exam').then(m => m.TakeExamPage) },
+  { path: 'flashcards/:id', loadComponent: () => import('./pages/flashcards/flashcards').then(m => m.FlashcardsPage) },
   { path: 'results/:id', loadComponent: () => import('./pages/results/results').then(m => m.ResultsPage) },
   { path: 'history', loadComponent: () => import('./pages/history/history').then(m => m.HistoryPage) },
   { path: 'history/:id', loadComponent: () => import('./pages/history-detail/history-detail').then(m => m.HistoryDetailPage) },

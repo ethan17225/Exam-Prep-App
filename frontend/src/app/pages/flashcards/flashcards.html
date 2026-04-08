@@ -1,0 +1,60 @@
+@if (loading()) {
+  <p class="empty-state">Loading flashcards...</p>
+} @else if (error()) {
+  <p class="empty-state">{{ error() }}</p>
+  <button class="btn btn-secondary" (click)="backToExams()">Back to Exams</button>
+} @else if (total() === 0) {
+  <p class="empty-state">No questions in this exam.</p>
+  <button class="btn btn-secondary" (click)="backToExams()">Back to Exams</button>
+} @else {
+  <div class="flashcards-header">
+    <button class="btn btn-secondary btn-sm" (click)="backToExams()">← Exams</button>
+    <span class="flashcards-title">{{ examTitle() }}</span>
+    <span class="flashcards-progress">{{ progressLabel() }}</span>
+  </div>
+
+  @if (currentQuestion(); as q) {
+    <div class="flashcard-hint">Click the card or press Space to flip · ← → to move</div>
+
+    <div class="flashcard-scene" (click)="toggleFlip()">
+      <div class="flashcard-inner" [class.flipped]="flipped()">
+        <div class="flashcard-face flashcard-front card">
+          <div class="fc-badges">
+            <span class="badge" [class.badge-mcq]="q.type === 'MCQ'" [class.badge-sata]="q.type === 'SATA'" [class.badge-fib]="isTextQuestion(q)">{{ q.type }}</span>
+            @if (q.topic) {
+              <span class="fc-topic">{{ q.topic }}</span>
+            }
+          </div>
+          <p class="fc-question">{{ q.question }}</p>
+          @if (!isTextQuestion(q) && q.options) {
+            <ul class="fc-options-front">
+              @for (opt of q.options; track opt) {
+                <li>{{ opt }}</li>
+              }
+            </ul>
+          } @else {
+            <p class="fc-front-hint">Think of your answer, then flip.</p>
+          }
+          <span class="fc-tap-hint">Tap to reveal answer</span>
+        </div>
+
+        <div class="flashcard-face flashcard-back card">
+          <div class="fc-back-label">Answer</div>
+          <p class="fc-answer">{{ formatAnswer(q) }}</p>
+          @if (q.rationale) {
+            <div class="fc-rationale">
+              <strong>Rationale</strong>
+              <p>{{ q.rationale }}</p>
+            </div>
+          }
+          <span class="fc-tap-hint">Tap to see question</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="flashcard-nav">
+      <button class="btn btn-secondary" (click)="prev(); $event.stopPropagation()" [disabled]="currentIndex() === 0">Previous</button>
+      <button class="btn btn-secondary" (click)="next(); $event.stopPropagation()" [disabled]="currentIndex() >= total() - 1">Next</button>
+    </div>
+  }
+}

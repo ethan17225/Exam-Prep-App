@@ -48,6 +48,13 @@ export class ExamsPage implements OnInit {
     this.router.navigate(['/exam', exam.id], { queryParams: { mode, count } });
   }
 
+  openFlashcards(exam: ExamSummary): void {
+    this.menuOpen.set(null);
+    const selected = this.questionCounts()[exam.id] ?? exam.total_questions;
+    const count = Math.max(1, Math.min(exam.total_questions, Math.floor(selected)));
+    this.router.navigate(['/flashcards', exam.id], { queryParams: { count, shuffle: true } });
+  }
+
   updateTitleDraft(examId: string, value: string): void {
     this.titleDrafts.set({ ...this.titleDrafts(), [examId]: value });
   }

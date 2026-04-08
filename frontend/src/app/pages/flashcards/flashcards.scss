@@ -1,0 +1,171 @@
+.flashcards-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.flashcards-title {
+  font-weight: 700;
+  font-size: 1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.flashcards-progress {
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: 600;
+}
+
+.flashcard-hint {
+  font-size: 0.78rem;
+  color: #888;
+  margin-bottom: 0.75rem;
+}
+
+.flashcard-scene {
+  perspective: 1400px;
+  max-width: min(960px, 100%);
+  margin: 0 auto 1.5rem;
+  cursor: pointer;
+}
+
+.flashcard-inner {
+  position: relative;
+  min-height: 420px;
+  transition: transform 0.55s cubic-bezier(0.4, 0.2, 0.2, 1);
+  transform-style: preserve-3d;
+
+  &.flipped {
+    transform: rotateY(180deg);
+  }
+}
+
+.flashcard-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 1.75rem 2rem;
+  overflow: auto;
+}
+
+.flashcard-front {
+  transform: rotateY(0deg);
+}
+
+.flashcard-back {
+  transform: rotateY(180deg);
+  background: linear-gradient(145deg, #f8fafc 0%, #fff 100%);
+}
+
+.fc-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.fc-topic {
+  font-size: 0.88rem;
+  color: #666;
+}
+
+.fc-question {
+  font-size: 1.15rem;
+  line-height: 1.55;
+  margin-bottom: 1rem;
+  flex: 1;
+}
+
+.fc-options-front {
+  margin: 0;
+  padding-left: 1.35rem;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: #333;
+}
+
+.fc-front-hint {
+  font-size: 0.95rem;
+  color: #999;
+  font-style: italic;
+  margin-top: auto;
+}
+
+.fc-tap-hint {
+  margin-top: auto;
+  padding-top: 1rem;
+  font-size: 0.78rem;
+  color: #aaa;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.fc-back-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #888;
+  margin-bottom: 0.35rem;
+}
+
+.fc-answer {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111;
+  margin-bottom: 0.75rem;
+  line-height: 1.45;
+}
+
+.fc-rationale {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #444;
+  padding: 1rem 1.1rem;
+  background: #f9f9f3;
+  border-radius: 8px;
+  border: 1px solid #eee;
+
+  strong {
+    display: block;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #888;
+    margin-bottom: 0.35rem;
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+.flashcard-nav {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  max-width: min(960px, 100%);
+  margin: 0 auto;
+}
+
+@media (max-width: 520px) {
+  .flashcard-inner {
+    min-height: 380px;
+  }
+
+  .flashcard-face {
+    padding: 1.35rem 1.25rem;
+  }
+
+  .fc-question {
+    font-size: 1.05rem;
+  }
+}

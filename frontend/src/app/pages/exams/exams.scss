@@ -4,7 +4,15 @@
   gap: 0.6rem;
 }
 
+.exam-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .exam-card {
+  flex: 1;
+  min-width: 0;
   transition: border-color 0.15s;
 
   &:hover {
@@ -84,6 +92,34 @@
   font-size: 0.8rem;
 }
 
+/* 3-dot control sits outside the card; hidden until row hover (or menu open / keyboard) */
+.exam-card-menu {
+  flex-shrink: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding: 0 0.15rem;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+}
+
+.exam-row:hover .exam-card-menu,
+.exam-row.exam-row--menu-open .exam-card-menu,
+.exam-row:focus-within .exam-card-menu,
+.exam-row.exam-row--edit .exam-card-menu {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Touch devices: no hover — keep control visible */
+@media (hover: none) {
+  .exam-card-menu {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 .menu-wrap {
   position: relative;
 }
@@ -132,8 +168,17 @@
     align-items: flex-start;
   }
 
+  .exam-row {
+    align-items: flex-start;
+  }
+
+  .exam-card-menu {
+    align-self: center;
+    padding-top: 0.5rem;
+  }
+
   .menu-panel {
-    left: 0;
-    right: auto;
+    left: auto;
+    right: 0;
   }
 }
