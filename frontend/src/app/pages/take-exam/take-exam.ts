@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { ExamService, Question, AnswerSubmission } from '../../services/exam.service';
+import { ExamService, Question, AnswerSubmission, InProgressExam } from '../../services/exam.service';
 
 @Component({
   selector: 'app-take-exam',
@@ -15,6 +15,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
   answers = signal<Map<number, string | string[]>>(new Map());
   flagged = signal<Set<number>>(new Set());
   submitting = signal(false);
+  saving = signal(false);
   showNav = signal(false);
 
   mode = signal<'exam' | 'practice'>('exam');
@@ -28,6 +29,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
 
   private timerInterval: ReturnType<typeof setInterval> | null = null;
   private examId = '';
+  private resumeId: string | null = null;
 
   totalQuestions = computed(() => this.questions().length);
   answeredCount = computed(() => this.answers().size);
@@ -65,12 +67,24 @@ export class TakeExamPage implements OnInit, OnDestroy {
     this.examId = this.route.snapshot.paramMap.get('id')!;
     const modeParam = this.route.snapshot.queryParamMap.get('mode');
     if (modeParam === 'practice') this.mode.set('practice');
+    this.resumeId = this.route.snapshot.queryParamMap.get('resume');
 
     this.examService.getExam(this.examId, true).subscribe((exam) => {
       this.examTitle.set(exam.title);
-      this.questions.set(this.shuffle(exam.questions));
-    });
 
+      if (this.resumeId) {
+        this.examService.getInProgress(this.resumeId).subscribe((saved) => {
+          this.restoreProgress(exam.questions, saved);
+          this.startTimer();
+        });
+      } else {
+        this.questions.set(this.shuffle(exam.questions));
+        this.startTimer();
+      }
+    });
+  }
+
+  private startTimer(): void {
     this.timerInterval = setInterval(() => {
       const remaining = this.remainingSeconds();
       if (remaining <= 1) {
@@ -81,6 +95,23 @@ export class TakeExamPage implements OnInit, OnDestroy {
       }
       this.remainingSeconds.update((v) => v - 1);
     }, 1000);
+  }
+
+  private restoreProgress(allQuestions: Question[], saved: InProgressExam): void {
+    const questionMap = new Map(allQuestions.map((q) => [q.number, q]));
+    const ordered = saved.question_order
+      .map((num) => questionMap.get(num))
+      .filter((q): q is Question => !!q);
+    this.questions.set(ordered);
+
+    const restoredAnswers = new Map<number, string | string[]>();
+    for (const [key, val] of Object.entries(saved.answers)) {
+      restoredAnswers.set(Number(key), val);
+    }
+    this.answers.set(restoredAnswers);
+    this.flagged.set(new Set(saved.flagged));
+    this.remainingSeconds.set(saved.remaining_seconds);
+    this.currentPage.set(saved.current_page);
   }
 
   ngOnDestroy(): void {
@@ -254,6 +285,40 @@ export class TakeExamPage implements OnInit, OnDestroy {
     return ans !== '';
   }
 
+  // ── Save & Exit ─────────────────────────────────────────────
+
+  saveAndExit(): void {
+    if (this.saving()) return;
+    this.saving.set(true);
+
+    const answersObj: Record<string, string | string[]> = {};
+    for (const [key, val] of this.answers()) {
+      answersObj[String(key)] = val;
+    }
+
+    this.examService
+      .saveProgress({
+        exam_id: this.examId,
+        mode: this.mode(),
+        answers: answersObj,
+        flagged: [...this.flagged()],
+        question_order: this.questions().map((q) => q.number),
+        remaining_seconds: this.remainingSeconds(),
+        current_page: this.currentPage(),
+      })
+      .subscribe({
+        next: () => {
+          this.saving.set(false);
+          if (this.timerInterval) clearInterval(this.timerInterval);
+          this.router.navigate(['/in-progress']);
+        },
+        error: () => {
+          this.saving.set(false);
+          alert('Failed to save progress. Please try again.');
+        },
+      });
+  }
+
   // ── Submit ──────────────────────────────────────────────────
 
   submit(): void {
@@ -282,6 +347,9 @@ export class TakeExamPage implements OnInit, OnDestroy {
       .subscribe({
         next: (result) => {
           this.submitting.set(false);
+          this.examService
+            .deleteInProgressByExam(this.examId, this.mode())
+            .subscribe({ error: () => {} });
           this.router.navigate(['/results', result.id]);
         },
         error: () => {

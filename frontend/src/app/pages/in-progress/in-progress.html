@@ -1,0 +1,30 @@
+<h1 class="page-title">In Progress</h1>
+
+@if (records().length === 0) {
+  <p class="empty-state">No exams in progress. Start an exam and save your progress to continue later.</p>
+} @else {
+  <div class="ip-list">
+    @for (r of records(); track r.id) {
+      <div class="card ip-card" (click)="resume(r)">
+        <div class="ip-left">
+          <span class="ip-title">{{ r.exam_title }}</span>
+          <span class="ip-meta">Saved {{ formatDate(r.saved_at) }}</span>
+        </div>
+        <div class="ip-center">
+          <div class="ip-progress-bar">
+            <div class="ip-progress-fill" [style.width.%]="progressPercent(r)"></div>
+          </div>
+          <span class="ip-progress-text">{{ r.answered_count }}/{{ r.total_questions }} answered ({{ progressPercent(r) }}%)</span>
+        </div>
+        <div class="ip-right">
+          <span class="badge" [class.badge-exam]="r.mode !== 'practice'" [class.badge-practice]="r.mode === 'practice'">
+            {{ r.mode === 'practice' ? 'Practice' : 'Exam' }}
+          </span>
+          <span class="ip-timer">{{ formatTime(r.remaining_seconds) }}</span>
+          <button class="btn btn-primary btn-sm" (click)="resume(r); $event.stopPropagation()">Resume</button>
+          <button class="btn btn-danger btn-sm" (click)="remove(r.id, $event)">Discard</button>
+        </div>
+      </div>
+    }
+  </div>
+}

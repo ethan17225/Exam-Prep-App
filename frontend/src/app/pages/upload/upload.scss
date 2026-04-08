@@ -47,3 +47,39 @@
     font-size: 0.8rem;
   }
 }
+
+.example-section {
+  margin-top: 0.75rem;
+}
+
+.example-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.9rem;
+}
+
+.example-toggle {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.example-json {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f7f7f7;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: #333;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.copy-btn {
+  margin-top: 0.75rem;
+}

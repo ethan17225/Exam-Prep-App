@@ -32,6 +32,25 @@ class Question(Base):
     exam = relationship("Exam", back_populates="questions")
 
 
+class InProgressExam(Base):
+    __tablename__ = "in_progress_exams"
+
+    id = Column(String(8), primary_key=True)
+    exam_id = Column(String(8), ForeignKey("exams.id", ondelete="CASCADE"), nullable=False)
+    exam_title = Column(String(255), nullable=False)
+    mode = Column(String(10), nullable=False, default="exam")
+    answers = Column(JSONB, nullable=False, default={})
+    flagged = Column(JSONB, nullable=False, default=[])
+    question_order = Column(JSONB, nullable=False, default=[])
+    remaining_seconds = Column(Integer, nullable=False)
+    current_page = Column(Integer, nullable=False, default=0)
+    total_questions = Column(Integer, nullable=False)
+    answered_count = Column(Integer, nullable=False, default=0)
+    saved_at = Column(DateTime, nullable=False)
+
+    exam = relationship("Exam")
+
+
 class History(Base):
     __tablename__ = "history"
 

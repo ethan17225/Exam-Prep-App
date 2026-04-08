@@ -9,7 +9,7 @@ from sqlalchemy import func
 from sqlalchemy import text, inspect as sa_inspect
 
 from database import Base, engine, get_db
-from models import Exam, Question, History
+from models import Exam, Question, History, InProgressExam
 
 Base.metadata.create_all(bind=engine)
 
@@ -59,6 +59,16 @@ class ExamSubmission(BaseModel):
     answers: list[AnswerSubmission]
     time_spent_seconds: int
     mode: str = "exam"
+
+
+class SaveProgressPayload(BaseModel):
+    exam_id: str
+    mode: str = "exam"
+    answers: dict[str, str | list[str]]
+    flagged: list[int]
+    question_order: list[int]
+    remaining_seconds: int
+    current_page: int = 0
 
 
 # ── Endpoints ─────────────────────────────────────────────────────
@@ -185,6 +195,109 @@ def submit_exam(exam_id: str, submission: ExamSubmission, db: Session = Depends(
 
     return _history_to_dict(record)
 
+
+# ── In-Progress Endpoints ─────────────────────────────────────────
+
+@app.post("/api/in-progress")
+def save_progress(payload: SaveProgressPayload, db: Session = Depends(get_db)):
+    exam = db.query(Exam).filter(Exam.id == payload.exam_id).first()
+    if not exam:
+        raise HTTPException(404, "Exam not found")
+
+    existing = (
+        db.query(InProgressExam)
+        .filter(InProgressExam.exam_id == payload.exam_id, InProgressExam.mode == payload.mode)
+        .first()
+    )
+
+    if existing:
+        existing.answers = payload.answers
+        existing.flagged = payload.flagged
+        existing.question_order = payload.question_order
+        existing.remaining_seconds = payload.remaining_seconds
+        existing.current_page = payload.current_page
+        existing.answered_count = len(payload.answers)
+        existing.saved_at = datetime.now()
+        db.commit()
+        db.refresh(existing)
+        return _in_progress_to_dict(existing)
+
+    total = db.query(Question).filter(Question.exam_id == payload.exam_id).count()
+    record = InProgressExam(
+        id=str(uuid4())[:8],
+        exam_id=payload.exam_id,
+        exam_title=exam.title,
+        mode=payload.mode,
+        answers=payload.answers,
+        flagged=payload.flagged,
+        question_order=payload.question_order,
+        remaining_seconds=payload.remaining_seconds,
+        current_page=payload.current_page,
+        total_questions=total,
+        answered_count=len(payload.answers),
+        saved_at=datetime.now(),
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    return _in_progress_to_dict(record)
+
+
+@app.get("/api/in-progress")
+def list_in_progress(db: Session = Depends(get_db)):
+    rows = db.query(InProgressExam).order_by(InProgressExam.saved_at.desc()).all()
+    return [_in_progress_to_dict(r) for r in rows]
+
+
+@app.get("/api/in-progress/{record_id}")
+def get_in_progress(record_id: str, db: Session = Depends(get_db)):
+    record = db.query(InProgressExam).filter(InProgressExam.id == record_id).first()
+    if not record:
+        raise HTTPException(404, "Record not found")
+    return _in_progress_to_dict(record)
+
+
+@app.delete("/api/in-progress/by-exam/{exam_id}")
+def delete_in_progress_by_exam(exam_id: str, mode: str = "exam", db: Session = Depends(get_db)):
+    record = (
+        db.query(InProgressExam)
+        .filter(InProgressExam.exam_id == exam_id, InProgressExam.mode == mode)
+        .first()
+    )
+    if record:
+        db.delete(record)
+        db.commit()
+    return {"deleted": True}
+
+
+@app.delete("/api/in-progress/{record_id}")
+def delete_in_progress(record_id: str, db: Session = Depends(get_db)):
+    record = db.query(InProgressExam).filter(InProgressExam.id == record_id).first()
+    if not record:
+        raise HTTPException(404, "Record not found")
+    db.delete(record)
+    db.commit()
+    return {"deleted": True}
+
+
+def _in_progress_to_dict(record: InProgressExam) -> dict:
+    return {
+        "id": record.id,
+        "exam_id": record.exam_id,
+        "exam_title": record.exam_title,
+        "mode": record.mode,
+        "answers": record.answers,
+        "flagged": record.flagged,
+        "question_order": record.question_order,
+        "remaining_seconds": record.remaining_seconds,
+        "current_page": record.current_page,
+        "total_questions": record.total_questions,
+        "answered_count": record.answered_count,
+        "saved_at": record.saved_at.isoformat(),
+    }
+
+
+# ── History Endpoints ─────────────────────────────────────────────
 
 @app.get("/api/history")
 def get_history(db: Session = Depends(get_db)):

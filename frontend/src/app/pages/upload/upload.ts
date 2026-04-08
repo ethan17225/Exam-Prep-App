@@ -14,11 +14,59 @@ export class UploadPage {
   jsonText = signal('');
   error = signal('');
   loading = signal(false);
+  showExample = signal(false);
+  copied = signal(false);
+
+  private readonly exampleJson = `[
+  {
+    "number": 1,
+    "topic": "Pharmacology",
+    "type": "MCQ",
+    "question": "Which medication is a beta-blocker?",
+    "options": [
+      "A. Metoprolol",
+      "B. Lisinopril",
+      "C. Amlodipine",
+      "D. Losartan"
+    ],
+    "answer": "A",
+    "rationale": "Metoprolol is a selective beta-1 blocker."
+  },
+  {
+    "number": 2,
+    "topic": "Infection Control",
+    "type": "SATA",
+    "question": "Which are standard precautions? Select all that apply.",
+    "options": [
+      "A. Hand hygiene",
+      "B. Use of PPE",
+      "C. Reverse isolation",
+      "D. Safe injection practices"
+    ],
+    "answer": ["A", "B", "D"],
+    "rationale": "Standard precautions include hand hygiene, PPE, and safe injection practices."
+  },
+  {
+    "number": 3,
+    "topic": "Anatomy",
+    "type": "FIB",
+    "question": "The largest organ of the human body is the ____.",
+    "answer": "skin",
+    "rationale": "The skin is the largest organ by surface area."
+  }
+]`;
 
   constructor(
     private examService: ExamService,
     private router: Router,
   ) {}
+
+  copyExample(): void {
+    navigator.clipboard.writeText(this.exampleJson).then(() => {
+      this.copied.set(true);
+      setTimeout(() => this.copied.set(false), 2000);
+    });
+  }
 
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;

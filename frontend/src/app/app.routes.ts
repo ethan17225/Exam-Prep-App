@@ -5,6 +5,7 @@ export const routes: Routes = [
   { path: 'overview', loadComponent: () => import('./pages/overview/overview').then(m => m.OverviewPage) },
   { path: 'upload', loadComponent: () => import('./pages/upload/upload').then(m => m.UploadPage) },
   { path: 'exams', loadComponent: () => import('./pages/exams/exams').then(m => m.ExamsPage) },
+  { path: 'in-progress', loadComponent: () => import('./pages/in-progress/in-progress').then(m => m.InProgressPage) },
   { path: 'exam/:id', loadComponent: () => import('./pages/take-exam/take-exam').then(m => m.TakeExamPage) },
   { path: 'results/:id', loadComponent: () => import('./pages/results/results').then(m => m.ResultsPage) },
   { path: 'history', loadComponent: () => import('./pages/history/history').then(m => m.HistoryPage) },

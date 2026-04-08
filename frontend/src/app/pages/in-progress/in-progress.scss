@@ -1,0 +1,87 @@
+.ip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.ip-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: border-color 0.15s;
+
+  &:hover { border-color: #bbb; }
+}
+
+.ip-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.ip-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.ip-meta {
+  font-size: 0.78rem;
+  color: #888;
+}
+
+.ip-center {
+  flex: 1;
+  max-width: 220px;
+  margin: 0 1.5rem;
+}
+
+.ip-progress-bar {
+  height: 4px;
+  background: #eee;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 0.3rem;
+}
+
+.ip-progress-fill {
+  height: 100%;
+  background: #f90;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.ip-progress-text {
+  font-size: 0.72rem;
+  color: #888;
+}
+
+.ip-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.ip-timer {
+  font-size: 0.8rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.badge-exam {
+  background: #eef;
+  color: #44c;
+}
+
+.badge-practice {
+  background: #e6f9ed;
+  color: #0a7;
+}
+
+.btn-sm {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.78rem;
+}

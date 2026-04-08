@@ -63,6 +63,31 @@ export interface ExamResult {
   taken_at: string;
 }
 
+export interface InProgressExam {
+  id: string;
+  exam_id: string;
+  exam_title: string;
+  mode: string;
+  answers: Record<string, string | string[]>;
+  flagged: number[];
+  question_order: number[];
+  remaining_seconds: number;
+  current_page: number;
+  total_questions: number;
+  answered_count: number;
+  saved_at: string;
+}
+
+export interface SaveProgressPayload {
+  exam_id: string;
+  mode: string;
+  answers: Record<string, string | string[]>;
+  flagged: number[];
+  question_order: number[];
+  remaining_seconds: number;
+  current_page: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ExamService {
   private base = '/api';
@@ -100,5 +125,25 @@ export class ExamService {
 
   deleteExam(id: string): Observable<{ deleted: boolean }> {
     return this.http.delete<{ deleted: boolean }>(`${this.base}/exams/${id}`);
+  }
+
+  saveProgress(payload: SaveProgressPayload): Observable<InProgressExam> {
+    return this.http.post<InProgressExam>(`${this.base}/in-progress`, payload);
+  }
+
+  listInProgress(): Observable<InProgressExam[]> {
+    return this.http.get<InProgressExam[]>(`${this.base}/in-progress`);
+  }
+
+  getInProgress(id: string): Observable<InProgressExam> {
+    return this.http.get<InProgressExam>(`${this.base}/in-progress/${id}`);
+  }
+
+  deleteInProgress(id: string): Observable<{ deleted: boolean }> {
+    return this.http.delete<{ deleted: boolean }>(`${this.base}/in-progress/${id}`);
+  }
+
+  deleteInProgressByExam(examId: string, mode: string = 'exam'): Observable<{ deleted: boolean }> {
+    return this.http.delete<{ deleted: boolean }>(`${this.base}/in-progress/by-exam/${examId}?mode=${mode}`);
   }
 }

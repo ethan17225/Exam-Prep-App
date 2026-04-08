@@ -1,30 +1,36 @@
 @if (questions().length === 0) {
   <p class="empty-state">Loading exam...</p>
 } @else {
-  <!-- Top bar -->
-  <div class="exam-topbar">
-    <div class="exam-topbar-left">
-      <span class="exam-name">{{ examTitle() }}</span>
-      @if (mode() === 'practice') {
-        <span class="mode-badge practice">Practice</span>
-      } @else {
-        <span class="mode-badge exam">Exam</span>
-      }
-      <span class="progress-text">{{ answeredCount() }}/{{ totalQuestions() }} answered</span>
+  <!-- Sticky exam header -->
+  <div class="exam-header-sticky">
+    <!-- Top bar -->
+    <div class="exam-topbar">
+      <div class="exam-topbar-left">
+        <span class="exam-name">{{ examTitle() }}</span>
+        @if (mode() === 'practice') {
+          <span class="mode-badge practice">Practice</span>
+        } @else {
+          <span class="mode-badge exam">Exam</span>
+        }
+        <span class="progress-text">{{ answeredCount() }}/{{ totalQuestions() }} answered</span>
+      </div>
+      <div class="exam-topbar-right">
+        <span class="timer" [class.timer-warning]="timerWarning()" [class.timer-danger]="timerDanger()">
+          {{ formattedTime() }}
+        </span>
+        <button class="btn btn-save btn-sm" (click)="saveAndExit()" [disabled]="saving() || submitting()">
+          {{ saving() ? 'Saving...' : 'Save & Exit' }}
+        </button>
+        <button class="btn btn-secondary btn-sm" (click)="toggleNav()">
+          {{ showNav() ? 'Hide' : 'Questions' }}
+        </button>
+      </div>
     </div>
-    <div class="exam-topbar-right">
-      <span class="timer" [class.timer-warning]="timerWarning()" [class.timer-danger]="timerDanger()">
-        {{ formattedTime() }}
-      </span>
-      <button class="btn btn-secondary btn-sm" (click)="toggleNav()">
-        {{ showNav() ? 'Hide' : 'Questions' }}
-      </button>
-    </div>
-  </div>
 
-  <!-- Progress bar -->
-  <div class="progress-bar-track">
-    <div class="progress-bar-fill" [style.width.%]="progress()"></div>
+    <!-- Progress bar -->
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" [style.width.%]="progress()"></div>
+    </div>
   </div>
 
   <!-- Question navigator panel -->
@@ -39,7 +45,7 @@
             [class.current]="isOnCurrentPage(i)"
             (click)="goTo(i)"
           >
-            {{ q.number }}
+            {{ i + 1 }}
           </button>
         }
       </div>
@@ -58,7 +64,7 @@
   </div>
 
   <!-- Questions for current page -->
-  @for (q of pageQuestions(); track q.number) {
+  @for (q of pageQuestions(); track q.number; let i = $index) {
     <div
       class="card question-card"
       [class.revealed-correct]="isRevealed(q.number) && isQuestionCorrect(q)"
@@ -79,7 +85,7 @@
         </button>
       </div>
 
-      <p class="question-number">Question {{ q.number }} of {{ totalQuestions() }}</p>
+      <p class="question-number">Question {{ pageStartNum() + i }} of {{ totalQuestions() }}</p>
       <p class="question-text">{{ q.question }}</p>
 
       @if (q.type === 'SATA') {
