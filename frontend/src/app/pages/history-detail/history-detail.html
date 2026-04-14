@@ -20,6 +20,11 @@
       <span>{{ r.correct }} / {{ r.total }} correct</span>
       <span>Time: {{ formattedTime() }}</span>
     </div>
+    <div class="score-type-breakdown">
+      <span class="type-chip type-chip-mcq">MCQ {{ typeCounts().mcq }}</span>
+      <span class="type-chip type-chip-sata">SATA {{ typeCounts().sata }}</span>
+      <span class="type-chip type-chip-fib">FIB {{ typeCounts().fib }}</span>
+    </div>
   </div>
 
   <h2 class="section-title">Review</h2>

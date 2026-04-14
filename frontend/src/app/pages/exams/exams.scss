@@ -1,3 +1,52 @@
+.exams-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+
+  .page-title {
+    margin-bottom: 0;
+  }
+}
+
+.course-filter {
+  flex-shrink: 0;
+}
+
+.course-select {
+  padding: 0.45rem 2rem 0.45rem 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #333;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E") no-repeat right 0.65rem center;
+  background-size: 10px 6px;
+  appearance: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+
+  &:focus {
+    outline: none;
+    border-color: #111;
+  }
+}
+
+.course-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.12rem 0.5rem;
+  border-radius: 4px;
+  background: #f0eaff;
+  color: #6b3fa0;
+  letter-spacing: 0.02em;
+  width: fit-content;
+}
+
 .exam-list {
   display: flex;
   flex-direction: column;
@@ -53,6 +102,35 @@
 .exam-meta {
   font-size: 0.8rem;
   color: #888;
+}
+
+.exam-type-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.exam-type-count {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+
+  &.pill-mcq {
+    background: #e8f0ff;
+    color: #1a4aa0;
+  }
+
+  &.pill-sata {
+    background: #f3e8ff;
+    color: #5b2b8a;
+  }
+
+  &.pill-fib {
+    background: #e8f8f5;
+    color: #088;
+  }
 }
 
 .rename-error {

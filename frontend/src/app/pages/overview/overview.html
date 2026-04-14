@@ -71,7 +71,7 @@
                 (mousedown)="selectTopic(t.topic)"
               >
                 <span class="topic-dropdown-name">{{ t.topic }}</span>
-                <span class="topic-dropdown-score" [class.topic-score-pass]="t.score >= 75" [class.topic-score-fail]="t.score < 75">{{ t.score }}%</span>
+                <span class="topic-dropdown-score" [class.topic-score-pass]="t.score >= 72" [class.topic-score-fail]="t.score < 72">{{ t.score }}%</span>
               </button>
             }
           }
@@ -84,7 +84,7 @@
       <div class="topic-detail">
         <div class="topic-detail-top">
           <span class="topic-name">{{ stat.topic }}</span>
-          <span class="topic-score" [class.topic-score-pass]="stat.score >= 75" [class.topic-score-fail]="stat.score < 75">
+          <span class="topic-score" [class.topic-score-pass]="stat.score >= 72" [class.topic-score-fail]="stat.score < 72">
             {{ stat.score }}%
           </span>
         </div>

@@ -13,14 +13,21 @@
           <span class="mode-badge exam">Exam</span>
         }
         <span class="progress-text">{{ answeredCount() }}/{{ totalQuestions() }} answered</span>
+        <span class="exam-type-summary">
+          <span class="type-chip type-chip-mcq">MCQ {{ typeCounts().mcq }}</span>
+          <span class="type-chip type-chip-sata">SATA {{ typeCounts().sata }}</span>
+          <span class="type-chip type-chip-fib">FIB {{ typeCounts().fib }}</span>
+        </span>
       </div>
       <div class="exam-topbar-right">
         <span class="timer" [class.timer-warning]="timerWarning()" [class.timer-danger]="timerDanger()">
           {{ formattedTime() }}
         </span>
-        <button class="btn btn-save btn-sm" (click)="saveAndExit()" [disabled]="saving() || submitting()">
-          {{ saving() ? 'Saving...' : 'Save & Exit' }}
-        </button>
+        @if (autoSaveStatus() === 'saving') {
+          <span class="auto-save-indicator saving">Saving...</span>
+        } @else if (autoSaveStatus() === 'saved') {
+          <span class="auto-save-indicator saved">Saved</span>
+        }
         <button class="btn btn-secondary btn-sm" (click)="toggleNav()">
           {{ showNav() ? 'Hide' : 'Questions' }}
         </button>

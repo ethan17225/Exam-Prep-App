@@ -1,10 +1,27 @@
-<h1 class="page-title">Available Exams</h1>
+<div class="exams-header">
+  <h1 class="page-title">Available Exams</h1>
+  @if (courses().length > 0) {
+    <div class="course-filter">
+      <select
+        id="course-select"
+        class="course-select"
+        [ngModel]="selectedCourseId()"
+        (ngModelChange)="onCourseChange($event)"
+      >
+        <option value="">All Courses</option>
+        @for (course of courses(); track course.id) {
+          <option [value]="course.id">{{ course.name }}</option>
+        }
+      </select>
+    </div>
+  }
+</div>
 
-@if (exams().length === 0) {
+@if (filteredExams().length === 0) {
   <p class="empty-state">No exams available. Go to <strong>Upload</strong> to add one, or seed the database.</p>
 } @else {
   <div class="exam-list" (click)="closeMenu()">
-    @for (exam of exams(); track exam.id) {
+    @for (exam of filteredExams(); track exam.id) {
       <div
         class="exam-row"
         [class.exam-row--menu-open]="menuOpen() === exam.id"
@@ -31,7 +48,15 @@
               } @else {
                 <span class="exam-title">{{ exam.title }}</span>
               }
+              @if (exam.course_name) {
+                <span class="course-badge">{{ exam.course_name }}</span>
+              }
               <span class="exam-meta">{{ exam.total_questions }} questions</span>
+              <span class="exam-type-counts">
+                <span class="exam-type-count pill-mcq">MCQ {{ exam.mcq_count }}</span>
+                <span class="exam-type-count pill-sata">SATA {{ exam.sata_count }}</span>
+                <span class="exam-type-count pill-fib">FIB {{ exam.fib_count }}</span>
+              </span>
             </div>
             <div class="exam-actions">
               <button class="btn btn-primary btn-sm" (click)="start(exam, 'exam')">Exam</button>

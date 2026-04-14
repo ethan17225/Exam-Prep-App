@@ -41,6 +41,13 @@
         <div class="flashcard-face flashcard-back card">
           <div class="fc-back-label">Answer</div>
           <p class="fc-answer">{{ formatAnswer(q) }}</p>
+          @if (showAnswerOptionContent(q)) {
+            <ul class="fc-answer-content">
+              @for (line of answerOptionContentLines(q); track $index) {
+                <li>{{ line }}</li>
+              }
+            </ul>
+          }
           @if (q.rationale) {
             <div class="fc-rationale">
               <strong>Rationale</strong>

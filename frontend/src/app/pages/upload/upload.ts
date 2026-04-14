@@ -1,7 +1,7 @@
-import { Component, signal } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { ExamService } from '../../services/exam.service';
+import { ExamService, Course } from '../../services/exam.service';
 
 @Component({
   selector: 'app-upload',
@@ -9,13 +9,20 @@ import { ExamService } from '../../services/exam.service';
   templateUrl: './upload.html',
   styleUrl: './upload.scss',
 })
-export class UploadPage {
+export class UploadPage implements OnInit {
   title = signal('');
   jsonText = signal('');
   error = signal('');
   loading = signal(false);
   showExample = signal(false);
   copied = signal(false);
+
+  courses = signal<Course[]>([]);
+  selectedCourseId = signal<string>('');
+  showNewCourse = signal(false);
+  newCourseName = signal('');
+  courseLoading = signal(false);
+  courseError = signal('');
 
   private readonly exampleJson = `[
   {
@@ -61,6 +68,49 @@ export class UploadPage {
     private router: Router,
   ) {}
 
+  ngOnInit(): void {
+    this.loadCourses();
+  }
+
+  loadCourses(): void {
+    this.examService.listCourses().subscribe((data) => this.courses.set(data));
+  }
+
+  onCourseSelectChange(value: string): void {
+    if (value === '__new__') {
+      this.showNewCourse.set(true);
+      this.selectedCourseId.set('');
+    } else {
+      this.showNewCourse.set(false);
+      this.newCourseName.set('');
+      this.courseError.set('');
+      this.selectedCourseId.set(value);
+    }
+  }
+
+  createNewCourse(): void {
+    const name = this.newCourseName().trim();
+    if (!name) {
+      this.courseError.set('Course name cannot be empty.');
+      return;
+    }
+    this.courseLoading.set(true);
+    this.courseError.set('');
+    this.examService.createCourse(name).subscribe({
+      next: (course) => {
+        this.courseLoading.set(false);
+        this.courses.set([...this.courses(), course]);
+        this.selectedCourseId.set(course.id);
+        this.showNewCourse.set(false);
+        this.newCourseName.set('');
+      },
+      error: (err) => {
+        this.courseLoading.set(false);
+        this.courseError.set(err?.error?.detail || 'Failed to create course.');
+      },
+    });
+  }
+
   copyExample(): void {
     navigator.clipboard.writeText(this.exampleJson).then(() => {
       this.copied.set(true);
@@ -88,6 +138,10 @@ export class UploadPage {
     const titleVal = this.title().trim();
     const jsonVal = this.jsonText().trim();
 
+    if (!this.selectedCourseId()) {
+      this.error.set('Please select a course.');
+      return;
+    }
     if (!titleVal) {
       this.error.set('Please enter an exam title.');
       return;
@@ -107,7 +161,7 @@ export class UploadPage {
     }
 
     this.loading.set(true);
-    this.examService.createExam(titleVal, questions as never[]).subscribe({
+    this.examService.createExam(titleVal, questions as never[], this.selectedCourseId()).subscribe({
       next: () => {
         this.loading.set(false);
         this.router.navigate(['/exams']);

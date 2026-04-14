@@ -25,6 +25,16 @@ def export_seed(path: pathlib.Path | None = None) -> None:
     """Write exams and questions from the database to a JSON seed file."""
     path = path or SEED_FILE
     Base.metadata.create_all(bind=engine)
+
+    from sqlalchemy import text, inspect as sa_inspect
+    with engine.connect() as conn:
+        exam_cols = [c["name"] for c in sa_inspect(engine).get_columns("exams")]
+        if "course_id" not in exam_cols:
+            conn.execute(text(
+                "ALTER TABLE exams ADD COLUMN course_id VARCHAR(8) REFERENCES courses(id) ON DELETE SET NULL"
+            ))
+            conn.commit()
+
     db = SessionLocal()
     try:
         exams = sorted(db.query(Exam).all(), key=_exam_sort_key)
@@ -56,9 +66,30 @@ def export_seed(path: pathlib.Path | None = None) -> None:
 
 def seed():
     Base.metadata.create_all(bind=engine)
+
+    # Ensure course_id column exists on the exams table (may run before main.py migration)
+    from sqlalchemy import text, inspect as sa_inspect
+    from models import Course
+
+    with engine.connect() as conn:
+        exam_cols = [c["name"] for c in sa_inspect(engine).get_columns("exams")]
+        if "course_id" not in exam_cols:
+            conn.execute(text(
+                "ALTER TABLE exams ADD COLUMN course_id VARCHAR(8) REFERENCES courses(id) ON DELETE SET NULL"
+            ))
+            conn.commit()
+
     db = SessionLocal()
 
     try:
+        # Ensure default course exists
+        default_course = db.query(Course).filter(Course.name == "Lab 4").first()
+        if not default_course:
+            default_course = Course(id=str(uuid4())[:8], name="Lab 4", created_at=datetime.now())
+            db.add(default_course)
+            db.commit()
+            db.refresh(default_course)
+
         existing = db.query(Exam).count()
         if existing:
             print(f"Database already has {existing} exam(s) — skipping seed.")
@@ -66,12 +97,19 @@ def seed():
 
         data = json.loads(SEED_FILE.read_text(encoding="utf-8"))
 
-        for key in sorted(data.keys()):
+        def _seed_key_order(k: str) -> tuple[int, str]:
+            m = re.fullmatch(r"exam(\d+)", k)
+            if m:
+                return (int(m.group(1)), k)
+            return (10**9, k)
+
+        for key in sorted(data.keys(), key=_seed_key_order):
             exam_number = key.replace("exam", "")
             exam_id = str(uuid4())[:8]
             exam = Exam(
                 id=exam_id,
                 title=f"Exam {exam_number}",
+                course_id=default_course.id,
                 created_at=datetime.now(),
             )
             db.add(exam)

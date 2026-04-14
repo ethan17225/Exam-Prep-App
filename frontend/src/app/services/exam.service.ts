@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 export interface Question {
@@ -12,10 +12,61 @@ export interface Question {
   rationale?: string;
 }
 
+export interface QuestionTypeCounts {
+  mcq: number;
+  sata: number;
+  fib: number;
+}
+
+/** Classify a question the same way as take-exam and server grading. */
+export function classifyQuestionType(q: { type: string; options?: string[] | null }): 'MCQ' | 'SATA' | 'FIB' {
+  const t = (q.type ?? '').trim();
+  if (t === 'SATA') return 'SATA';
+  if (t === 'FIB' || t === 'Fill-in-the-blank' || !q.options || q.options.length === 0) return 'FIB';
+  return 'MCQ';
+}
+
+export function countQuestionTypes<T extends { type: string; options?: string[] | null }>(questions: T[]): QuestionTypeCounts {
+  const out: QuestionTypeCounts = { mcq: 0, sata: 0, fib: 0 };
+  for (const q of questions) {
+    const g = classifyQuestionType(q);
+    if (g === 'MCQ') out.mcq += 1;
+    else if (g === 'SATA') out.sata += 1;
+    else out.fib += 1;
+  }
+  return out;
+}
+
+export interface Course {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface DocumentItem {
+  filename: string;
+  title: string;
+  pdf_url: string;
+  html_url: string | null;
+  size_bytes: number;
+  course_id: string | null;
+  course_name: string | null;
+}
+
+export interface DocumentContent {
+  title: string;
+  html: string;
+}
+
 export interface ExamSummary {
   id: string;
   title: string;
+  course_id: string | null;
+  course_name: string | null;
   total_questions: number;
+  mcq_count: number;
+  sata_count: number;
+  fib_count: number;
   created_at: string;
 }
 
@@ -28,6 +79,7 @@ export interface ExamDetail {
 export interface AnswerSubmission {
   question_number: number;
   answer: string | string[];
+  fib_correct?: boolean | null;
 }
 
 export interface SubmissionPayload {
@@ -76,7 +128,26 @@ export interface InProgressExam {
   current_page: number;
   total_questions: number;
   answered_count: number;
+  started_at: string | null;
   saved_at: string;
+}
+
+export interface AdminDashboardItem {
+  id: string;
+  exam_id: string;
+  exam_title: string;
+  mode: string;
+  total_questions: number;
+  answered_count: number;
+  remaining_count: number;
+  correct_count: number;
+  wrong_count: number;
+  score_percent: number;
+  started_at: string | null;
+  saved_at: string;
+  seconds_since_last_answer: number;
+  seconds_since_start: number | null;
+  remaining_seconds: number;
 }
 
 export interface SaveProgressPayload {
@@ -95,12 +166,35 @@ export class ExamService {
 
   constructor(private http: HttpClient) {}
 
-  createExam(title: string, questions: Question[]): Observable<{ exam_id: string; total_questions: number }> {
-    return this.http.post<{ exam_id: string; total_questions: number }>(`${this.base}/exams`, { title, questions });
+  createExam(title: string, questions: Question[], courseId?: string): Observable<{ exam_id: string; total_questions: number }> {
+    const body: Record<string, unknown> = { title, questions };
+    if (courseId) body['course_id'] = courseId;
+    return this.http.post<{ exam_id: string; total_questions: number }>(`${this.base}/exams`, body);
   }
 
-  listExams(): Observable<ExamSummary[]> {
-    return this.http.get<ExamSummary[]>(`${this.base}/exams`);
+  listExams(courseId?: string): Observable<ExamSummary[]> {
+    let params = new HttpParams();
+    if (courseId) params = params.set('course_id', courseId);
+    return this.http.get<ExamSummary[]>(`${this.base}/exams`, { params });
+  }
+
+  listCourses(): Observable<Course[]> {
+    return this.http.get<Course[]>(`${this.base}/courses`);
+  }
+
+  createCourse(name: string): Observable<Course> {
+    return this.http.post<Course>(`${this.base}/courses`, { name });
+  }
+
+  listDocuments(courseId?: string): Observable<DocumentItem[]> {
+    let params = new HttpParams();
+    if (courseId) params = params.set('course_id', courseId);
+    return this.http.get<DocumentItem[]>(`${this.base}/documents`, { params });
+  }
+
+  getDocumentContent(docUrl: string): Observable<DocumentContent> {
+    const params = new HttpParams().set('path', docUrl);
+    return this.http.get<DocumentContent>(`${this.base}/documents/html`, { params });
   }
 
   getExam(id: string, includeAnswers: boolean = false): Observable<ExamDetail> {
@@ -150,5 +244,9 @@ export class ExamService {
 
   deleteInProgressByExam(examId: string, mode: string = 'exam'): Observable<{ deleted: boolean }> {
     return this.http.delete<{ deleted: boolean }>(`${this.base}/in-progress/by-exam/${examId}?mode=${mode}`);
+  }
+
+  getAdminDashboard(): Observable<AdminDashboardItem[]> {
+    return this.http.get<AdminDashboardItem[]>(`${this.base}/admin/dashboard`);
   }
 }

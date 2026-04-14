@@ -1,0 +1,347 @@
+.docs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+
+  .page-title {
+    margin-bottom: 0;
+  }
+}
+
+.course-filter {
+  flex-shrink: 0;
+}
+
+.course-select {
+  padding: 0.45rem 2rem 0.45rem 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #333;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E") no-repeat right 0.65rem center;
+  background-size: 10px 6px;
+  appearance: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+
+  &:focus {
+    outline: none;
+    border-color: #111;
+  }
+}
+
+// ── Document Groups ──────────────────────────────────────────────
+
+.doc-group {
+  margin-bottom: 1.75rem;
+}
+
+.doc-group-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.doc-group-icon {
+  font-size: 1.1rem;
+}
+
+.doc-group-count {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #999;
+  margin-left: auto;
+}
+
+// ── Document Cards ───────────────────────────────────────────────
+
+.doc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.doc-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+
+  &:hover {
+    border-color: #bbb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+}
+
+.doc-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8f6ff;
+  border-radius: 8px;
+}
+
+.doc-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.doc-title {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: #222;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-meta {
+  font-size: 0.75rem;
+  color: #999;
+}
+
+.doc-actions {
+  flex-shrink: 0;
+}
+
+// ── Viewer Overlay ───────────────────────────────────────────────
+
+.viewer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.viewer-container {
+  width: 100%;
+  max-width: 820px;
+  height: 92vh;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid #e8e8e8;
+  background: #fafafa;
+  flex-shrink: 0;
+}
+
+.viewer-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #222;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.viewer-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.viewer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.viewer-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  height: 100%;
+  color: #999;
+  font-size: 0.9rem;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #e8e8e8;
+  border-top-color: #666;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.viewer-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  height: 100%;
+  color: #c00;
+  font-size: 0.9rem;
+}
+
+// ── Document Content Styling ─────────────────────────────────────
+
+.doc-content {
+  padding: 2rem 2.5rem;
+  font-size: 0.92rem;
+  line-height: 1.75;
+  color: #2a2a2a;
+  max-width: 100%;
+
+  // Page sections
+  ::ng-deep .doc-page {
+    margin-bottom: 2.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px dashed #e0e0e0;
+
+    &:last-child {
+      border-bottom: none;
+      margin-bottom: 1rem;
+    }
+  }
+
+  ::ng-deep .doc-page-header {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #aaa;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  // Headings extracted from PDF
+  ::ng-deep .doc-heading {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #111;
+    margin: 1.5rem 0 0.65rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 2px solid #eee;
+    line-height: 1.4;
+  }
+
+  ::ng-deep .doc-subheading {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 1.25rem 0 0.5rem;
+    line-height: 1.4;
+  }
+
+  // List items
+  ::ng-deep .doc-list-item {
+    padding-left: 1.25rem;
+    position: relative;
+    margin: 0.3rem 0;
+    line-height: 1.65;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0.25rem;
+      top: 0.65em;
+      width: 4px;
+      height: 4px;
+      background: #999;
+      border-radius: 50%;
+    }
+  }
+
+  // Paragraphs
+  ::ng-deep p {
+    margin: 0.3rem 0;
+    line-height: 1.7;
+  }
+
+  // Bold = key concepts → add subtle highlight
+  ::ng-deep strong {
+    font-weight: 700;
+    color: #111;
+    background: linear-gradient(to bottom, transparent 60%, rgba(255, 220, 100, 0.3) 60%);
+    padding: 0 1px;
+  }
+
+  // Italic
+  ::ng-deep em {
+    font-style: italic;
+    color: #444;
+  }
+}
+
+// ── Responsive ───────────────────────────────────────────────────
+
+@media (max-width: 600px) {
+  .doc-card {
+    flex-wrap: wrap;
+  }
+
+  .doc-actions {
+    width: 100%;
+    margin-top: 0.25rem;
+  }
+
+  .viewer-overlay {
+    padding: 0;
+  }
+
+  .viewer-container {
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .viewer-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .doc-content {
+    padding: 1.25rem 1rem;
+  }
+}

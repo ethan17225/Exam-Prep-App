@@ -1,0 +1,68 @@
+<h1 class="page-title">Admin Dashboard</h1>
+<p class="subtitle">Live exam monitoring &mdash; auto-refreshes every 3 seconds</p>
+
+@if (items().length === 0) {
+  <div class="empty-state">
+    <p>No exams in progress right now.</p>
+  </div>
+} @else {
+  <div class="dashboard-grid">
+    @for (item of items(); track item.id) {
+      <div class="card dash-card">
+        <div class="dash-header">
+          <span class="dash-title">{{ item.exam_title }}</span>
+          <span class="mode-badge" [class.exam]="item.mode !== 'practice'" [class.practice]="item.mode === 'practice'">
+            {{ item.mode === 'practice' ? 'Practice' : 'Exam' }}
+          </span>
+        </div>
+
+        <div class="progress-section">
+          <div class="progress-track">
+            <div class="progress-fill" [style.width.%]="progressPercent(item)"></div>
+          </div>
+          <span class="progress-label">{{ item.answered_count }} / {{ item.total_questions }} answered ({{ progressPercent(item) }}%)</span>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat">
+            <span class="stat-value done">{{ item.answered_count }}</span>
+            <span class="stat-label">Done</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value remaining">{{ item.remaining_count }}</span>
+            <span class="stat-label">Remaining</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value correct">{{ item.correct_count }}</span>
+            <span class="stat-label">Correct</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value wrong">{{ item.wrong_count }}</span>
+            <span class="stat-label">Wrong</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value score" [class.score-pass]="item.score_percent >= 72" [class.score-fail]="item.score_percent < 72 && item.answered_count > 0">
+              {{ item.score_percent }}%
+            </span>
+            <span class="stat-label">Score</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value timer">{{ formatTimerRemaining(item.remaining_seconds) }}</span>
+            <span class="stat-label">Timer Left</span>
+          </div>
+        </div>
+
+        <div class="time-row">
+          <div class="time-item">
+            <span class="time-label">Idle</span>
+            <span class="time-value idle">{{ getIdleDuration(item) }}</span>
+          </div>
+          <div class="time-item">
+            <span class="time-label">Elapsed</span>
+            <span class="time-value elapsed">{{ getElapsedDuration(item) }}</span>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+}

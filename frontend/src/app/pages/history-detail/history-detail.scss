@@ -32,6 +32,36 @@
   color: #777;
 }
 
+.score-type-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+}
+
+.type-chip {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.12rem 0.45rem;
+  border-radius: 4px;
+}
+
+.type-chip-mcq {
+  background: #eef;
+  color: #44c;
+}
+
+.type-chip-sata {
+  background: #f3e8ff;
+  color: #5b2b8a;
+}
+
+.type-chip-fib {
+  background: #e8f8f5;
+  color: #088;
+}
+
 .section-title {
   font-size: 1.1rem;
   font-weight: 700;

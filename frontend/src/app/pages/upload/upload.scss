@@ -12,6 +12,59 @@
   margin-bottom: 0.4rem;
 }
 
+.course-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.course-select {
+  width: 100%;
+  padding: 0.55rem 2rem 0.55rem 0.8rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #333;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E") no-repeat right 0.65rem center;
+  background-size: 10px 6px;
+  appearance: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+
+  &:focus {
+    outline: none;
+    border-color: #111;
+  }
+}
+
+.new-course-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.new-course-input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.88rem;
+  transition: border-color 0.15s;
+
+  &:focus {
+    outline: none;
+    border-color: #111;
+  }
+}
+
+.course-error {
+  font-size: 0.78rem;
+  color: #c00;
+}
+
 .upload-actions {
   display: flex;
   gap: 0.75rem;

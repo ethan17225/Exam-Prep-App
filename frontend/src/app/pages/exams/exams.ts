@@ -1,7 +1,7 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { ExamService, ExamSummary } from '../../services/exam.service';
+import { ExamService, ExamSummary, Course } from '../../services/exam.service';
 
 @Component({
   selector: 'app-exams',
@@ -11,6 +11,8 @@ import { ExamService, ExamSummary } from '../../services/exam.service';
 })
 export class ExamsPage implements OnInit {
   exams = signal<ExamSummary[]>([]);
+  courses = signal<Course[]>([]);
+  selectedCourseId = signal<string>('');
   titleDrafts = signal<Record<string, string>>({});
   questionCounts = signal<Record<string, number>>({});
   loadingRename = signal<Record<string, boolean>>({});
@@ -18,13 +20,25 @@ export class ExamsPage implements OnInit {
   menuOpen = signal<string | null>(null);
   editMode = signal<Record<string, 'rename' | 'count' | null>>({});
 
+  filteredExams = computed(() => {
+    const courseId = this.selectedCourseId();
+    const all = this.exams();
+    if (!courseId) return all;
+    return all.filter((e) => e.course_id === courseId);
+  });
+
   constructor(
     private examService: ExamService,
     private router: Router,
   ) {}
 
   ngOnInit(): void {
+    this.loadCourses();
     this.load();
+  }
+
+  loadCourses(): void {
+    this.examService.listCourses().subscribe((data) => this.courses.set(data));
   }
 
   load(): void {
@@ -39,6 +53,10 @@ export class ExamsPage implements OnInit {
       this.titleDrafts.set(titleDrafts);
       this.questionCounts.set(counts);
     });
+  }
+
+  onCourseChange(courseId: string): void {
+    this.selectedCourseId.set(courseId);
   }
 
   start(exam: ExamSummary, mode: 'exam' | 'practice'): void {

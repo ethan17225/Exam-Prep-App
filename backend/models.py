@@ -6,13 +6,25 @@ from sqlalchemy.orm import relationship
 from database import Base
 
 
+class Course(Base):
+    __tablename__ = "courses"
+
+    id = Column(String(8), primary_key=True)
+    name = Column(String(255), nullable=False, unique=True)
+    created_at = Column(DateTime, nullable=False)
+
+    exams = relationship("Exam", back_populates="course")
+
+
 class Exam(Base):
     __tablename__ = "exams"
 
     id = Column(String(8), primary_key=True)
+    course_id = Column(String(8), ForeignKey("courses.id", ondelete="SET NULL"), nullable=True)
     title = Column(String(255), nullable=False)
     created_at = Column(DateTime, nullable=False)
 
+    course = relationship("Course", back_populates="exams")
     questions = relationship("Question", back_populates="exam", cascade="all, delete-orphan", order_by="Question.number")
 
 
@@ -46,6 +58,7 @@ class InProgressExam(Base):
     current_page = Column(Integer, nullable=False, default=0)
     total_questions = Column(Integer, nullable=False)
     answered_count = Column(Integer, nullable=False, default=0)
+    started_at = Column(DateTime, nullable=True)
     saved_at = Column(DateTime, nullable=False)
 
     exam = relationship("Exam")

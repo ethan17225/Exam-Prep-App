@@ -1,7 +1,13 @@
 import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { ExamService, Question, AnswerSubmission, InProgressExam } from '../../services/exam.service';
+import {
+  ExamService,
+  Question,
+  AnswerSubmission,
+  InProgressExam,
+  countQuestionTypes,
+} from '../../services/exam.service';
 
 @Component({
   selector: 'app-take-exam',
@@ -15,8 +21,8 @@ export class TakeExamPage implements OnInit, OnDestroy {
   answers = signal<Map<number, string | string[]>>(new Map());
   flagged = signal<Set<number>>(new Set());
   submitting = signal(false);
-  saving = signal(false);
   showNav = signal(false);
+  autoSaveStatus = signal<'idle' | 'saving' | 'saved'>('idle');
 
   mode = signal<'exam' | 'practice'>('exam');
   remainingSeconds = signal(180 * 60);
@@ -28,11 +34,13 @@ export class TakeExamPage implements OnInit, OnDestroy {
   fibUserMarked = signal<Map<number, boolean>>(new Map());
 
   private timerInterval: ReturnType<typeof setInterval> | null = null;
+  private autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
   private examId = '';
   private resumeId: string | null = null;
   private selectedQuestionCount: number | null = null;
 
   totalQuestions = computed(() => this.questions().length);
+  typeCounts = computed(() => countQuestionTypes(this.questions()));
   answeredCount = computed(() => this.answers().size);
   progress = computed(() =>
     this.totalQuestions() > 0 ? Math.round((this.answeredCount() / this.totalQuestions()) * 100) : 0,
@@ -89,6 +97,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
           : shuffled.length;
         this.questions.set(shuffled.slice(0, takeCount));
         this.startTimer();
+        this.persistProgress();
       }
     });
   }
@@ -125,6 +134,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.timerInterval) clearInterval(this.timerInterval);
+    if (this.autoSaveTimeout) clearTimeout(this.autoSaveTimeout);
   }
 
   private shuffle<T>(arr: T[]): T[] {
@@ -178,6 +188,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
     const map = new Map(this.answers());
     map.set(qNum, letter);
     this.answers.set(map);
+    this.scheduleAutoSave();
 
     if (this.mode() === 'practice') {
       this.revealQuestion(qNum);
@@ -193,12 +204,14 @@ export class TakeExamPage implements OnInit, OnDestroy {
     const updated = idx >= 0 ? current.filter((c) => c !== letter) : [...current, letter];
     map.set(qNum, updated);
     this.answers.set(map);
+    this.scheduleAutoSave();
   }
 
   setTextAnswer(qNum: number, value: string): void {
     const map = new Map(this.answers());
     map.set(qNum, value);
     this.answers.set(map);
+    this.scheduleAutoSave();
   }
 
   getAnswer(qNum: number): string | string[] | undefined {
@@ -233,7 +246,8 @@ export class TakeExamPage implements OnInit, OnDestroy {
   isCorrectOption(q: Question, option: string): boolean {
     const letter = option.charAt(0);
     if (Array.isArray(q.answer)) return q.answer.includes(letter);
-    return q.answer === letter;
+    const letters = String(q.answer ?? '').split(',').map((s) => s.trim());
+    return letters.includes(letter);
   }
 
   isQuestionCorrect(q: Question): boolean {
@@ -243,9 +257,12 @@ export class TakeExamPage implements OnInit, OnDestroy {
     if (!q.answer) return false;
     const answer = this.getAnswer(q.number);
     if (q.type === 'SATA') {
-      const expected: Set<string> = new Set(Array.isArray(q.answer) ? q.answer : [q.answer]);
+      const expectedArr = Array.isArray(q.answer)
+        ? q.answer
+        : String(q.answer).split(',').map((s) => s.trim());
+      const expected = new Set(expectedArr);
       const userArr = Array.isArray(answer) ? answer : [];
-      const userSet: Set<string> = new Set(userArr);
+      const userSet = new Set(userArr);
       return expected.size === userSet.size && [...expected].every((e) => userSet.has(e));
     }
     return answer === (Array.isArray(q.answer) ? q.answer[0] : q.answer);
@@ -281,6 +298,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
     if (s.has(qNum)) s.delete(qNum);
     else s.add(qNum);
     this.flagged.set(s);
+    this.scheduleAutoSave();
   }
 
   isFlagged(qNum: number): boolean {
@@ -294,11 +312,16 @@ export class TakeExamPage implements OnInit, OnDestroy {
     return ans !== '';
   }
 
-  // ── Save & Exit ─────────────────────────────────────────────
+  // ── Auto-save ──────────────────────────────────────────────
 
-  saveAndExit(): void {
-    if (this.saving()) return;
-    this.saving.set(true);
+  private scheduleAutoSave(): void {
+    if (this.autoSaveTimeout) clearTimeout(this.autoSaveTimeout);
+    this.autoSaveTimeout = setTimeout(() => this.persistProgress(), 500);
+  }
+
+  private persistProgress(): void {
+    if (this.questions().length === 0) return;
+    this.autoSaveStatus.set('saving');
 
     const answersObj: Record<string, string | string[]> = {};
     for (const [key, val] of this.answers()) {
@@ -317,14 +340,12 @@ export class TakeExamPage implements OnInit, OnDestroy {
       })
       .subscribe({
         next: () => {
-          this.saving.set(false);
-          if (this.timerInterval) clearInterval(this.timerInterval);
-          this.router.navigate(['/in-progress']);
+          this.autoSaveStatus.set('saved');
+          setTimeout(() => {
+            if (this.autoSaveStatus() === 'saved') this.autoSaveStatus.set('idle');
+          }, 2000);
         },
-        error: () => {
-          this.saving.set(false);
-          alert('Failed to save progress. Please try again.');
-        },
+        error: () => this.autoSaveStatus.set('idle'),
       });
   }
 
@@ -344,6 +365,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
     const subs: AnswerSubmission[] = this.questions().map((q) => ({
       question_number: q.number,
       answer: this.answers().get(q.number) ?? (q.type === 'SATA' ? [] : ''),
+      fib_correct: this.getFibMark(q.number) ?? null,
     }));
 
     this.examService

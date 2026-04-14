@@ -133,3 +133,19 @@ textarea {
   font-size: 0.8rem;
   line-height: 1.5;
 }
+
+select {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  background: #fff;
+  color: #111;
+  transition: border-color 0.15s;
+
+  &:focus {
+    outline: none;
+    border-color: #111;
+  }
+}

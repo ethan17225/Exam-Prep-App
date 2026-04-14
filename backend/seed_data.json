@@ -10708,5 +10708,912 @@
       "answer": "B",
       "rationale": "An incident report is a legal, internal risk-management document. It must contain only objective, factual observations and assessments without assigning blame, making assumptions, or offering excuses. Crucially, the filing of an incident report should NEVER be mentioned in the client's actual medical record to protect the document from legal discovery."
     }
+  ],
+  "exam10": [
+    {
+      "number": 1,
+      "topic": "Adult Nutrition / Gastrointestinal",
+      "type": "MCQ",
+      "question": "A client scheduled for elective bowel surgery is prescribed total parenteral nutrition (TPN) prior to the procedure. The nurse understands that a primary goal of TPN in this setting is to achieve which outcome?",
+      "rationale": "By bypassing the gastrointestinal tract entirely, TPN decreases fecal bulk and provides necessary bowel rest while optimizing nutritional status prior to surgery.",
+      "options": [
+        "A. Increasing gastric motility",
+        "B. Decreasing fecal bulk",
+        "C. Stimulating oral intake",
+        "D. Restoring normal bowel flora"
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 2,
+      "topic": "Pediatric",
+      "type": "MCQ",
+      "question": "Thick mucous gland secretions, elevated sweat electrolytes, meconium ileus, and difficulty maintaining and gaining weight are associated with which autosomal recessive disorder?",
+      "rationale": "Cystic fibrosis is an autosomal recessive genetic disorder that affects exocrine gland function, resulting in thick mucus, meconium ileus, and elevated sweat electrolytes.",
+      "options": [
+        "A. Cerebral palsy",
+        "B. Cystic fibrosis",
+        "C. Muscular dystrophy",
+        "D. Multiple sclerosis"
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 3,
+      "topic": "Dosage Calculation",
+      "type": "FIB",
+      "question": "A client is ordered to receive Ondansetron 12 mg PO. The available medication is supplied as a liquid concentration of 4 mg/5 mL. How many mL will the nurse administer? (Fill in the blank)",
+      "rationale": "Using the formula (Desired / Have) x Quantity: (12 mg / 4 mg) x 5 mL = 3 x 5 mL = 15 mL.",
+      "options": null,
+      "answer": "15"
+    },
+    {
+      "number": 4,
+      "topic": "Dosage Calculation",
+      "type": "FIB",
+      "question": "The physician orders a medication dose of 0.05 mg. The pharmacy supplies the medication in micrograms (mcg). How many mcg will the nurse administer? (Fill in the blank)",
+      "rationale": "To convert milligrams to micrograms, multiply by 1,000 (move the decimal point three places to the right). Therefore, 0.05 mg x 1,000 = 50 mcg.",
+      "options": null,
+      "answer": "50"
+    },
+    {
+      "number": 5,
+      "topic": "Dosage Calculation",
+      "type": "FIB",
+      "question": "A client is prescribed 1000 mL of 0.9% Normal Saline to infuse over 8 hours. The drop factor of the manual IV tubing is 15 gtt/mL. How many drops per minute (gtt/min) should the nurse regulate the IV to infuse? (Round to the nearest whole number; Fill in the blank)",
+      "rationale": "Total Volume (1000 mL) / Time in minutes (480 minutes) x Drop Factor (15 gtt/mL) = 31.25. Rounded to the nearest whole number is 31 gtt/min.[1]",
+      "options": null,
+      "answer": "31"
+    },
+    {
+      "number": 6,
+      "topic": "Dosage Calculation",
+      "type": "FIB",
+      "question": "A pediatric client weighing 44 lbs is prescribed oral amoxicillin at 40 mg/kg/day divided into two equal doses. How many mg will the child receive per single dose? (Fill in the blank)",
+      "rationale": "First, convert lbs to kg: 44 lbs / 2.2 = 20 kg. Total daily dose: 20 kg x 40 mg/kg = 800 mg/day. Divided into two doses: 800 mg / 2 = 400 mg/dose.[2]",
+      "options": null,
+      "answer": "400"
+    },
+    {
+      "number": 7,
+      "topic": "Dosage Calculation",
+      "type": "FIB",
+      "question": "A client with schizophrenia and psychogenic polydipsia is placed on a strict fluid restriction of 1.2 Liters per day. For breakfast, the client consumed 240 mL of water and 120 mL of apple juice. At lunch, the client drank 300 mL of broth. How many mL of fluid is the client allowed for the remainder of the day? (Fill in the blank)",
+      "rationale": "Total restriction is 1.2 L, which is 1200 mL. Fluid consumed so far: 240 + 120 + 300 = 660 mL. Remaining allowed volume: 1200 mL - 660 mL = 540 mL.[3]",
+      "options": null,
+      "answer": "540"
+    },
+    {
+      "number": 8,
+      "topic": "Dosage Calculation",
+      "type": "FIB",
+      "question": "The nurse is preparing to administer heparin 5,000 units subcutaneously. The vial is labeled 10,000 units/mL. How many mL will the nurse draw up in the syringe? (Enter numeric value only, including a leading zero; Fill in the blank)",
+      "rationale": "Using the formula Desired / Have = Volume. 5,000 units / 10,000 units/mL = 0.5 mL.",
+      "options": null,
+      "answer": "0.5"
+    },
+    {
+      "number": 9,
+      "topic": "Maternal-Newborn",
+      "type": "MCQ",
+      "question": "According to the Society of Obstetricians and Gynaecologists of Canada (SOGC) guidelines, which method should the nurse utilize to accurately assess blood loss during a postpartum hemorrhage?",
+      "rationale": "Quantitative blood loss measurement should replace visual estimated blood loss to ensure accurate hemorrhage staging.[4]",
+      "options": [
+        "A. Visual estimation of blood pooled on bed pads",
+        "B. Quantitative blood loss measurement by weighing soaked materials",
+        "C. Evaluating the percentage drop in maternal hematocrit",
+        "D. Assessing the client's subjective report of clot size"
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 10,
+      "topic": "Maternal-Newborn Pharmacology",
+      "type": "MCQ",
+      "question": "The interdisciplinary team is managing a severe postpartum hemorrhage. The nurse is preparing the first-line uterotonic, oxytocin. What is the maximum recommended single dose for rapid intravenous injection according to SOGC?",
+      "rationale": "The maximum single dose of oxytocin should be 3 IU via rapid IV injection, or 10 IU via the intramuscular route.[4]",
+      "options": [
+        "A. 3 IU",
+        "B. 10 IU",
+        "C. 20 IU",
+        "D. 40 IU"
+      ],
+      "answer": "A"
+    },
+    {
+      "number": 11,
+      "topic": "Maternal-Newborn Pharmacology",
+      "type": "FIB",
+      "question": "A physician orders misoprostol for a client experiencing postpartum hemorrhage. According to SOGC guidelines, which routes of administration are appropriate for this medication?",
+      "rationale": "SOGC guidelines state that misoprostol should only be used sublingually or orally for the prevention and treatment of postpartum hemorrhage to ensure rapid mucosal absorption.[4]",
+      "options": null,
+      "answer": "Sublingual or oral"
+    },
+    {
+      "number": 12,
+      "topic": "Maternal-Newborn",
+      "type": "FIB",
+      "question": "A client is experiencing a massive Stage 3 postpartum hemorrhage. Laboratory results indicate a fibrinogen level of 1.5 g/L. What is the nurse's priority action?",
+      "rationale": "Fibrinogen levels should be measured in every moderate to severe case of PPH, and if the level falls below 2 g/L, it must be replaced immediately to prevent disseminated intravascular coagulation.[4]",
+      "options": null,
+      "answer": "Prepare to administer fibrinogen replacement therapy."
+    },
+    {
+      "number": 13,
+      "topic": "Maternal-Newborn",
+      "type": "MCQ",
+      "question": "In the absence of timely laboratory results during a severe postpartum hemorrhage, the massive hemorrhage protocol dictates that red blood cells, fresh frozen plasma, and platelets should be transfused in what ratio?",
+      "rationale": "A massive hemorrhage protocol with ratios of red blood cells to fresh frozen plasma to platelets of 1:1:1 or 2:1:1 can be used in the absence of timely lab results.[4]",
+      "options": [
+        "A. 1:1:1",
+        "B. 3:1:0",
+        "C. 2:2:4",
+        "D. 4:1:1"
+      ],
+      "answer": "A"
+    },
+    {
+      "number": 14,
+      "topic": "Maternal-Newborn",
+      "type": "MCQ",
+      "question": "The nurse notes a continuous trickle of bright red vaginal blood and a soft, boggy uterus 30 minutes after delivery. What is the nurse's initial, priority action?",
+      "rationale": "Uterine atony is the most common cause of postpartum hemorrhage; the absolute first physical intervention is to firmly massage the fundus to stimulate muscle contraction.",
+      "options": [
+        "A. Administer ordered methylergonovine.",
+        "B. Firmly massage the uterine fundus.",
+        "C. Notify the primary healthcare provider.",
+        "D. Insert an indwelling urinary catheter."
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 15,
+      "topic": "Maternal-Newborn",
+      "type": "FIB",
+      "question": "During a routine postpartum assessment, the nurse suspects the client has a distended bladder. Which clinical finding uniquely supports this assessment?",
+      "rationale": "A full, distended bladder displaces the uterus upwards and laterally (usually to the right side), preventing it from contracting and thereby increasing the risk of uterine atony and hemorrhage.",
+      "options": null,
+      "answer": "A boggy fundus deviated laterally to the right side."
+    },
+    {
+      "number": 16,
+      "topic": "Maternal-Newborn",
+      "type": "MCQ",
+      "question": "During labor, the electronic fetal monitor displays late decelerations corresponding with uterine contractions. What is the underlying physiological cause of this ominous pattern?",
+      "rationale": "Late decelerations (drops in fetal heart rate occurring after the peak of a contraction) indicate that the placenta is failing to provide adequate oxygen to the fetus during the stress of a contraction.",
+      "options": [
+        "A. Fetal head compression against the maternal pelvis",
+        "B. Uteroplacental insufficiency causing fetal hypoxia",
+        "C. Umbilical cord compression during uterine contractions",
+        "D. Normal physiological fetal sleep cycle"
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 17,
+      "topic": "Maternal-Newborn",
+      "type": "MCQ",
+      "question": "The fetal monitor displays abrupt, V-shaped variable decelerations that drop independently of the contraction timing. What is the physiological cause of this pattern?",
+      "rationale": "Variable decelerations are typically caused by the mechanical compression of the umbilical cord (e.g., nuchal cord or oligohydramnios), obstructing fetal blood flow.",
+      "options": [
+        "A. Umbilical cord compression",
+        "B. Fetal head compression",
+        "C. Uteroplacental insufficiency",
+        "D. Maternal dehydration"
+      ],
+      "answer": "A"
+    },
+    {
+      "number": 18,
+      "topic": "Pediatric Endocrine",
+      "type": "MCQ",
+      "question": "The parents of a child with Type 1 Diabetes ask for guidelines on sick day management. How frequently should the nurse instruct the parents to check the child's blood glucose?",
+      "rationale": "During illness, physiological stress can cause rapid glucose fluctuations, requiring caregivers to check blood glucose levels every 2 to 3 hours to detect impending emergencies.[5]",
+      "options": [
+        "A. Every 2 to 3 hours around the clock",
+        "B. Once daily before breakfast",
+        "C. Only when the child exhibits confusion",
+        "D. Every 8 hours after meals"
+      ],
+      "answer": "A"
+    },
+    {
+      "number": 19,
+      "topic": "Pediatric Endocrine",
+      "type": "FIB",
+      "question": "A child with Type 1 Diabetes is experiencing severe nausea and has not eaten all day. What is the most critical instruction regarding the child's basal insulin?",
+      "rationale": "Basal (long-acting) insulin must never be skipped during illness, as the absolute lack of insulin is the primary catalyst for ketone production and life-threatening diabetic ketoacidosis.",
+      "options": null,
+      "answer": "Never skip the basal insulin, even if the child is not eating."
+    },
+    {
+      "number": 20,
+      "topic": "Pediatric Endocrine",
+      "type": "FIB",
+      "question": "During sick day management of a pediatric client with Type 1 Diabetes, the nurse emphasizes the importance of checking for which specific substance in the urine?",
+      "rationale": "Ketones must be monitored frequently during illness, as they can develop rapidly with normal, low, or high glucose levels, signaling starvation ketosis or impending diabetic ketoacidosis.[5]",
+      "options": null,
+      "answer": "Urine ketones"
+    },
+    {
+      "number": 21,
+      "topic": "Pediatric Endocrine",
+      "type": "FIB",
+      "question": "An ill child with Type 1 Diabetes has a current blood glucose level of 140 mg/dL. To prevent dehydration and starvation ketosis, the nurse instructs the parents to offer which type of fluids?",
+      "rationale": "If blood glucose is under 200 mg/dL during an illness, sugar-containing fluids should be offered to prevent hypoglycemia and provide necessary carbohydrates to suppress ketogenesis.[5]",
+      "options": null,
+      "answer": "Sugar-containing fluids like regular ginger ale"
+    },
+    {
+      "number": 22,
+      "topic": "Pediatric Diagnostics",
+      "type": "FIB",
+      "question": "Which diagnostic test result is considered positive and confirms a diagnosis of cystic fibrosis?",
+      "rationale": "A sweat chloride concentration greater than 60 mmol/L on a quantitative pilocarpine iontophoresis test is a positive result and is considered the gold standard for diagnosing cystic fibrosis.",
+      "options": null,
+      "answer": "Sweat chloride concentration of 65 mmol/L"
+    },
+    {
+      "number": 23,
+      "topic": "Pediatric Nutrition",
+      "type": "MCQ",
+      "question": "A nurse is teaching the parents of a child with cystic fibrosis about dietary management. Which dietary modification is most appropriate to prevent steatorrhea?",
+      "rationale": "Patients with cystic fibrosis require a high-calorie, high-protein diet along with pancreatic enzyme replacement therapy administered with all meals and snacks to manage steatorrhea and prevent malnutrition.",
+      "options": [
+        "A. Low fat, low sodium diet with fluid restriction",
+        "B. High calorie, high protein diet with pancreatic enzymes",
+        "C. Clear liquid diet supplemented with vitamin K",
+        "D. Vegetarian diet strictly avoiding all dairy products"
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 24,
+      "topic": "Pediatric Pharmacology",
+      "type": "FIB",
+      "question": "The nurse is evaluating the effectiveness of pancreatic enzyme replacement therapy in a child with cystic fibrosis. Which finding indicates the therapy is effective?",
+      "rationale": "Effective pancreatic enzyme replacement therapy improves fat digestion and absorption in the GI tract, thereby eliminating steatorrhea and resulting in well-formed, normal stools.",
+      "options": null,
+      "answer": "The child produces one to two well-formed stools per day."
+    },
+    {
+      "number": 25,
+      "topic": "Pediatric Respiratory",
+      "type": "MCQ",
+      "question": "A 2-year-old child is rushed to the emergency department after suspected aspiration of a small toy. The child cannot vocalize, has a weak cough, and exhibits high-pitched inspiratory stridor. What is the immediate action?",
+      "rationale": "A weak cough, inability to speak, and stridor indicate a severe or complete airway obstruction. Immediate life-saving intervention with back blows and chest thrusts is required.[6]",
+      "options": [
+        "A. Perform a blind finger sweep of the oral cavity.",
+        "B. Initiate alternating back blows and chest thrusts.",
+        "C. Administer high-flow oxygen via a non-rebreather mask.",
+        "D. Elevate the infant's legs above the level of the heart."
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 26,
+      "topic": "Pediatric Respiratory & Nutrition",
+      "type": "FIB",
+      "question": "An infant is diagnosed with severe gastroesophageal reflux (GER) and is at high risk for aspiration. Which specialized feeding technique should the nurse teach the parents?",
+      "rationale": "Thickening formula with rice cereal makes the liquid heavier, helping it stay down in the stomach and significantly reducing the risk of reflux and subsequent pulmonary aspiration.[7]",
+      "options": null,
+      "answer": "Thicken the formula with rice cereal."
+    },
+    {
+      "number": 27,
+      "topic": "Pediatric Trauma & Safety",
+      "type": "FIB",
+      "question": "A 4-month-old, non-ambulatory infant is brought to the clinic with a spiral fracture of the femur. The parents state the infant rolled off the bed. What is the most appropriate nursing interpretation of this injury?",
+      "rationale": "Spiral fractures require forceful twisting forces. In an infant under 6 months who cannot walk or cruise, this type of fracture is highly specific for physical abuse.[8]",
+      "options": null,
+      "answer": "The fracture is highly suspicious for inflicted abuse."
+    },
+    {
+      "number": 28,
+      "topic": "Pediatric Trauma",
+      "type": "FIB",
+      "question": "Which specific fracture pattern seen on an infant's skeletal survey is considered highly specific for violent shaking or pulling associated with child maltreatment?",
+      "rationale": "Classic metaphyseal fractures at the end of developing long bones result from violent pulling or twisting forces and have incredibly high specificity for maltreatment in infants.[9]",
+      "options": null,
+      "answer": "Classic metaphyseal (corner or bucket-handle) fracture"
+    },
+    {
+      "number": 29,
+      "topic": "Pediatric Trauma",
+      "type": "MCQ",
+      "question": "A 3-year-old child sustains an accidental fracture after tripping and falling a short distance on an extended leg. This is commonly referred to in clinical practice as a 'toddler's fracture'. What type of fracture is this?",
+      "rationale": "An accidental, minimally displaced spiral fracture of the tibia in a preschool child who falls on an extended leg is a common, non-abusive injury known as a 'toddler's fracture'.[8]",
+      "options": [
+        "A. A classic metaphyseal corner fracture of the femur.",
+        "B. A minimally displaced spiral fracture of the tibia.",
+        "C. A depressed skull fracture of the parietal bone.",
+        "D. A bilateral posterior rib fracture."
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 30,
+      "topic": "Pediatric Trauma",
+      "type": "MCQ",
+      "question": "A 4-year-old child sustains a torus (buckle) fracture of the distal radius after falling onto an outstretched arm at the playground. How should the nurse interpret this finding?",
+      "rationale": "Torus or buckle fractures are common, accidental injuries in preschool children resulting from axial loading (falling on an outstretched arm) because their growing metaphyses easily buckle under pressure.[8]",
+      "options": [
+        "A. It is a normal, accidental injury resulting from axial loading on growing bones.",
+        "B. It is a classic sign of child abuse requiring immediate reporting.",
+        "C. It indicates severe, underlying calcium deficiency.",
+        "D. It is caused by violent, torsional twisting of the limb."
+      ],
+      "answer": "A"
+    },
+    {
+      "number": 31,
+      "topic": "Safety & Ethics",
+      "type": "FIB",
+      "question": "Under the Child, Youth and Family Services Act in Ontario, if a nurse has reasonable grounds to suspect that a 10-year-old child is being abused, the nurse must:",
+      "rationale": "Healthcare professionals have a mandatory legal obligation to personally and immediately report any suspicion of abuse or neglect of a child under 16 directly to the Children's Aid Society.",
+      "options": null,
+      "answer": "Report the suspicion directly to the Children's Aid Society immediately."
+    },
+    {
+      "number": 32,
+      "topic": "Safety & Ethics",
+      "type": "FIB",
+      "question": "A nurse in a long-term care facility suspects that a colleague is physically abusing a resident. According to the Fixing Long-Term Care Act, 2021 in Ontario, what is the nurse's responsibility?",
+      "rationale": "Under the Fixing Long-Term Care Act, 2021, nurses have a mandatory obligation to immediately report any suspected improper care, incompetence, or abuse that results in harm or a risk of harm to a resident.[10]",
+      "options": null,
+      "answer": "Report the suspected abuse immediately to the Director or regulatory authority."
+    },
+    {
+      "number": 33,
+      "topic": "Elder Abuse",
+      "type": "MCQ",
+      "question": "An elderly client's primary caregiver refuses to purchase necessary medications, claiming a lack of funds, despite the client receiving a substantial monthly pension. What type of abuse should the nurse suspect?",
+      "rationale": "Stealing money or withholding the client's own funds needed for basic care and medication constitutes financial abuse and exploitation.",
+      "options": [
+        "A. Physical abuse",
+        "B. Emotional abuse",
+        "C. Financial abuse and exploitation",
+        "D. Medical malpractice"
+      ],
+      "answer": "C"
+    },
+    {
+      "number": 34,
+      "topic": "Mental Health",
+      "type": "MCQ",
+      "question": "A client is diagnosed with psychogenic polydipsia. The nurse understands this condition is primarily characterized by:",
+      "rationale": "Psychogenic polydipsia involves the compulsive, excessive consumption of water, often associated with psychiatric disorders such as schizophrenia.[11]",
+      "options": [
+        "A. Compulsive, excessive consumption of water.",
+        "B. A complete lack of the physiological thirst mechanism.",
+        "C. Excessive urination strictly due to severe hyperglycemia.",
+        "D. Massive fluid retention caused by acute renal failure."
+      ],
+      "answer": "A"
+    },
+    {
+      "number": 35,
+      "topic": "Mental Health",
+      "type": "FIB",
+      "question": "A client with chronic schizophrenia and psychogenic polydipsia exhibits confusion, lethargy, and muscle fasciculations. Which electrolyte imbalance is the primary cause of these symptoms?",
+      "rationale": "Excessive water intake dilutes the extracellular fluid, resulting in severe dilutional hyponatremia, which causes fluid to shift into brain cells, leading to cerebral edema and neurological decline.[11]",
+      "options": null,
+      "answer": "Dilutional hyponatremia"
+    },
+    {
+      "number": 36,
+      "topic": "Mental Health",
+      "type": "FIB",
+      "question": "When caring for a client with water intoxication due to psychogenic polydipsia, the nurse must implement immediate precautions to prevent which life-threatening complication?",
+      "rationale": "Severe hyponatremia causes cerebral edema, putting the client at a critical risk for delirium, seizures, coma, and potentially death.[12]",
+      "options": null,
+      "answer": "Seizures due to cerebral edema"
+    },
+    {
+      "number": 37,
+      "topic": "Mental Health",
+      "type": "FIB",
+      "question": "Which nursing intervention is essential for the daily management of a psychiatric client diagnosed with psychogenic polydipsia?",
+      "rationale": "Close monitoring of daily weights and strict control of fluid intake are necessary to detect and prevent fluid volume overload and water intoxication in institutionalized clients.[13]",
+      "options": null,
+      "answer": "Strict monitoring of fluid intake and output alongside daily weights."
+    },
+    {
+      "number": 38,
+      "topic": "Adult Respiratory",
+      "type": "MCQ",
+      "question": "A nurse is assessing a chest tube drainage system connected to a client recovering from a pneumothorax. The nurse observes the fluid level in the water seal chamber rising during inhalation and falling during exhalation. How should the nurse document this finding?",
+      "rationale": "Fluctuations, or tidaling, in the water seal chamber are a normal expected finding that corresponds with the pressure changes during the respiratory cycle until the lung has fully re-expanded.",
+      "options": [
+        "A. A dangerous, active air leak in the pleural space.",
+        "B. Normal tidaling indicating patency of the system.",
+        "C. Complete re-expansion of the affected lung.",
+        "D. An occlusion or kink in the drainage tubing."
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 39,
+      "topic": "Adult Respiratory",
+      "type": "FIB",
+      "question": "While evaluating a wet-suction chest tube drainage system, the nurse notes continuous, vigorous bubbling in the water seal chamber. What does this specific assessment finding indicate?",
+      "rationale": "While gentle bubbling in the suction control chamber is normal, continuous bubbling in the water seal chamber indicates a pathological air leak that must be investigated immediately.",
+      "options": null,
+      "answer": "There is an active air leak in the system or the pleural space."
+    },
+    {
+      "number": 40,
+      "topic": "Adult Respiratory",
+      "type": "MCQ",
+      "question": "A client accidentally pulls out their chest tube entirely from the chest wall. What is the nurse's immediate, life-saving intervention?",
+      "rationale": "An occlusive dressing taped on exactly three sides functions as a flutter valve, allowing trapped air to escape during expiration while preventing atmospheric air from entering during inspiration, thus preventing a tension pneumothorax.[14]",
+      "options": [
+        "A. Apply a sterile occlusive dressing taped securely on three sides.",
+        "B. Attempt to quickly reinsert the sterile tube into the opening.",
+        "C. Clamp the disconnected tubing to prevent fluid backflow.",
+        "D. Leave the site open to air and call the rapid response team."
+      ],
+      "answer": "A"
+    },
+    {
+      "number": 41,
+      "topic": "Adult Respiratory",
+      "type": "FIB",
+      "question": "The tubing connecting a client's chest tube to the drainage unit accidentally breaks. What action should the nurse take first while waiting for a new drainage unit?",
+      "rationale": "Submerging the end of the tube into sterile water creates an emergency underwater seal, preventing atmospheric air from rushing into the pleural space while allowing intrathoracic air to escape.[14]",
+      "options": null,
+      "answer": "Submerge the distal end of the chest tube into 2 cm of sterile water."
+    },
+    {
+      "number": 42,
+      "topic": "Adult Respiratory",
+      "type": "FIB",
+      "question": "A client with a closed pneumothorax suddenly experiences extreme dyspnea, severe hypotension, and tachycardia. The nurse observes that the trachea is deviated to the unaffected side. What emergency condition is occurring?",
+      "rationale": "A tension pneumothorax acts as a one-way valve where air builds up under immense pressure, compressing the heart and pushing mediastinal structures (like the trachea) toward the unaffected side.[15]",
+      "options": null,
+      "answer": "Tension pneumothorax"
+    },
+    {
+      "number": 43,
+      "topic": "Adult Respiratory",
+      "type": "FIB",
+      "question": "While palpating the skin around a chest tube insertion site, the nurse feels a crackling, popping sensation under the fingertips. The nurse recognizes this finding as:",
+      "rationale": "Crepitus is a crackling sensation felt on palpation caused by the leakage of air into the subcutaneous tissues surrounding the chest tube insertion site.",
+      "options": null,
+      "answer": "Subcutaneous emphysema (crepitus)"
+    },
+    {
+      "number": 44,
+      "topic": "Adult Endocrine",
+      "type": "FIB",
+      "question": "A client is diagnosed with small cell lung cancer and subsequently develops the paraneoplastic Syndrome of Inappropriate Antidiuretic Hormone (SIADH). Which critical assessment finding correlates with this complication?",
+      "rationale": "SIADH involves the inappropriate, excessive release of ADH, which forces the kidneys to reabsorb massive amounts of free water. This physiological action leads to a decreased volume of highly concentrated urine output and severe dilutional hyponatremia.",
+      "options": null,
+      "answer": "Decreased, highly concentrated urine output and dilutional hyponatremia."
+    },
+    {
+      "number": 45,
+      "topic": "Fundamentals & Safety",
+      "type": "MCQ",
+      "question": "When setting up a sterile field for a bedside procedure, the nurse is aware that the outer boundary of the sterile drape is considered unsterile. How wide is this unsterile border?",
+      "rationale": "According to the principles of surgical asepsis, the outer 1-inch border of a sterile drape or field is considered unsterile and should not be touched by sterile objects.[16]",
+      "options": [
+        "A. 0.5 inches",
+        "B. 1 inch",
+        "C. 2 inches",
+        "D. 3 inches"
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 46,
+      "topic": "Fundamentals & Safety",
+      "type": "FIB",
+      "question": "A client is admitted with suspected active pulmonary tuberculosis. Which specific piece of personal protective equipment (PPE) is mandatory for the nurse to wear prior to entering the room?",
+      "rationale": "Tuberculosis requires Airborne Precautions, meaning healthcare workers must don a fit-tested N95 respirator before entering the isolation room to filter out airborne droplet nuclei.",
+      "options": null,
+      "answer": "Fit-tested N95 respirator"
+    },
+    {
+      "number": 47,
+      "topic": "Fundamentals & Safety",
+      "type": "FIB",
+      "question": "A client is placed on Droplet Precautions for influenza. Which action by the nurse demonstrates proper adherence to these precautions?",
+      "rationale": "Droplet Precautions require the use of a standard surgical mask and eye protection when coming into close proximity of the client to protect mucous membranes from large respiratory droplets.[17]",
+      "options": null,
+      "answer": "Wearing a surgical mask and eye protection when within 3 feet of the client."
+    },
+    {
+      "number": 48,
+      "topic": "Fundamentals & Safety",
+      "type": "FIB",
+      "question": "The nurse discovers a small fire in a client's trash can. According to the RACE acronym, what is the absolute first action the nurse must take?",
+      "rationale": "In any fire scenario, the absolute first priority (R in RACE) is to Rescue or remove anyone in immediate, direct danger from the flames or smoke.",
+      "options": null,
+      "answer": "Rescue: Remove the client from immediate danger."
+    },
+    {
+      "number": 49,
+      "topic": "Fundamentals & Safety",
+      "type": "FIB",
+      "question": "A nurse sustains an accidental needle-stick injury after administering a medication. What is the very first physical action the nurse must take?",
+      "rationale": "The immediate physical safety priority is to wash the area vigorously with soap and water to decrease the viral/bacterial load. Reporting and testing are essential but secondary administrative steps.[1]",
+      "options": null,
+      "answer": "Wash the puncture site thoroughly with soap and running water."
+    },
+    {
+      "number": 50,
+      "topic": "Safety & Disaster Triage",
+      "type": "MCQ",
+      "question": "During a mass casualty incident, the triage nurse assesses a victim who has a tension pneumothorax and is in severe respiratory distress. Which triage priority category should this victim receive?",
+      "rationale": "A tension pneumothorax is a highly lethal but quickly treatable condition (via needle decompression). These clients require immediate, life-saving intervention and are categorized as Red (Immediate priority).",
+      "options": [
+        "A. Red (immediate — life-threatening but salvageable)",
+        "B. Black (expectant / deceased)",
+        "C. Yellow (delayed)",
+        "D. Green (minor / walking wounded)"
+      ],
+      "answer": "A"
+    },
+    {
+      "number": 51,
+      "topic": "Prioritization & Delegation",
+      "type": "MCQ",
+      "question": "Which task is most appropriate for a practical nurse to delegate to an Unregulated Care Provider (UCP)?",
+      "rationale": "UCPs can perform standard, routine, and non-invasive tasks such as measuring intake and output on stable clients. Assessing, teaching, and evaluating require licensed nursing judgment.",
+      "options": [
+        "A. Assessing a client's newly inserted colostomy stoma.",
+        "B. Providing discharge health teaching to a client with diabetes.",
+        "C. Emptying a urinary catheter drainage bag and recording the output.",
+        "D. Evaluating the effectiveness of a newly administered pain medication."
+      ],
+      "answer": "C"
+    },
+    {
+      "number": 52,
+      "topic": "Prioritization",
+      "type": "MCQ",
+      "question": "A practical nurse is receiving the morning report. Which client should the nurse assess first using the ABC (Airway, Breathing, Circulation) framework?",
+      "rationale": "Sudden restlessness and diaphoresis in an asthmatic client are early, critical signs of hypoxia and impending airway/breathing failure, demanding immediate prioritization.[18]",
+      "options": [
+        "A. A client with a fractured tibia complaining of 8/10 pain.",
+        "B. A client with asthma who exhibits sudden restlessness and diaphoresis.",
+        "C. A client with diabetes whose morning blood glucose is 150 mg/dL.",
+        "D. A client 2 days post-op requesting assistance to the bathroom."
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 53,
+      "topic": "Prioritization",
+      "type": "MCQ",
+      "question": "A client has just returned from a diagnostic bronchoscopy. The client requests a sip of water. What is the nurse's priority assessment before providing fluids?",
+      "rationale": "A bronchoscopy utilizes topical anesthetics that numb the throat. The nurse must verify the return of the gag reflex to prevent fatal pulmonary aspiration before giving any oral intake.[19]",
+      "options": [
+        "A. Auscultating bilateral lung sounds.",
+        "B. Checking the client's gag reflex.",
+        "C. Monitoring the heart rate for tachycardia.",
+        "D. Assessing the client's core body temperature."
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 54,
+      "topic": "Pharmacology",
+      "type": "MCQ",
+      "question": "Prior to administering a scheduled dose of digoxin to an adult client, the nurse must assess which vital parameter?",
+      "rationale": "Digoxin decreases the heart rate. The nurse must auscultate the apical pulse for 1 full minute and withhold the medication if the heart rate is below 60 beats per minute in an adult.[20]",
+      "options": [
+        "A. A respiratory rate of 14 breaths per minute",
+        "B. An auscultated apical pulse of 55 beats per minute",
+        "C. A blood pressure of 118/76 mmHg",
+        "D. A serum potassium level of 4.5 mEq/L"
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 55,
+      "topic": "Pharmacology",
+      "type": "MCQ",
+      "question": "A client presents to the emergency department with severe bleeding and an INR of 7.5. The client is currently taking warfarin. Which medication should the nurse prepare to administer as an antidote?",
+      "rationale": "Vitamin K is the specific pharmacological antidote used to reverse the anticoagulant effects and toxicity of warfarin.",
+      "options": [
+        "A. Protamine sulfate",
+        "B. Vitamin K (Phytonadione)",
+        "C. Flumazenil",
+        "D. Naloxone"
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 56,
+      "topic": "Pharmacology",
+      "type": "MCQ",
+      "question": "A client on a continuous intravenous heparin infusion begins oozing blood from the IV site and has blood in their urine. What is the appropriate antidote for heparin toxicity?",
+      "rationale": "Protamine sulfate is the specific pharmacological antagonist used to rapidly reverse the effects of heparin toxicity.[21]",
+      "options": [
+        "A. Vitamin K",
+        "B. Protamine sulfate",
+        "C. Calcium gluconate",
+        "D. Acetylcysteine"
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 57,
+      "topic": "Pharmacology",
+      "type": "MCQ",
+      "question": "A client with heart failure is prescribed furosemide (Lasix). The nurse knows to monitor the client closely for which critical electrolyte imbalance?",
+      "rationale": "Furosemide is a potent loop diuretic that wastes potassium in the urine, putting the client at significant risk for hypokalemia and subsequent cardiac dysrhythmias.[22]",
+      "options": [
+        "A. Hypernatremia",
+        "B. Hypokalemia",
+        "C. Hypercalcemia",
+        "D. Hyperphosphatemia"
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 58,
+      "topic": "Mental Health Pharmacology",
+      "type": "MCQ",
+      "question": "A client taking lithium carbonate for bipolar disorder presents with severe tremors, vomiting, and ataxia. The nurse recognizes these as signs of lithium toxicity. What concurrent electrolyte imbalance commonly precipitates lithium toxicity?",
+      "rationale": "Lithium is a salt. When sodium levels drop (hyponatremia), the kidneys reabsorb lithium instead of sodium, rapidly leading to life-threatening lithium toxicity.[21]",
+      "options": [
+        "A. Hypercalcemia",
+        "B. Hyponatremia",
+        "C. Hyperkalemia",
+        "D. Hypomagnesemia"
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 59,
+      "topic": "Mental Health Pharmacology",
+      "type": "FIB",
+      "question": "A client taking a Selective Serotonin Reuptake Inhibitor (SSRI) presents to the emergency department with a high fever, severe muscle rigidity, tachycardia, and agitation. The nurse suspects which life-threatening complication?",
+      "rationale": "Serotonin syndrome is a potentially fatal condition caused by an overaccumulation of serotonin, characterized by altered mental status, autonomic instability (fever, tachycardia), and neuromuscular hyperactivity (rigidity).",
+      "options": null,
+      "answer": "Serotonin syndrome"
+    },
+    {
+      "number": 60,
+      "topic": "Mental Health Pharmacology",
+      "type": "FIB",
+      "question": "A client who has been taking haloperidol (a typical antipsychotic) for several years exhibits involuntary lip smacking, tongue protrusion, and choreiform movements of the extremities. This condition is known as:",
+      "rationale": "Tardive dyskinesia is a severe, often irreversible extrapyramidal side effect of long-term typical antipsychotic use, characterized by involuntary, repetitive movements of the face and limbs.[16]",
+      "options": null,
+      "answer": "Tardive dyskinesia"
+    },
+    {
+      "number": 61,
+      "topic": "Safety & Fundamentals",
+      "type": "MCQ",
+      "question": "A violent, combative client has been placed in bilateral wrist restraints. According to standard safety protocols, how frequently must the nurse assess the client's neurovascular status (skin color, temperature, pulses)?",
+      "rationale": "Physical restraints pose a massive risk to tissue perfusion. Neurovascular assessments and skin checks must be performed strictly every 15 to 30 minutes, and the restraints temporarily removed every 2 hours.",
+      "options": [
+        "A. Every 15 to 30 minutes",
+        "B. Every 2 hours",
+        "C. Every 4 hours",
+        "D. Once per shift"
+      ],
+      "answer": "A"
+    },
+    {
+      "number": 62,
+      "topic": "Adult Gastrointestinal",
+      "type": "MCQ",
+      "question": "A client is diagnosed with peptic ulcer disease (PUD). The nurse understands that the most common underlying cause of PUD is:",
+      "rationale": "The vast majority of peptic ulcers are caused by an infection with the H. pylori bacterium, which damages the protective mucosal lining of the stomach and duodenum.",
+      "options": [
+        "A. Excessive consumption of spicy foods.",
+        "B. Chronic psychological stress.",
+        "C. Helicobacter pylori (H. pylori) infection.",
+        "D. A diet high in refined sugars."
+      ],
+      "answer": "C"
+    },
+    {
+      "number": 63,
+      "topic": "Adult Gastrointestinal",
+      "type": "FIB",
+      "question": "The nurse provides dietary teaching to a client with Gastroesophageal Reflux Disease (GERD). Which instruction is most effective in preventing nocturnal reflux?",
+      "rationale": "Remaining upright for 2 to 3 hours after meals utilizes gravity to prevent gastric contents from flowing backward into the esophagus. Peppermint and milk can actually exacerbate GERD.[23]",
+      "options": null,
+      "answer": "Remain upright for at least 2 hours after eating."
+    },
+    {
+      "number": 64,
+      "topic": "Adult Gastrointestinal",
+      "type": "MCQ",
+      "question": "A client is 24 hours post-operative following a bowel resection with the creation of a new colostomy. During the assessment, the nurse notes the stoma appears dark purple and dry. What is the priority nursing action?",
+      "rationale": "A healthy stoma should be beefy red and moist. A dark purple or dry stoma suggests ischemia and impending necrosis, which is a surgical emergency; the provider must be notified immediately.",
+      "options": [
+        "A. Notify the surgeon immediately of the finding.",
+        "B. Document the finding and reassess in 4 hours.",
+        "C. Apply petroleum jelly to the stoma surface.",
+        "D. Replace the pouch and continue routine teaching."
+      ],
+      "answer": "A"
+    },
+    {
+      "number": 65,
+      "topic": "Adult Renal",
+      "type": "FIB",
+      "question": "A client with end-stage chronic kidney disease (CKD) is being evaluated. Which laboratory findings are characteristic of this disease process?",
+      "rationale": "Failing kidneys are unable to excrete nitrogenous wastes, leading to consistently elevated levels of Blood Urea Nitrogen (BUN) and serum creatinine.[24]",
+      "options": null,
+      "answer": "Elevated BUN and elevated serum creatinine"
+    },
+    {
+      "number": 66,
+      "topic": "Adult Renal",
+      "type": "FIB",
+      "question": "A client has an arteriovenous (AV) fistula in their left arm for hemodialysis. How should the nurse accurately assess the patency of this fistula?",
+      "rationale": "A functioning AV fistula will produce a palpable vibration (thrill) and a rushing sound upon auscultation (bruit) due to the high-velocity blood flow. Blood pressures and blood draws are strictly contraindicated on the fistula arm.",
+      "options": null,
+      "answer": "Palpate for a thrill and auscultate for a bruit over the fistula."
+    },
+    {
+      "number": 67,
+      "topic": "Adult Endocrine",
+      "type": "FIB",
+      "question": "A client is diagnosed with advanced hypothyroidism. Which cluster of clinical manifestations should the nurse expect to assess?",
+      "rationale": "Hypothyroidism is characterized by a globally slowed metabolic rate, resulting in bradycardia, unexpected weight gain, lethargy, and an inability to tolerate cold environments.[25]",
+      "options": null,
+      "answer": "Bradycardia, weight gain, and cold intolerance"
+    },
+    {
+      "number": 68,
+      "topic": "Adult Endocrine",
+      "type": "MCQ",
+      "question": "A client with Graves' disease (hyperthyroidism) is admitted to the medical unit. Which unique physical finding is strongly associated with this specific autoimmune condition?",
+      "rationale": "Graves' disease frequently causes exophthalmos, an irreversible outward bulging of the eyes due to edema and fat accumulation behind the orbits.",
+      "options": [
+        "A. Myxedema coma",
+        "B. Exophthalmos (bulging of the eyes)",
+        "C. A thick, deeply furrowed tongue",
+        "D. Profound, generalized pitting edema"
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 69,
+      "topic": "Adult Endocrine",
+      "type": "FIB",
+      "question": "A client in Diabetic Ketoacidosis (DKA) is exhibiting very deep, rapid, and unlabored respirations. The nurse documents this finding as:",
+      "rationale": "Kussmaul respirations are deep, rapid breathing patterns that serve as a compensatory mechanism to exhale excess carbon dioxide and reduce the severe metabolic acidosis associated with DKA.",
+      "options": null,
+      "answer": "Kussmaul respirations"
+    },
+    {
+      "number": 70,
+      "topic": "Adult Endocrine",
+      "type": "MCQ",
+      "question": "A nurse finds a diabetic client unconscious and unresponsive on the floor. What is the most appropriate emergency intervention?",
+      "rationale": "An unconscious diabetic client is presumed to be experiencing severe hypoglycemia. Giving oral fluids poses a lethal aspiration risk; IM glucagon rapidly stimulates the liver to release stored glucose.",
+      "options": [
+        "A. Pour a glass of orange juice down the client's throat.",
+        "B. Administer 10 units of regular insulin subcutaneously.",
+        "C. Place a hard candy under the client's tongue.",
+        "D. Administer an intramuscular injection of glucagon."
+      ],
+      "answer": "D"
+    },
+    {
+      "number": 71,
+      "topic": "Adult Neurological",
+      "type": "MCQ",
+      "question": "A client with a known seizure disorder is admitted to the unit. Which action by the nurse represents an essential seizure safety precaution?",
+      "rationale": "Suction equipment must be readily available to clear the airway of secretions during or after a seizure to prevent aspiration. Nothing should ever be placed in the mouth of a seizing client.[7]",
+      "options": [
+        "A. Place a padded tongue blade at the bedside.",
+        "B. Keep the bed in the highest position to facilitate rapid assessment.",
+        "C. Ensure functioning suction equipment and oxygen are at the bedside.",
+        "D. Apply tight, physical wrist restraints at all times."
+      ],
+      "answer": "C"
+    },
+    {
+      "number": 72,
+      "topic": "Adult Neurological",
+      "type": "FIB",
+      "question": "A client has suffered an ischemic stroke affecting the right hemisphere of the brain. Which specific deficit should the nurse anticipate during the assessment?",
+      "rationale": "A right-hemispheric stroke paralyzes the left side of the body (contralateral effect) and frequently results in poor judgment, impulsivity, and a lack of awareness of deficits.",
+      "options": null,
+      "answer": "Left-sided hemiplegia and severe impulsive behavior"
+    },
+    {
+      "number": 73,
+      "topic": "Adult Cardiovascular",
+      "type": "FIB",
+      "question": "When assessing a client with right-sided heart failure (Cor Pulmonale), the nurse expects to observe which systemic clinical manifestation?",
+      "rationale": "Right-sided heart failure causes venous blood to back up into the systemic circulation, leading to classic signs such as JVD, hepatomegaly, and severe dependent peripheral edema.",
+      "options": null,
+      "answer": "Jugular venous distension (JVD) and peripheral edema"
+    },
+    {
+      "number": 74,
+      "topic": "Adult Cardiovascular",
+      "type": "MCQ",
+      "question": "A client with advanced left-sided heart failure reports waking up at night gasping for air. Which assessment finding is most closely associated with left-sided failure?",
+      "rationale": "Left-sided heart failure prevents the heart from effectively pumping blood out to the body, causing it to back up into the pulmonary veins and lungs, resulting in pulmonary edema and crackles.",
+      "options": [
+        "A. Ascites and an enlarged, palpable liver",
+        "B. Pulmonary crackles and dyspnea",
+        "C. Pitting edema in the lower extremities",
+        "D. A bounding peripheral pulse in the arms"
+      ],
+      "answer": "B"
+    },
+    {
+      "number": 75,
+      "topic": "Adult Cardiovascular",
+      "type": "FIB",
+      "question": "A client is prescribed sublingual nitroglycerin for stable angina. What specific instruction must the nurse include in the client's discharge teaching?",
+      "rationale": "Nitroglycerin must be dissolved under the tongue. If chest pain is not relieved after 1 tablet, the client should call EMS, but can take up to 3 tablets 5 minutes apart. Headaches are an expected side effect of the vasodilation.",
+      "options": null,
+      "answer": "Take 1 tablet every 5 minutes for chest pain, up to a maximum of 3 doses."
+    },
+    {
+      "number": 76,
+      "topic": "Adult Respiratory",
+      "type": "MCQ",
+      "question": "A client is experiencing an acute, severe asthma attack. Which pharmacological agent is the first-line 'rescue' medication the nurse should administer?",
+      "rationale": "Albuterol is a fast-acting bronchodilator (SABA) used exclusively as a rescue inhaler to immediately reverse acute bronchospasms during an asthma attack.",
+      "options": [
+        "A. Inhaled fluticasone (corticosteroid)",
+        "B. Oral montelukast (leukotriene modifier)",
+        "C. Inhaled albuterol (short-acting beta agonist)",
+        "D. Intravenous broad-spectrum antibiotics"
+      ],
+      "answer": "C"
+    },
+    {
+      "number": 77,
+      "topic": "Adult Respiratory",
+      "type": "FIB",
+      "question": "The nurse is teaching a client with severe COPD how to perform pursed-lip breathing. What is the primary physiological purpose of this technique?",
+      "rationale": "Pursed-lip breathing creates positive end-expiratory pressure, which splints the airways open, prolongs exhalation, and allows trapped carbon dioxide to escape from the lungs.[26]",
+      "options": null,
+      "answer": "To prolong exhalation and prevent alveolar collapse (air trapping)."
+    },
+    {
+      "number": 78,
+      "topic": "Adult Hematology",
+      "type": "FIB",
+      "question": "A pediatric client is admitted in a severe vaso-occlusive sickle cell crisis. Aside from aggressive pain management, what is the absolute highest priority nursing intervention?",
+      "rationale": "Aggressive hydration is critical in a sickle cell crisis to hemodilute the blood, reverse the clumping of sickled cells, and restore perfusion to ischemic tissues. Cold compresses are contraindicated as they cause vasoconstriction.",
+      "options": null,
+      "answer": "Administering high volumes of intravenous fluids for hydration"
+    },
+    {
+      "number": 79,
+      "topic": "Adult Hematology",
+      "type": "MCQ",
+      "question": "The nurse is providing education to a client prescribed oral iron supplements for iron-deficiency anemia. To maximize intestinal absorption, the nurse suggests taking the iron with:",
+      "rationale": "Vitamin C (ascorbic acid), found in orange juice, creates an acidic environment that significantly enhances the intestinal absorption of dietary iron. Milk, tea, and antacids severely inhibit absorption.[24]",
+      "options": [
+        "A. A full glass of milk",
+        "B. An oral liquid antacid",
+        "C. A glass of orange juice",
+        "D. A hot cup of black tea"
+      ],
+      "answer": "C"
+    },
+    {
+      "number": 80,
+      "topic": "Geriatric Nutrition",
+      "type": "MCQ",
+      "question": "The interdisciplinary team is evaluating the acute nutritional status of an elderly client admitted with failure to thrive. Which statement correctly distinguishes prealbumin from albumin in this assessment?",
+      "rationale": "Prealbumin possesses a very short half-life of approximately 2 days, making it a highly sensitive indicator of acute changes in nutritional status, whereas albumin has a half-life of ~21 days and only reflects chronic states.[27, 28]",
+      "options": [
+        "A. Albumin is more sensitive to acute, day-to-day nutritional changes.",
+        "B. Prealbumin has a shorter half-life, making it a better indicator of acute nutritional status.",
+        "C. Prealbumin is exclusively used to diagnose long-term, chronic malnutrition.",
+        "D. Albumin levels are completely unaffected by acute inflammatory processes."
+      ],
+      "answer": "B"
+    }
   ]
 }

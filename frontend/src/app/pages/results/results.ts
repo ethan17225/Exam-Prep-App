@@ -1,6 +1,6 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { ExamService, ExamResult, QuestionResult } from '../../services/exam.service';
+import { ExamService, ExamResult, QuestionResult, countQuestionTypes } from '../../services/exam.service';
 
 @Component({
   selector: 'app-results',
@@ -17,6 +17,8 @@ export class ResultsPage implements OnInit {
     const secs = s % 60;
     return `${mins}m ${secs}s`;
   });
+
+  typeCounts = computed(() => countQuestionTypes(this.result()?.results ?? []));
 
   constructor(
     private route: ActivatedRoute,
@@ -47,14 +49,15 @@ export class ResultsPage implements OnInit {
   isUserPick(q: QuestionResult, opt: string): boolean {
     const letter = opt.charAt(0);
     if (Array.isArray(q.user_answer)) return q.user_answer.includes(letter);
-    if (q.user_answer && q.user_answer.length > 1) return q.user_answer === opt;
-    return q.user_answer === letter;
+    if (!q.user_answer) return false;
+    const letters = String(q.user_answer).split(',').map((s) => s.trim());
+    return letters.includes(letter);
   }
 
   isCorrectOpt(q: QuestionResult, opt: string): boolean {
     const letter = opt.charAt(0);
     if (Array.isArray(q.correct_answer)) return q.correct_answer.includes(letter);
-    if (q.correct_answer && q.correct_answer.length > 1) return q.correct_answer === opt;
-    return q.correct_answer === letter;
+    const letters = String(q.correct_answer).split(',').map((s) => s.trim());
+    return letters.includes(letter);
   }
 }

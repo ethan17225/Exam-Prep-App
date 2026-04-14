@@ -18,8 +18,9 @@
 
 .exam-topbar-left {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 0.75rem;
+  gap: 0.5rem 0.75rem;
 }
 
 .exam-name {
@@ -43,6 +44,35 @@
 .progress-text {
   font-size: 0.8rem;
   color: #888;
+}
+
+.exam-type-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.type-chip {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.type-chip-mcq {
+  background: #eef;
+  color: #44c;
+}
+
+.type-chip-sata {
+  background: #f3e8ff;
+  color: #5b2b8a;
+}
+
+.type-chip-fib {
+  background: #e8f8f5;
+  color: #088;
 }
 
 .exam-topbar-right {
@@ -75,10 +105,14 @@
   font-size: 0.8rem;
 }
 
-.btn-save {
-  background: #fff3e0;
-  color: #e65100;
-  &:hover:not(:disabled) { background: #ffe0b2; }
+.auto-save-indicator {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+
+  &.saving { color: #e65100; }
+  &.saved { color: #0a7; }
 }
 
 // Progress bar

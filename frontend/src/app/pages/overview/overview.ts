@@ -183,7 +183,7 @@ export class OverviewPage implements OnInit, OnDestroy {
             },
             {
               label: 'Pass Threshold',
-              data: sorted.map(() => 75),
+              data: sorted.map(() => 72),
               borderColor: '#e0e0e0',
               borderDash: [6, 4],
               borderWidth: 1.5,

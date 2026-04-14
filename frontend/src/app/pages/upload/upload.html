@@ -1,7 +1,45 @@
 <h1 class="page-title">Upload Exam</h1>
 
 <div class="card upload-card">
-  <label class="field-label">Exam Title</label>
+  <label class="field-label">Course</label>
+  <div class="course-selector">
+    <select
+      id="upload-course-select"
+      class="course-select"
+      [ngModel]="showNewCourse() ? '__new__' : selectedCourseId()"
+      (ngModelChange)="onCourseSelectChange($event)"
+    >
+      <option value="" disabled>Select a course…</option>
+      @for (course of courses(); track course.id) {
+        <option [value]="course.id">{{ course.name }}</option>
+      }
+      <option value="__new__">＋ New Course</option>
+    </select>
+
+    @if (showNewCourse()) {
+      <div class="new-course-row">
+        <input
+          type="text"
+          class="new-course-input"
+          placeholder="Enter new course name…"
+          [ngModel]="newCourseName()"
+          (ngModelChange)="newCourseName.set($event)"
+        />
+        <button
+          class="btn btn-primary btn-sm"
+          (click)="createNewCourse()"
+          [disabled]="courseLoading()"
+        >
+          {{ courseLoading() ? 'Creating…' : 'Create' }}
+        </button>
+      </div>
+      @if (courseError()) {
+        <span class="course-error">{{ courseError() }}</span>
+      }
+    }
+  </div>
+
+  <label class="field-label" style="margin-top: 1rem">Exam Title</label>
   <input type="text" [ngModel]="title()" (ngModelChange)="title.set($event)" placeholder="e.g. Nursing Practice Exam 1" />
 
   <label class="field-label" style="margin-top: 1rem">Questions JSON</label>

@@ -115,4 +115,34 @@ export class FlashcardsPage implements OnInit {
     if (Array.isArray(a)) return a.join(', ');
     return String(a);
   }
+
+  /** For MCQ/SATA: full text of each correct option (options are labeled A., B., …). */
+  answerOptionContentLines(q: Question): string[] {
+    if (!q.options?.length || this.isTextQuestion(q)) return [];
+    const letters = this.answerLetters(q);
+    return letters.map((letter) => this.optionMatchingLetter(q, letter) ?? letter);
+  }
+
+  showAnswerOptionContent(q: Question): boolean {
+    return this.answerOptionContentLines(q).length > 0;
+  }
+
+  private answerLetters(q: Question): string[] {
+    const a = q.answer;
+    if (a === undefined || a === null) return [];
+    if (Array.isArray(a)) {
+      return a.map((x) => String(x).trim()).filter(Boolean);
+    }
+    const s = String(a).trim();
+    if (!s) return [];
+    return s.split(',').map((part) => part.trim()).filter(Boolean);
+  }
+
+  private optionMatchingLetter(q: Question, letter: string): string | null {
+    if (!q.options?.length) return null;
+    const L = letter.trim().charAt(0).toUpperCase();
+    if (!L) return null;
+    const found = q.options.find((opt) => opt.trim().charAt(0).toUpperCase() === L);
+    return found ?? null;
+  }
 }

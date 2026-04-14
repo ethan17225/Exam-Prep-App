@@ -1,0 +1,80 @@
+<!-- HTML Content Viewer Overlay -->
+@if (viewingDoc(); as doc) {
+  <div class="viewer-overlay" (click)="closeViewer()">
+    <div class="viewer-container" (click)="$event.stopPropagation()">
+      <div class="viewer-header">
+        <span class="viewer-title">{{ doc.title }}</span>
+        <div class="viewer-actions">
+          <a class="btn btn-secondary btn-sm" [href]="doc.pdf_url" target="_blank" rel="noopener">Open PDF</a>
+          <a class="btn btn-secondary btn-sm" [href]="doc.pdf_url" download>Download</a>
+          <button class="btn btn-danger btn-sm" (click)="closeViewer()">Close</button>
+        </div>
+      </div>
+      <div class="viewer-body">
+        @if (viewerLoading()) {
+          <div class="viewer-loading">
+            <div class="spinner"></div>
+            <p>Loading document…</p>
+          </div>
+        } @else if (viewerError()) {
+          <div class="viewer-error">
+            <p>{{ viewerError() }}</p>
+            <a class="btn btn-primary btn-sm" [href]="doc.pdf_url" target="_blank" rel="noopener">Open as PDF instead</a>
+          </div>
+        } @else {
+          <article class="doc-content" [innerHTML]="viewingHtml()"></article>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Document List -->
+<div class="docs-header">
+  <h1 class="page-title">Documents</h1>
+  @if (courses().length > 0) {
+    <div class="course-filter">
+      <select
+        id="docs-course-select"
+        class="course-select"
+        [ngModel]="selectedCourseId()"
+        (ngModelChange)="onCourseChange($event)"
+      >
+        <option value="">All Courses</option>
+        @for (course of courses(); track course.id) {
+          <option [value]="course.id">{{ course.name }}</option>
+        }
+      </select>
+    </div>
+  }
+</div>
+
+@if (groupedDocuments().length === 0) {
+  <p class="empty-state">No documents available.</p>
+} @else {
+  @for (group of groupedDocuments(); track group.courseName) {
+    <div class="doc-group">
+      <h2 class="doc-group-title">
+        <span class="doc-group-icon">📁</span>
+        {{ group.courseName }}
+        <span class="doc-group-count">{{ group.docs.length }} file{{ group.docs.length === 1 ? '' : 's' }}</span>
+      </h2>
+      <div class="doc-list">
+        @for (doc of group.docs; track doc.filename) {
+          <div class="card doc-card" (click)="openDoc(doc)">
+            <div class="doc-icon">📄</div>
+            <div class="doc-info">
+              <span class="doc-title">{{ doc.title }}</span>
+              <span class="doc-meta">PDF · {{ formatSize(doc.size_bytes) }}</span>
+            </div>
+            <div class="doc-actions">
+              <a class="btn btn-secondary btn-sm" [href]="doc.pdf_url" target="_blank" rel="noopener" (click)="$event.stopPropagation()">
+                Open PDF
+              </a>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+}

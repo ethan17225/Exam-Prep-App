@@ -1,6 +1,6 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { ExamService, ExamResult, QuestionResult } from '../../services/exam.service';
+import { ExamService, ExamResult, QuestionResult, classifyQuestionType, countQuestionTypes } from '../../services/exam.service';
 
 @Component({
   selector: 'app-history-detail',
@@ -19,6 +19,8 @@ export class HistoryDetailPage implements OnInit {
     const secs = s % 60;
     return `${mins}m ${secs}s`;
   });
+
+  typeCounts = computed(() => countQuestionTypes(this.result()?.results ?? []));
 
   filteredResults = computed(() => {
     let results = this.result()?.results ?? [];
@@ -121,8 +123,6 @@ export class HistoryDetailPage implements OnInit {
   }
 
   getQuestionTypeGroup(q: QuestionResult): 'MCQ' | 'SATA' | 'FIB' {
-    if (q.type === 'SATA') return 'SATA';
-    if (q.type === 'FIB' || q.type === 'Fill-in-the-blank' || !q.options || q.options.length === 0) return 'FIB';
-    return 'MCQ';
+    return classifyQuestionType(q);
   }
 }
