@@ -25,6 +25,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
   autoSaveStatus = signal<'idle' | 'saving' | 'saved'>('idle');
 
   mode = signal<'exam' | 'practice'>('exam');
+  timeLimitSeconds = signal(180 * 60);
   remainingSeconds = signal(180 * 60);
   currentPage = signal(0);
   readonly questionsPerPage = 20;
@@ -84,6 +85,9 @@ export class TakeExamPage implements OnInit, OnDestroy {
 
     this.examService.getExam(this.examId, true).subscribe((exam) => {
       this.examTitle.set(exam.title);
+      
+      const limit = exam.time_limit_minutes ? exam.time_limit_minutes * 60 : 180 * 60;
+      this.timeLimitSeconds.set(limit);
 
       if (this.resumeId) {
         this.examService.getInProgress(this.resumeId).subscribe((saved) => {
@@ -96,6 +100,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
           ? Math.min(Math.max(this.selectedQuestionCount, 1), shuffled.length)
           : shuffled.length;
         this.questions.set(shuffled.slice(0, takeCount));
+        this.remainingSeconds.set(limit);
         this.startTimer();
         this.persistProgress();
       }
@@ -361,7 +366,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
     }
 
     this.submitting.set(true);
-    const timeSpent = 180 * 60 - this.remainingSeconds();
+    const timeSpent = this.timeLimitSeconds() - this.remainingSeconds();
     const subs: AnswerSubmission[] = this.questions().map((q) => ({
       question_number: q.number,
       answer: this.answers().get(q.number) ?? (q.type === 'SATA' ? [] : ''),

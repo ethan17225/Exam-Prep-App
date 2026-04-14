@@ -1,10 +1,20 @@
-<h1 class="page-title">Past Tests</h1>
+<div class="exams-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+  <h1 class="page-title" style="margin-bottom: 0;">Past Tests</h1>
+  <div class="search-filter" style="width: 280px; max-width: 100%;">
+    <input
+      type="text"
+      placeholder="Search history..."
+      [ngModel]="searchQuery()"
+      (ngModelChange)="searchQuery.set($event)"
+    />
+  </div>
+</div>
 
-@if (records().length === 0) {
-  <p class="empty-state">No test history yet. Take an exam to see results here.</p>
+@if (filteredRecords().length === 0) {
+  <p class="empty-state">No test history found.</p>
 } @else {
   <div class="history-list">
-    @for (r of records(); track r.id) {
+    @for (r of filteredRecords(); track r.id) {
       <div class="card history-card" (click)="view(r.id)">
         <div class="history-left">
           <span class="history-title">{{ r.exam_title }}</span>

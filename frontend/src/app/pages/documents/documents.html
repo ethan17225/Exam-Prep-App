@@ -30,23 +30,33 @@
 }
 
 <!-- Document List -->
-<div class="docs-header">
-  <h1 class="page-title">Documents</h1>
-  @if (courses().length > 0) {
-    <div class="course-filter">
-      <select
-        id="docs-course-select"
-        class="course-select"
-        [ngModel]="selectedCourseId()"
-        (ngModelChange)="onCourseChange($event)"
-      >
-        <option value="">All Courses</option>
-        @for (course of courses(); track course.id) {
-          <option [value]="course.id">{{ course.name }}</option>
-        }
-      </select>
+<div class="docs-header" style="align-items: center; margin-bottom: 1.25rem;">
+  <h1 class="page-title" style="margin-bottom: 0;">Documents</h1>
+  <div class="header-controls" style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+    @if (courses().length > 0) {
+      <div class="course-filter">
+        <select
+          id="docs-course-select"
+          class="course-select"
+          [ngModel]="selectedCourseId()"
+          (ngModelChange)="onCourseChange($event)"
+        >
+          <option value="">All Courses</option>
+          @for (course of courses(); track course.id) {
+            <option [value]="course.id">{{ course.name }}</option>
+          }
+        </select>
+      </div>
+    }
+    <div class="search-filter" style="width: 280px; max-width: 100%;">
+      <input
+        type="text"
+        placeholder="Search documents..."
+        [ngModel]="searchQuery()"
+        (ngModelChange)="searchQuery.set($event)"
+      />
     </div>
-  }
+  </div>
 </div>
 
 @if (groupedDocuments().length === 0) {

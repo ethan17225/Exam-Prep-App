@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Module 6-7 Exam Sheet</title>
+    <!-- We used clean CSS variables and semantic HTML to make this easy to read and modify! -->
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --text-color: #333333;
+            --heading-color: #2c3e50;
+            --highlight-bg: #ffeaa7;
+            --highlight-text: #d35400;
+            --card-bg: #ffffff;
+            --border-color: #e0e0e0;
+            --primary-accent: #3498db;
+            --danger-accent: #e74c3c;
+            --font-main: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 2rem;
+            font-size: 16px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            padding: 2rem 3rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: var(--heading-color);
+            margin-top: 1.5em;
+        }
+
+        h1 {
+            border-bottom: 3px solid var(--primary-accent);
+            padding-bottom: 0.5rem;
+            text-align: center;
+            font-size: 2.2rem;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0.3rem;
+        }
+
+        h3 {
+            font-size: 1.4rem;
+            color: var(--primary-accent);
+        }
+
+        /* Highlighting styles */
+        .key-concept {
+            background-color: var(--highlight-bg);
+            font-weight: 600;
+            padding: 0.1em 0.3em;
+            border-radius: 3px;
+            color: #b8860b;
+        }
+
+        .action-word {
+            color: var(--highlight-text);
+            font-weight: bold;
+        }
+
+        .emergency {
+            color: var(--danger-accent);
+            font-weight: bold;
+            text-decoration: underline;
+        }
+
+        /* Lists formatting */
+        ul {
+            padding-left: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Card-style bullet points for complex data */
+        .info-card {
+            background: #f9fbff;
+            border-left: 4px solid var(--primary-accent);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .info-card ul {
+            margin-bottom: 0;
+        }
+
+        .checklist-box {
+            background: #fff5f5;
+            border: 1px solid #fbd5d5;
+            border-radius: 6px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .checklist-box h3 {
+            color: var(--danger-accent);
+            margin-top: 0;
+        }
+
+        .mnemonic-box {
+            background-color: #e8f4f8;
+            padding: 1rem;
+            border-radius: 6px;
+            font-style: italic;
+            border-left: 4px solid #17a2b8;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>Module 6–7 One-Page Exam Sheet</h1>
+
+        <h2>1. Shock – Types, Key Signs, Priority Actions</h2>
+
+        <h3>Types of Shock</h3>
+
+        <div class="info-card">
+            <strong><span class="key-concept">Cardiogenic</span></strong>
+            <ul>
+                <li><strong>Typical Causes:</strong> Acute MI, severe LV failure, cardiomyopathy, dysrhythmias,
+                    structural damage.</li>
+                <li><strong>Key Signs:</strong> Tachycardia, hypotension, tachypnea, cool/clammy skin, signs of
+                    peripheral hypoperfusion, crackles (if LV failure).</li>
+                <li><strong>Priority Actions:</strong> <span class="action-word">High-flow O₂</span>, continuous
+                    monitoring, IV access, <span class="action-word">prepare for inotropes/vasopressors</span>, rapid
+                    cardiology input.</li>
+            </ul>
+        </div>
+
+        <div class="info-card">
+            <strong><span class="key-concept">Hypovolemic</span> (Absolute/Relative)</strong>
+            <ul>
+                <li><strong>Typical Causes:</strong> Hemorrhage, severe trauma, burns, pancreatitis, massive GI loss,
+                    third spacing.</li>
+                <li><strong>Key Signs:</strong> Tachycardia, hypotension, ↑ RR & depth, ↓ urine output, cool/pale skin,
+                    anxiety.</li>
+                <li><strong>Priority Actions:</strong> <span class="action-word">Control source of loss</span>,
+                    aggressive <span class="action-word">IV fluid resuscitation</span>, monitor vitals/urine output
+                    closely.</li>
+            </ul>
+        </div>
+
+        <div class="info-card">
+            <strong><span class="key-concept">Neurogenic</span> (Distributive)</strong>
+            <ul>
+                <li><strong>Typical Causes:</strong> Spinal cord injury at/above T5, spinal anesthesia, severe CNS
+                    depressants.</li>
+                <li><strong>Key Signs:</strong> <strong class="emergency">Hypotension with bradycardia</strong>,
+                    warm/dry skin, inability to regulate temperature.</li>
+                <li><strong>Priority Actions:</strong> <span class="action-word">Maintain spinal precautions</span>,
+                    airway support, cautious fluids, vasopressors, prevent hypothermia.</li>
+            </ul>
+        </div>
+
+        <div class="info-card">
+            <strong><span class="key-concept">Anaphylactic</span> (Distributive)</strong>
+            <ul>
+                <li><strong>Typical Causes:</strong> Drugs, blood products, insect stings, foods, latex.</li>
+                <li><strong>Key Signs:</strong> Sudden airway swelling, wheeze/stridor, dyspnea, flushing/urticaria,
+                    "impending doom".</li>
+                <li><strong>Priority Actions:</strong> <strong class="emergency">IM epinephrine immediately</strong>,
+                    high-flow O₂, call rapid response, prepare fluids/steroids/antihistamines.</li>
+            </ul>
+        </div>
+
+        <div class="info-card">
+            <strong><span class="key-concept">Septic</span> (Distributive)</strong>
+            <ul>
+                <li><strong>Typical Causes:</strong> Advanced/untreated infection, high-risk clients.</li>
+                <li><strong>Key Signs:</strong> Hypotension, tachycardia, altered LOC, fever/hypothermia, elevated
+                    lactate.</li>
+                <li><strong>Priority Actions:</strong> <span class="action-word">Early sepsis protocol</span>, obtain
+                    cultures, <span class="action-word">broad-spectrum antibiotics ASAP</span>, aggressive IV fluids.
+                </li>
+            </ul>
+        </div>
+
+        <div class="checklist-box">
+            <h3>General Shock Assessment Checklist</h3>
+            <ul>
+                <li><strong>Mental status:</strong> Anxiety → restlessness → confusion → ↓ LOC → unresponsive.</li>
+                <li><strong>BP & Pulse:</strong> ≥20 mm Hg drop from baseline; tachycardic, thready pulse.</li>
+                <li><strong>Respirations:</strong> Rapid, shallow; SpO₂ often <90% in late stages.</li>
+                <li><strong>Temperature:</strong> Febrile (septic); low/normal in others.</li>
+                <li><strong>Skin:</strong> Cool, pale, mottled; delayed cap refill.</li>
+                <li><strong>Urine output:</strong> <span class="action-word">Decreased</span> (aim ≥0.5 mL/kg/hr).</li>
+            </ul>
+        </div>
+
+        <h2>2. CAD & Chest Pain – Fast Reference</h2>
+
+        <h3>CAD & Risk Factors</h3>
+        <ul>
+            <li><strong>Definition:</strong> <span class="key-concept">CAD</span> = atherosclerotic narrowing of
+                coronary arteries → ischemia/infarction.</li>
+            <li><strong>Non-modifiable:</strong> Age ↑, male <65, Black ethnicity, family history.</li>
+            <li><strong>Major modifiable:</strong> Dyslipidemia (↑ LDL, ↓ HDL), HTN ≥140/90, smoking, inactivity,
+                central obesity.</li>
+        </ul>
+
+        <h3>Angina vs ACS vs MI</h3>
+
+        <div class="info-card">
+            <strong><span class="key-concept">Chronic Stable Angina (CSA)</span></strong>
+            <ul>
+                <li><strong>Pattern:</strong> Predictable, exertional, pressure/ache, lasts 3–5 min. Relieved by rest or
+                    nitro.</li>
+                <li><strong>Context:</strong> Fixed atherosclerotic narrowing.</li>
+                <li><strong>Actions:</strong> <span class="action-word">Stop activity</span>, assess PQRST, give
+                    nitro/O₂.</li>
+            </ul>
+        </div>
+
+        <div class="info-card">
+            <strong><span class="key-concept">Unstable Angina (UA) / ACS</span></strong>
+            <ul>
+                <li><strong>Pattern:</strong> New, at rest, or worsening. Unpredictable, less responsive to nitro.</li>
+                <li><strong>Context:</strong> Plaque rupture with non-occlusive thrombus.</li>
+                <li><strong>Actions:</strong> Treat as emergency; <span class="action-word">12-lead ECG</span>, O₂,
+                    nitro, ASA, IV access.</li>
+            </ul>
+        </div>
+
+        <div class="info-card">
+            <strong><span class="key-concept">STEMI / NSTEMI (MI)</span></strong>
+            <ul>
+                <li><strong>Pattern:</strong> Severe, crushing, >20 min. Not relieved by rest/nitro. Diaphoresis, N/V.
+                </li>
+                <li><strong>Context:</strong> Sustained ischemia with myocardial necrosis.</li>
+                <li><strong>Actions:</strong> <span class="action-word">MONA + ECG</span> (Morphine, O₂, Nitro, <strong
+                        class="emergency">ASA</strong>), prep for reperfusion (PCI).</li>
+            </ul>
+        </div>
+
+        <div class="mnemonic-box">
+            <strong>Chest Pain Assessment:</strong> <span class="key-concept">PQRST</span> - Precipitating factors,
+            Quality, Radiation, Severity (0–10), Timing.
+        </div>
+
+        <h2>3. Cardiac Rhythms – Key Patterns & Priorities</h2>
+
+        <h3>ECG Basics</h3>
+        <ul>
+            <li><strong>P wave:</strong> Atrial depolarization.</li>
+            <li><strong>PR interval:</strong> Impulse through atria → AV node → His–Purkinje.</li>
+            <li><strong>QRS:</strong> Ventricular depolarization.</li>
+            <li><strong>ST segment:</strong> Early repolarization (should be isoelectric).</li>
+        </ul>
+
+        <h3>Rhythm Quick Reference</h3>
+
+        <div class="info-card">
+            <strong><span class="key-concept">Sinus Bradycardia</span></strong>
+            <ul>
+                <li><strong>Hallmark:</strong> Regular, <60 bpm.</li>
+                <li><strong>Actions:</strong> Assess symptoms. If unstable: O₂, <span
+                        class="action-word">atropine/pacing</span>.</li>
+            </ul>
+        </div>
+
+        <div class="info-card">
+            <strong><span class="key-concept">Atrial Fibrillation (AF)</span></strong>
+            <ul>
+                <li><strong>Hallmark:</strong> Irregularly irregular, no P waves.</li>
+                <li><strong>Actions:</strong> Assess stability. <span class="action-word">Rate control &
+                        anticoagulation</span>.</li>
+            </ul>
+        </div>
+
+        <div class="info-card">
+            <strong><span class="key-concept">Ventricular Tachycardia (VT)</span></strong>
+            <ul>
+                <li><strong>Hallmark:</strong> Wide, fast QRS; ≥3 PVCs.</li>
+                <li><strong>Actions:</strong> No pulse = <strong class="emergency">CPR + Defibrillation</strong>. Pulse
+                    (unstable) = Synchronized cardioversion.</li>
+            </ul>
+        </div>
+
+        <div class="info-card">
+            <strong><span class="key-concept">Ventricular Fibrillation (VF)</span></strong>
+            <ul>
+                <li><strong>Hallmark:</strong> Chaotic, irregular waveform; quivering.</li>
+                <li><strong>Actions:</strong> <strong class="emergency">Immediate CPR + Defibrillation</strong> (ACLS
+                    protocols).</li>
+            </ul>
+        </div>
+
+        <div class="info-card">
+            <strong><span class="key-concept">Asystole</span></strong>
+            <ul>
+                <li><strong>Hallmark:</strong> Flat line.</li>
+                <li><strong>Actions:</strong> CPR, Epinephrine. <strong class="emergency">NO defibrillation</strong>.
+                </li>
+            </ul>
+        </div>
+
+        <div class="checklist-box">
+            <h3>Dysrhythmia Emergency Checklist (Unstable Rhythm)</h3>
+            <ul>
+                <li><strong>1. CAB:</strong> Check responsiveness/pulse. Start CPR if pulseless.</li>
+                <li><strong>2. Airway & Breathing:</strong> Ensure airway, give O₂, prep for intubation.</li>
+                <li><strong>3. Circulation:</strong> Attach monitor/defibrillator, establish IV.</li>
+                <li><strong>4. ACLS:</strong> Follow algorithm for specific rhythm.</li>
+            </ul>
+        </div>
+
+    </div>
+
+</body>
+
+</html>

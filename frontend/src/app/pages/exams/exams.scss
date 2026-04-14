@@ -5,6 +5,7 @@
   flex-wrap: wrap;
   gap: 0.75rem;
   margin-bottom: 0.25rem;
+  padding-right: 2.65rem; // offset for 3-dot menu column so header aligns with card edge
 
   .page-title {
     margin-bottom: 0;
@@ -13,6 +14,21 @@
 
 .course-filter {
   flex-shrink: 0;
+}
+
+.header-controls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.search-filter {
+  width: 220px;
+
+  input {
+    width: 100%;
+  }
 }
 
 .course-select {

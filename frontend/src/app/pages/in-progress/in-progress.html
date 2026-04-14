@@ -1,10 +1,20 @@
-<h1 class="page-title">In Progress</h1>
+<div class="exams-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+  <h1 class="page-title" style="margin-bottom: 0;">In Progress</h1>
+  <div class="search-filter" style="width: 280px; max-width: 100%;">
+    <input
+      type="text"
+      placeholder="Search in progress..."
+      [ngModel]="searchQuery()"
+      (ngModelChange)="searchQuery.set($event)"
+    />
+  </div>
+</div>
 
-@if (records().length === 0) {
+@if (filteredRecords().length === 0) {
   <p class="empty-state">No exams in progress. Start an exam and save your progress to continue later.</p>
 } @else {
   <div class="ip-list">
-    @for (r of records(); track r.id) {
+    @for (r of filteredRecords(); track r.id) {
       <div class="card ip-card" (click)="resume(r)">
         <div class="ip-left">
           <span class="ip-title">{{ r.exam_title }}</span>

@@ -13,6 +13,7 @@ export class DocumentsPage implements OnInit {
   courses = signal<Course[]>([]);
   documents = signal<DocumentItem[]>([]);
   selectedCourseId = signal<string>('');
+  searchQuery = signal('');
 
   // Viewer state
   viewingDoc = signal<DocumentItem | null>(null);
@@ -23,9 +24,15 @@ export class DocumentsPage implements OnInit {
   /** Group documents by course_name for display */
   groupedDocuments = computed(() => {
     const courseId = this.selectedCourseId();
+    const query = this.searchQuery().toLowerCase().trim();
     let docs = this.documents();
+    
     if (courseId) {
       docs = docs.filter((d) => d.course_id === courseId);
+    }
+    
+    if (query) {
+      docs = docs.filter((d) => d.title.toLowerCase().includes(query));
     }
 
     const groups: { courseName: string; docs: DocumentItem[] }[] = [];

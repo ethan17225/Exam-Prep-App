@@ -94,10 +94,14 @@ class ExamCreate(BaseModel):
     title: str
     questions: list[QuestionIn]
     course_id: str | None = None
+    time_limit_minutes: int | None = None
 
 
 class ExamTitleUpdate(BaseModel):
     title: str
+
+class ExamTimeLimitUpdate(BaseModel):
+    time_limit_minutes: int | None = None
 
 
 class AnswerSubmission(BaseModel):
@@ -227,7 +231,13 @@ def get_document_html(path: str = Query(...)):
 @app.post("/api/exams")
 def create_exam(payload: ExamCreate, db: Session = Depends(get_db)):
     exam_id = str(uuid4())[:8]
-    exam = Exam(id=exam_id, title=payload.title, course_id=payload.course_id, created_at=datetime.now())
+    exam = Exam(
+        id=exam_id,
+        title=payload.title,
+        course_id=payload.course_id,
+        time_limit_minutes=payload.time_limit_minutes,
+        created_at=datetime.now()
+    )
     db.add(exam)
     for q in payload.questions:
         db.add(Question(
@@ -260,6 +270,7 @@ def list_exams(course_id: str | None = Query(None), db: Session = Depends(get_db
                 "title": exam.title,
                 "course_id": exam.course_id,
                 "course_name": exam.course.name if exam.course else None,
+                "time_limit_minutes": exam.time_limit_minutes,
                 "total_questions": total,
                 "mcq_count": mcq,
                 "sata_count": sata,
@@ -293,6 +304,7 @@ def get_exam(exam_id: str, include_answers: bool = False, db: Session = Depends(
         "title": exam.title,
         "course_id": exam.course_id,
         "course_name": exam.course.name if exam.course else None,
+        "time_limit_minutes": exam.time_limit_minutes,
         "questions": questions,
     }
 

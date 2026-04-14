@@ -22,6 +22,7 @@ class Exam(Base):
     id = Column(String(8), primary_key=True)
     course_id = Column(String(8), ForeignKey("courses.id", ondelete="SET NULL"), nullable=True)
     title = Column(String(255), nullable=False)
+    time_limit_minutes = Column(Integer, nullable=True)
     created_at = Column(DateTime, nullable=False)
 
     course = relationship("Course", back_populates="exams")

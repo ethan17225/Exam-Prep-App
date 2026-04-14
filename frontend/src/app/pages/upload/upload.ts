@@ -23,6 +23,7 @@ export class UploadPage implements OnInit {
   newCourseName = signal('');
   courseLoading = signal(false);
   courseError = signal('');
+  timeLimitMinutes = signal<number | null>(null);
 
   private readonly exampleJson = `[
   {
@@ -161,7 +162,10 @@ export class UploadPage implements OnInit {
     }
 
     this.loading.set(true);
-    this.examService.createExam(titleVal, questions as never[], this.selectedCourseId()).subscribe({
+    let timeLimit = this.timeLimitMinutes();
+    if (timeLimit && timeLimit <= 0) timeLimit = null; // invalid times ignored
+
+    this.examService.createExam(titleVal, questions as never[], this.selectedCourseId(), timeLimit).subscribe({
       next: () => {
         this.loading.set(false);
         this.router.navigate(['/exams']);

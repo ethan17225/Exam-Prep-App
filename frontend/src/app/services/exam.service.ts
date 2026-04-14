@@ -63,6 +63,7 @@ export interface ExamSummary {
   title: string;
   course_id: string | null;
   course_name: string | null;
+  time_limit_minutes: number | null;
   total_questions: number;
   mcq_count: number;
   sata_count: number;
@@ -73,6 +74,8 @@ export interface ExamSummary {
 export interface ExamDetail {
   id: string;
   title: string;
+  course_name?: string | null;
+  time_limit_minutes?: number | null;
   questions: Question[];
 }
 
@@ -166,9 +169,10 @@ export class ExamService {
 
   constructor(private http: HttpClient) {}
 
-  createExam(title: string, questions: Question[], courseId?: string): Observable<{ exam_id: string; total_questions: number }> {
+  createExam(title: string, questions: Question[], courseId?: string, timeLimitMinutes?: number | null): Observable<{ exam_id: string; total_questions: number }> {
     const body: Record<string, unknown> = { title, questions };
     if (courseId) body['course_id'] = courseId;
+    if (timeLimitMinutes) body['time_limit_minutes'] = timeLimitMinutes;
     return this.http.post<{ exam_id: string; total_questions: number }>(`${this.base}/exams`, body);
   }
 
@@ -224,6 +228,10 @@ export class ExamService {
 
   renameExam(id: string, title: string): Observable<ExamSummary> {
     return this.http.patch<ExamSummary>(`${this.base}/exams/${id}`, { title });
+  }
+
+  updateTimeLimit(id: string, timeLimitMinutes: number | null): Observable<ExamSummary> {
+    return this.http.patch<ExamSummary>(`${this.base}/exams/${id}/time-limit`, { time_limit_minutes: timeLimitMinutes });
   }
 
   saveProgress(payload: SaveProgressPayload): Observable<InProgressExam> {

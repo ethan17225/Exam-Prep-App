@@ -42,6 +42,9 @@
   <label class="field-label" style="margin-top: 1rem">Exam Title</label>
   <input type="text" [ngModel]="title()" (ngModelChange)="title.set($event)" placeholder="e.g. Nursing Practice Exam 1" />
 
+  <label class="field-label" style="margin-top: 1rem">Time Limit (minutes) <span style="font-weight: normal; color: #666; font-size: 0.9em;">(Leave blank for no limit)</span></label>
+  <input type="number" [ngModel]="timeLimitMinutes()" (ngModelChange)="timeLimitMinutes.set($event)" placeholder="e.g. 60" min="1" />
+
   <label class="field-label" style="margin-top: 1rem">Questions JSON</label>
   <textarea rows="16" [ngModel]="jsonText()" (ngModelChange)="jsonText.set($event)" placeholder='Paste your JSON array here, or use the file picker below...'></textarea>
 

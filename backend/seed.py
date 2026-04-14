@@ -34,6 +34,11 @@ def export_seed(path: pathlib.Path | None = None) -> None:
                 "ALTER TABLE exams ADD COLUMN course_id VARCHAR(8) REFERENCES courses(id) ON DELETE SET NULL"
             ))
             conn.commit()
+        if "time_limit_minutes" not in exam_cols:
+            conn.execute(text(
+                "ALTER TABLE exams ADD COLUMN time_limit_minutes INTEGER"
+            ))
+            conn.commit()
 
     db = SessionLocal()
     try:
@@ -76,6 +81,11 @@ def seed():
         if "course_id" not in exam_cols:
             conn.execute(text(
                 "ALTER TABLE exams ADD COLUMN course_id VARCHAR(8) REFERENCES courses(id) ON DELETE SET NULL"
+            ))
+            conn.commit()
+        if "time_limit_minutes" not in exam_cols:
+            conn.execute(text(
+                "ALTER TABLE exams ADD COLUMN time_limit_minutes INTEGER"
             ))
             conn.commit()
 

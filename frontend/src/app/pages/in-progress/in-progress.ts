@@ -1,15 +1,23 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { ExamService, InProgressExam } from '../../services/exam.service';
 
 @Component({
   selector: 'app-in-progress',
-  imports: [],
+  imports: [FormsModule],
   templateUrl: './in-progress.html',
   styleUrl: './in-progress.scss',
 })
 export class InProgressPage implements OnInit {
   records = signal<InProgressExam[]>([]);
+  searchQuery = signal('');
+
+  filteredRecords = computed(() => {
+    const query = this.searchQuery().toLowerCase().trim();
+    if (!query) return this.records();
+    return this.records().filter((r) => r.exam_title.toLowerCase().includes(query));
+  });
 
   constructor(
     private examService: ExamService,

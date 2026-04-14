@@ -1,20 +1,30 @@
 <div class="exams-header">
   <h1 class="page-title">Available Exams</h1>
-  @if (courses().length > 0) {
-    <div class="course-filter">
-      <select
-        id="course-select"
-        class="course-select"
-        [ngModel]="selectedCourseId()"
-        (ngModelChange)="onCourseChange($event)"
-      >
-        <option value="">All Courses</option>
-        @for (course of courses(); track course.id) {
-          <option [value]="course.id">{{ course.name }}</option>
-        }
-      </select>
+  <div class="header-controls">
+    @if (courses().length > 0) {
+      <div class="course-filter">
+        <select
+          id="course-select"
+          class="course-select"
+          [ngModel]="selectedCourseId()"
+          (ngModelChange)="onCourseChange($event)"
+        >
+          <option value="">All Courses</option>
+          @for (course of courses(); track course.id) {
+            <option [value]="course.id">{{ course.name }}</option>
+          }
+        </select>
+      </div>
+    }
+    <div class="search-filter">
+      <input
+        type="text"
+        placeholder="Search exams..."
+        [ngModel]="searchQuery()"
+        (ngModelChange)="searchQuery.set($event)"
+      />
     </div>
-  }
+  </div>
 </div>
 
 @if (filteredExams().length === 0) {
@@ -51,7 +61,10 @@
               @if (exam.course_name) {
                 <span class="course-badge">{{ exam.course_name }}</span>
               }
-              <span class="exam-meta">{{ exam.total_questions }} questions</span>
+              <span class="exam-meta">
+                {{ exam.total_questions }} questions
+                @if (exam.time_limit_minutes) { &middot; {{ exam.time_limit_minutes }} min }
+              </span>
               <span class="exam-type-counts">
                 <span class="exam-type-count pill-mcq">MCQ {{ exam.mcq_count }}</span>
                 <span class="exam-type-count pill-sata">SATA {{ exam.sata_count }}</span>
@@ -80,6 +93,25 @@
               <span class="count-hint">of {{ exam.total_questions }}</span>
             </div>
           }
+          @if (editMode()[exam.id] === 'time-limit') {
+            <div class="inline-count" (click)="$event.stopPropagation()">
+              <label for="time-{{ exam.id }}">Time Limit (minutes):</label>
+              <input
+                id="time-{{ exam.id }}"
+                class="count-input"
+                type="number"
+                [min]="1"
+                [ngModel]="timeLimitDrafts()[exam.id]"
+                (ngModelChange)="updateTimeLimitDraft(exam.id, $event)"
+              />
+              <button class="btn btn-primary btn-sm" style="margin-left: 0.5rem" (click)="saveTimeLimit(exam, $event)" [disabled]="loadingTimeLimit()[exam.id]">
+                {{ loadingTimeLimit()[exam.id] ? 'Saving...' : 'Save' }}
+              </button>
+              @if (timeLimitError()[exam.id]) {
+                <span class="rename-error" style="margin-left: 0.5rem">{{ timeLimitError()[exam.id] }}</span>
+              }
+            </div>
+          }
         </div>
         <div class="exam-card-menu" (click)="$event.stopPropagation()">
           <div class="menu-wrap">
@@ -88,6 +120,7 @@
               <div class="menu-panel card">
                 <button class="menu-option" (mousedown)="pickMenuOption(exam.id, 'rename')">Rename Exam</button>
                 <button class="menu-option" (mousedown)="pickMenuOption(exam.id, 'count')">Modify Number of Questions</button>
+                <button class="menu-option" (mousedown)="pickMenuOption(exam.id, 'time-limit')">Set Time Limit</button>
               </div>
             }
           </div>
