@@ -261,4 +261,36 @@
   .review-toolbar-left {
     flex-wrap: wrap;
   }
+
+  .score-pct {
+    font-size: 2rem;
+  }
+
+  .score-details {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .review-answer-summary {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+  }
+
+  .answer-sep {
+    display: none;
+  }
+
+  .type-pills {
+    // allow pills to shrink gracefully
+    flex-wrap: wrap;
+    border: none;
+    gap: 0.3rem;
+
+    .type-pill {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+  }
 }

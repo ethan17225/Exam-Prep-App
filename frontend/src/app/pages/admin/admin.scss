@@ -138,3 +138,33 @@
   &.idle { color: #e65100; }
   &.elapsed { color: #555; }
 }
+
+// ── Mobile ──────────────────────────────────────────────────────
+@media (max-width: 640px) {
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+  }
+
+  .stat {
+    min-width: 0;
+  }
+
+  .stat-value {
+    font-size: 1.15rem;
+
+    &.timer {
+      font-size: 0.9rem;
+    }
+  }
+
+  .time-row {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .dash-title {
+    font-size: 0.95rem;
+  }
+}

@@ -382,3 +382,78 @@
   display: flex;
   justify-content: center;
 }
+
+// ── Mobile ──────────────────────────────────────────────────────
+@media (max-width: 640px) {
+  .exam-header-sticky {
+    top: 0; // no nav height offset; nav is at bottom
+    padding: 0.4rem 0 0;
+  }
+
+  .exam-topbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.4rem;
+    padding-bottom: 0.4rem;
+  }
+
+  .exam-topbar-left {
+    gap: 0.3rem 0.5rem;
+  }
+
+  .exam-name {
+    font-size: 0.88rem;
+  }
+
+  .exam-type-summary {
+    display: none; // hide type chips to save space, info is in the nav panel
+  }
+
+  .exam-topbar-right {
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .timer {
+    font-size: 0.88rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  // Question nav buttons — slightly larger for touch
+  .q-nav-btn {
+    width: 2.4rem;
+    height: 2.4rem;
+    font-size: 0.78rem;
+  }
+
+  .q-nav-legend {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  // FIB input stacking
+  .fib-input {
+    flex-direction: column;
+    align-items: stretch;
+    max-width: 100%;
+  }
+
+  .fib-self-grade {
+    flex-wrap: wrap;
+  }
+
+  // Bottom nav — stack vertically
+  .bottom-nav {
+    flex-direction: column;
+    gap: 0.5rem;
+
+    .btn {
+      width: 100%;
+    }
+  }
+
+  .bottom-nav-center {
+    order: -1; // submit button on top
+    width: 100%;
+  }
+}

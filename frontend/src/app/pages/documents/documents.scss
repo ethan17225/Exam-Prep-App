@@ -317,6 +317,21 @@
 // ── Responsive ───────────────────────────────────────────────────
 
 @media (max-width: 600px) {
+  .docs-header {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .header-controls {
+    flex-direction: column;
+    align-items: stretch !important;
+    width: 100%;
+  }
+
+  .course-select, .search-filter {
+    width: 100% !important;
+  }
+
   .doc-card {
     flex-wrap: wrap;
   }
