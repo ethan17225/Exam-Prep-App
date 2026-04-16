@@ -58,65 +58,7 @@
   color: #088;
 }
 
-.message-card {
-  text-align: center;
-  padding: 1.5rem 1.25rem;
-  margin-bottom: 1rem;
-  border-radius: 12px;
-  animation: messageSlideIn 0.5s ease-out;
 
-  .message-icon {
-    font-size: 2.2rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .message-title {
-    font-size: 1.3rem;
-    font-weight: 800;
-    margin-bottom: 0.4rem;
-    letter-spacing: 0.02em;
-  }
-
-  .message-main {
-    font-size: 1.1rem;
-    font-weight: 700;
-    margin: 0 0 0.3rem;
-    line-height: 1.5;
-  }
-
-  .message-sub {
-    font-size: 0.9rem;
-    color: #777;
-    margin: 0;
-  }
-
-  &.message-passed {
-    background: linear-gradient(135deg, #f0fff4, #e6f9ed);
-    border: 1.5px solid #a3e4b8;
-
-    .message-main { color: #2e7d32; }
-    .message-sub { color: #4caf50; }
-  }
-
-  &.message-failed {
-    background: linear-gradient(135deg, #fff8f0, #fef0f0);
-    border: 1.5px solid #f5b5b5;
-
-    .message-title { color: #e53935; }
-    .message-main { color: #c62828; }
-  }
-}
-
-@keyframes messageSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
 .result-actions {
   display: flex;
