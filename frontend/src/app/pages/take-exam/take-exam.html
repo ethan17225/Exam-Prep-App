@@ -17,6 +17,9 @@
           <span class="type-chip type-chip-mcq">MCQ {{ typeCounts().mcq }}</span>
           <span class="type-chip type-chip-sata">SATA {{ typeCounts().sata }}</span>
           <span class="type-chip type-chip-fib">FIB {{ typeCounts().fib }}</span>
+          @if (typeCounts().other > 0) {
+            <span class="type-chip type-chip-other">Other {{ typeCounts().other }}</span>
+          }
         </span>
       </div>
       <div class="exam-topbar-right">
@@ -80,9 +83,10 @@
       <div class="question-header">
         <div class="question-badges">
           <span class="badge"
-            [class.badge-mcq]="q.type === 'MCQ'"
-            [class.badge-sata]="q.type === 'SATA'"
-            [class.badge-fib]="q.type === 'FIB' || q.type === 'Fill-in-the-blank'">
+            [class.badge-mcq]="kind(q) === 'MCQ'"
+            [class.badge-sata]="kind(q) === 'SATA'"
+            [class.badge-fib]="kind(q) === 'FIB'"
+            [class.badge-other]="isAdvanced(q)">
             {{ q.type }}
           </span>
           <span class="topic-label">{{ q.topic }}</span>
@@ -93,13 +97,188 @@
       </div>
 
       <p class="question-number">Question {{ pageStartNum() + i }} of {{ totalQuestions() }}</p>
+
+      <app-question-sections [sections]="q.sections" />
+
       <p class="question-text">{{ q.question }}</p>
+
+      @if (q.image && kind(q) !== 'HOTSPOT') {
+        <img class="question-image" [src]="q.image" alt="Question illustration" />
+      }
 
       @if (q.type === 'SATA') {
         <p class="sata-hint">Select all that apply</p>
       }
 
-      @if (isTextInput(q)) {
+      @if (kind(q) === 'MATRIX') {
+        <!-- MATRIX: checkbox grid -->
+        <div class="matrix-wrap">
+          <table class="matrix-table">
+            <thead>
+              <tr>
+                <th></th>
+                @for (col of matrixCols(q); track col) {
+                  <th>{{ col }}</th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of matrixRows(q); track $index; let ri = $index) {
+                <tr>
+                  <td class="matrix-row-label">{{ row }}</td>
+                  @for (col of matrixCols(q); track col) {
+                    <td class="matrix-cell">
+                      <button
+                        class="matrix-check"
+                        [class.checked]="isMatrixChecked(q.number, ri, col)"
+                        [class.cell-correct]="isRevealed(q.number) && isMatrixExpected(q, ri, col) && isMatrixChecked(q.number, ri, col)"
+                        [class.cell-missed]="isRevealed(q.number) && isMatrixExpected(q, ri, col) && !isMatrixChecked(q.number, ri, col)"
+                        [class.cell-wrong]="isRevealed(q.number) && !isMatrixExpected(q, ri, col) && isMatrixChecked(q.number, ri, col)"
+                        (click)="toggleMatrix(q.number, ri, col)"
+                        [disabled]="isRevealed(q.number)"
+                      >{{ isMatrixChecked(q.number, ri, col) ? '☑' : '☐' }}</button>
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else if (kind(q) === 'CLOZE') {
+        <!-- CLOZE: dropdown blanks -->
+        <div class="cloze-blanks">
+          @for (blank of clozeBlanks(q); track $index; let bi = $index) {
+            <div
+              class="cloze-blank"
+              [class.cloze-correct]="isRevealed(q.number) && isClozeBlankCorrect(q, bi)"
+              [class.cloze-wrong]="isRevealed(q.number) && !isClozeBlankCorrect(q, bi)"
+            >
+              <label class="cloze-label">{{ blank.label }}</label>
+              <select
+                class="cloze-select"
+                [ngModel]="getClozeAnswer(q.number, bi)"
+                (ngModelChange)="setClozeAnswer(q, bi, $event)"
+                [disabled]="isRevealed(q.number)"
+              >
+                <option value="" disabled>Select an option…</option>
+                @for (choice of blank.choices; track choice) {
+                  <option [value]="choice">{{ choice }}</option>
+                }
+              </select>
+              @if (isRevealed(q.number) && !isClozeBlankCorrect(q, bi)) {
+                <span class="cloze-expected">Correct: {{ clozeExpected(q, bi) }}</span>
+              }
+            </div>
+          }
+        </div>
+      } @else if (kind(q) === 'BOWTIE') {
+        <!-- BOWTIE: assign choices to categories -->
+        <div class="bowtie-categories">
+          @for (cat of bowtieCategories(q); track cat.name) {
+            <div class="bowtie-category">
+              <div class="bowtie-cat-header">
+                <span class="bowtie-cat-name">{{ cat.name }}</span>
+                <span class="bowtie-count">{{ bowtieSelectedCount(q.number, cat.name) }}/{{ cat.count }} selected</span>
+              </div>
+              <div class="bowtie-choices">
+                @for (choice of cat.choices; track choice) {
+                  <button
+                    class="bowtie-choice"
+                    [class.selected]="isBowtieSelected(q.number, cat.name, choice)"
+                    [class.option-correct]="isRevealed(q.number) && isBowtieExpected(q, cat.name, choice)"
+                    [class.option-wrong]="isRevealed(q.number) && isBowtieSelected(q.number, cat.name, choice) && !isBowtieExpected(q, cat.name, choice)"
+                    (click)="toggleBowtie(q.number, cat, choice)"
+                    [disabled]="isRevealed(q.number)"
+                  >
+                    {{ choice }}
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      } @else if (kind(q) === 'RANKING') {
+        <!-- RANKING: reorder items -->
+        <p class="rank-hint">Use the arrows to put the items in the correct order, then confirm.</p>
+        <div class="rank-list">
+          @for (item of rankOrder(q); track item; let ri = $index) {
+            <div
+              class="rank-item"
+              [class.rank-correct]="isRevealed(q.number) && isRankItemCorrect(q, ri)"
+              [class.rank-wrong]="isRevealed(q.number) && !isRankItemCorrect(q, ri)"
+            >
+              <span class="rank-pos">{{ ri + 1 }}</span>
+              <span class="rank-text">{{ item }}</span>
+              <span class="rank-controls">
+                <button class="rank-btn" (click)="moveRank(q, ri, -1)" [disabled]="isRevealed(q.number) || ri === 0" aria-label="Move up">▲</button>
+                <button class="rank-btn" (click)="moveRank(q, ri, 1)" [disabled]="isRevealed(q.number) || ri === rankOrder(q).length - 1" aria-label="Move down">▼</button>
+              </span>
+            </div>
+          }
+        </div>
+        @if (!isRankConfirmed(q.number) && !isRevealed(q.number)) {
+          <button class="btn btn-secondary btn-sm rank-confirm-btn" (click)="confirmRankOrder(q)">Confirm This Order</button>
+        }
+      } @else if (kind(q) === 'HIGHLIGHT') {
+        <!-- HIGHLIGHT: click phrases -->
+        <p class="highlight-hint">Click to highlight each finding that applies.</p>
+        <div class="highlight-tokens">
+          @for (tok of highlightTokens(q); track $index; let ti = $index) {
+            <button
+              class="highlight-token"
+              [class.selected]="isHighlighted(q.number, ti)"
+              [class.option-correct]="isRevealed(q.number) && isHighlightExpected(q, ti) && isHighlighted(q.number, ti)"
+              [class.option-missed]="isRevealed(q.number) && isHighlightExpected(q, ti) && !isHighlighted(q.number, ti)"
+              [class.option-wrong]="isRevealed(q.number) && !isHighlightExpected(q, ti) && isHighlighted(q.number, ti)"
+              (click)="toggleHighlight(q.number, ti)"
+              [disabled]="isRevealed(q.number)"
+            >
+              {{ tok }}
+            </button>
+          }
+        </div>
+      } @else if (kind(q) === 'HOTSPOT') {
+        <!-- HOTSPOT: click a region on the image -->
+        @if (q.image) {
+          <div class="hotspot-wrap">
+            <img [src]="q.image" alt="Question image" />
+            @for (region of hotspotRegions(q); track region.id) {
+              <button
+                class="hotspot-region"
+                [style.left.%]="region.x"
+                [style.top.%]="region.y"
+                [style.width.%]="region.w"
+                [style.height.%]="region.h"
+                [class.selected]="isHotspotSelected(q.number, region.id)"
+                [class.region-correct]="isRevealed(q.number) && isHotspotExpected(q, region.id)"
+                [class.region-wrong]="isRevealed(q.number) && isHotspotSelected(q.number, region.id) && !isHotspotExpected(q, region.id)"
+                (click)="selectHotspot(q.number, region.id)"
+                [disabled]="isRevealed(q.number)"
+                [title]="region.label"
+              ></button>
+            }
+          </div>
+          @if (hotspotSelectedLabel(q)) {
+            <p class="hotspot-selected">Selected: <strong>{{ hotspotSelectedLabel(q) }}</strong></p>
+          }
+        } @else {
+          <div class="options-list">
+            @for (region of hotspotRegions(q); track region.id) {
+              <button
+                class="option-btn"
+                [class.selected]="isHotspotSelected(q.number, region.id)"
+                [class.option-correct]="isRevealed(q.number) && isHotspotExpected(q, region.id)"
+                [class.option-wrong]="isRevealed(q.number) && isHotspotSelected(q.number, region.id) && !isHotspotExpected(q, region.id)"
+                (click)="selectHotspot(q.number, region.id)"
+                [disabled]="isRevealed(q.number)"
+              >
+                <span class="option-indicator">{{ isHotspotSelected(q.number, region.id) ? '●' : '○' }}</span>
+                {{ region.label }}
+              </button>
+            }
+          </div>
+        }
+      } @else if (isTextInput(q)) {
         <!-- FIB / Text input -->
         <div class="fib-input">
           <input
@@ -140,10 +319,10 @@
             }
           </div>
         }
-      } @else if (q.type === 'SATA' && q.options) {
+      } @else if (q.type === 'SATA' && mcqOptions(q).length) {
         <!-- SATA options -->
         <div class="options-list">
-          @for (opt of q.options; track opt) {
+          @for (opt of mcqOptions(q); track opt) {
             <button
               class="option-btn"
               [class.selected]="isSataSelected(q.number, opt)"
@@ -167,10 +346,10 @@
             <strong>Rationale:</strong> {{ q.rationale }}
           </div>
         }
-      } @else if (q.options) {
+      } @else if (mcqOptions(q).length) {
         <!-- MCQ options -->
         <div class="options-list">
-          @for (opt of q.options; track opt) {
+          @for (opt of mcqOptions(q); track opt) {
             <button
               class="option-btn"
               [class.selected]="isSelected(q.number, opt)"
@@ -187,6 +366,28 @@
         @if (isRevealed(q.number) && q.rationale) {
           <div class="rationale">
             <strong>Rationale:</strong> {{ q.rationale }}
+          </div>
+        }
+      }
+
+      <!-- Shared check/reveal block for advanced question types -->
+      @if (isAdvanced(q)) {
+        @if (mode() === 'practice' && !isRevealed(q.number) && isFullyAnswered(q)) {
+          <button class="btn btn-primary btn-sm check-answer-btn" (click)="revealQuestion(q.number)">
+            Check Answer
+          </button>
+        }
+        @if (isRevealed(q.number)) {
+          <div class="fib-reveal">
+            <div class="fib-correct-answer">
+              <span class="fib-label">Correct answer:</span>
+              <strong>{{ correctAnswerText(q) }}</strong>
+            </div>
+            @if (q.rationale) {
+              <div class="rationale">
+                <strong>Rationale:</strong> {{ q.rationale }}
+              </div>
+            }
           </div>
         }
       }

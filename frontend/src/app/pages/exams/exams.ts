@@ -80,6 +80,11 @@ export class ExamsPage implements OnInit {
     this.router.navigate(['/exam', exam.id], { queryParams: { mode, count } });
   }
 
+  editQuestions(exam: ExamSummary): void {
+    this.menuOpen.set(null);
+    this.router.navigate(['/exams', exam.id, 'edit']);
+  }
+
   openFlashcards(exam: ExamSummary): void {
     this.menuOpen.set(null);
     const selected = this.questionCounts()[exam.id] ?? exam.total_questions;

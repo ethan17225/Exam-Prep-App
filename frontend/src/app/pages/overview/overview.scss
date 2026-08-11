@@ -283,4 +283,22 @@
   .charts-row {
     grid-template-columns: 1fr;
   }
+
+  .chart-wrap-wide {
+    height: 180px;
+  }
+
+  .chart-wrap-square {
+    height: 160px;
+  }
+
+  .recent-row {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .recent-right {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }

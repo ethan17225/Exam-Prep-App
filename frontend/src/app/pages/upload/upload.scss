@@ -99,6 +99,22 @@
     border-radius: 3px;
     font-size: 0.8rem;
   }
+
+  .format-note {
+    margin: 0.5rem 0 0;
+    font-size: 0.8rem;
+    color: #888;
+  }
+
+  strong:not(:first-child) {
+    display: inline-block;
+    margin-top: 0.9rem;
+  }
+
+  li.sub {
+    list-style: none;
+    margin-left: 0.4rem;
+  }
 }
 
 .example-section {

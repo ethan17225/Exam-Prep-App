@@ -62,6 +62,20 @@
   color: #088;
 }
 
+.type-chip-other {
+  background: #fff3e0;
+  color: #b45309;
+}
+
+.review-image {
+  display: block;
+  max-width: 100%;
+  max-height: 360px;
+  margin-bottom: 0.75rem;
+  border: 1px solid #e2e2e2;
+  border-radius: 8px;
+}
+
 .section-title {
   font-size: 1.1rem;
   font-weight: 700;
@@ -112,6 +126,7 @@
   &.pill-mcq.active { background: #44c; }
   &.pill-sata.active { background: #b80; }
   &.pill-fib.active { background: #088; }
+  &.pill-other.active { background: #b45309; }
 }
 
 .review-count {
@@ -260,5 +275,37 @@
 
   .review-toolbar-left {
     flex-wrap: wrap;
+  }
+
+  .score-pct {
+    font-size: 2rem;
+  }
+
+  .score-details {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .review-answer-summary {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+  }
+
+  .answer-sep {
+    display: none;
+  }
+
+  .type-pills {
+    // allow pills to shrink gracefully
+    flex-wrap: wrap;
+    border: none;
+    gap: 0.3rem;
+
+    .type-pill {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
   }
 }

@@ -58,65 +58,21 @@
   color: #088;
 }
 
-.message-card {
-  text-align: center;
-  padding: 1.5rem 1.25rem;
-  margin-bottom: 1rem;
-  border-radius: 12px;
-  animation: messageSlideIn 0.5s ease-out;
-
-  .message-icon {
-    font-size: 2.2rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .message-title {
-    font-size: 1.3rem;
-    font-weight: 800;
-    margin-bottom: 0.4rem;
-    letter-spacing: 0.02em;
-  }
-
-  .message-main {
-    font-size: 1.1rem;
-    font-weight: 700;
-    margin: 0 0 0.3rem;
-    line-height: 1.5;
-  }
-
-  .message-sub {
-    font-size: 0.9rem;
-    color: #777;
-    margin: 0;
-  }
-
-  &.message-passed {
-    background: linear-gradient(135deg, #f0fff4, #e6f9ed);
-    border: 1.5px solid #a3e4b8;
-
-    .message-main { color: #2e7d32; }
-    .message-sub { color: #4caf50; }
-  }
-
-  &.message-failed {
-    background: linear-gradient(135deg, #fff8f0, #fef0f0);
-    border: 1.5px solid #f5b5b5;
-
-    .message-title { color: #e53935; }
-    .message-main { color: #c62828; }
-  }
+.type-chip-other {
+  background: #fff3e0;
+  color: #b45309;
 }
 
-@keyframes messageSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.review-image {
+  display: block;
+  max-width: 100%;
+  max-height: 360px;
+  margin-bottom: 0.75rem;
+  border: 1px solid #e2e2e2;
+  border-radius: 8px;
 }
+
+
 
 .result-actions {
   display: flex;
@@ -235,4 +191,36 @@
   padding: 0.6rem 0.8rem;
   border-radius: 6px;
   border: 1px solid #eee;
+}
+
+// ── Mobile ──────────────────────────────────────────────────────
+@media (max-width: 640px) {
+  .score-pct {
+    font-size: 2rem;
+  }
+
+  .score-details {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .result-actions {
+    flex-direction: column;
+
+    .btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  .review-answer-summary {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+  }
+
+  .answer-sep {
+    display: none;
+  }
 }

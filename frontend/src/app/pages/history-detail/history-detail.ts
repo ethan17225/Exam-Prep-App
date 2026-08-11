@@ -1,17 +1,26 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { ExamService, ExamResult, QuestionResult, classifyQuestionType, countQuestionTypes } from '../../services/exam.service';
+import { QuestionSectionsComponent } from '../../components/question-sections/question-sections';
+import {
+  ExamService,
+  ExamResult,
+  QuestionResult,
+  AnswerValue,
+  classifyQuestionType,
+  countQuestionTypes,
+  formatAnswerForDisplay,
+} from '../../services/exam.service';
 
 @Component({
   selector: 'app-history-detail',
-  imports: [],
+  imports: [QuestionSectionsComponent],
   templateUrl: './history-detail.html',
   styleUrl: './history-detail.scss',
 })
 export class HistoryDetailPage implements OnInit {
   result = signal<ExamResult | null>(null);
   showWrongOnly = signal(false);
-  selectedType = signal<'all' | 'MCQ' | 'SATA' | 'FIB'>('all');
+  selectedType = signal<'all' | 'MCQ' | 'SATA' | 'FIB' | 'OTHER'>('all');
 
   formattedTime = computed(() => {
     const s = this.result()?.time_spent_seconds ?? 0;
@@ -53,14 +62,26 @@ export class HistoryDetailPage implements OnInit {
     this.showWrongOnly.update((v) => !v);
   }
 
-  setTypeFilter(value: 'all' | 'MCQ' | 'SATA' | 'FIB'): void {
+  setTypeFilter(value: 'all' | 'MCQ' | 'SATA' | 'FIB' | 'OTHER'): void {
     this.selectedType.set(value);
   }
 
-  formatAnswer(ans: string | string[] | null): string {
-    if (ans === null || ans === undefined) return '—';
-    if (Array.isArray(ans)) return ans.length ? ans.join(', ') : '—';
-    return ans || '—';
+  formatAnswer(q: QuestionResult, ans: AnswerValue | null | undefined): string {
+    return formatAnswerForDisplay(q, ans);
+  }
+
+  /** Only MCQ/SATA render a letter-based option list. */
+  showOptionList(q: QuestionResult): boolean {
+    const kind = classifyQuestionType(q);
+    return (kind === 'MCQ' || kind === 'SATA') && Array.isArray(q.options) && q.options.length > 0;
+  }
+
+  optionList(q: QuestionResult): string[] {
+    return Array.isArray(q.options) ? q.options : [];
+  }
+
+  isAdvanced(q: QuestionResult): boolean {
+    return this.getQuestionTypeGroup(q) === 'OTHER';
   }
 
   /** First answer letter (A–Z) from an option line, e.g. "A. Text" or "  B) ..." */
@@ -122,7 +143,8 @@ export class HistoryDetailPage implements OnInit {
     return (q.type ?? '').trim().toUpperCase() === 'SATA';
   }
 
-  getQuestionTypeGroup(q: QuestionResult): 'MCQ' | 'SATA' | 'FIB' {
-    return classifyQuestionType(q);
+  getQuestionTypeGroup(q: QuestionResult): 'MCQ' | 'SATA' | 'FIB' | 'OTHER' {
+    const kind = classifyQuestionType(q);
+    return kind === 'MCQ' || kind === 'SATA' || kind === 'FIB' ? kind : 'OTHER';
   }
 }

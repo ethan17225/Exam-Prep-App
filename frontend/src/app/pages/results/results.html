@@ -20,22 +20,13 @@
       <span class="type-chip type-chip-mcq">MCQ {{ typeCounts().mcq }}</span>
       <span class="type-chip type-chip-sata">SATA {{ typeCounts().sata }}</span>
       <span class="type-chip type-chip-fib">FIB {{ typeCounts().fib }}</span>
+      @if (typeCounts().other > 0) {
+        <span class="type-chip type-chip-other">Other {{ typeCounts().other }}</span>
+      }
     </div>
   </div>
 
-  @if (r.passed) {
-    <div class="card message-card message-passed">
-      <div class="message-icon">🎉</div>
-      <p class="message-main">Woww, bé iu của anh giỏi quá iii</p>
-      <p class="message-sub">Thi xong anh móc cho nhaaa:)</p>
-    </div>
-  } @else {
-    <div class="card message-card message-failed">
-      <div class="message-title">Fighting!!!</div>
-      <div class="message-icon">💪</div>
-      <p class="message-main">Hong shaooo. Bé iu của anh cố lên nhaaaa</p>
-    </div>
-  }
+
 
   <div class="result-actions">
     <button class="btn btn-primary" (click)="retake()">Retake Exam</button>
@@ -48,15 +39,21 @@
     <div class="card review-card" [class.correct]="q.is_correct" [class.wrong]="!q.is_correct">
       <div class="review-header">
         <span class="review-num">Q{{ q.question_number }}</span>
-        <span class="badge" [class.badge-mcq]="q.type === 'MCQ'" [class.badge-sata]="q.type === 'SATA'" [class.badge-fib]="q.type === 'FIB' || q.type === 'Fill-in-the-blank'">{{ q.type }}</span>
+        <span class="badge" [class.badge-mcq]="q.type === 'MCQ'" [class.badge-sata]="q.type === 'SATA'" [class.badge-fib]="q.type === 'FIB' || q.type === 'Fill-in-the-blank'" [class.badge-other]="isAdvanced(q)">{{ q.type }}</span>
         <span class="review-status">{{ q.is_correct ? '✓ Correct' : '✗ Incorrect' }}</span>
       </div>
 
+      <app-question-sections [sections]="q.sections" [startCollapsed]="true" />
+
       <p class="review-question">{{ q.question }}</p>
 
-      @if (q.options) {
+      @if (q.image) {
+        <img class="review-image" [src]="q.image" alt="Question illustration" />
+      }
+
+      @if (showOptionList(q)) {
         <div class="review-options">
-          @for (opt of q.options; track opt) {
+          @for (opt of optionList(q); track opt) {
             <div
               class="review-opt"
               [class.user-pick]="isUserPick(q, opt)"
@@ -73,15 +70,15 @@
           }
         </div>
         <div class="review-answer-summary">
-          <span class="fib-label">Your answer:</span> <strong>{{ formatAnswer(q.user_answer) }}</strong>
+          <span class="fib-label">Your answer:</span> <strong>{{ formatAnswer(q, q.user_answer) }}</strong>
           <span class="answer-sep">|</span>
-          <span class="fib-label">Correct answer:</span> <strong>{{ formatAnswer(q.correct_answer) }}</strong>
+          <span class="fib-label">Correct answer:</span> <strong>{{ formatAnswer(q, q.correct_answer) }}</strong>
         </div>
       } @else {
         <div class="review-fib">
-          <span class="fib-label">Your answer:</span> <strong>{{ formatAnswer(q.user_answer) }}</strong>
+          <span class="fib-label">Your answer:</span> <strong>{{ formatAnswer(q, q.user_answer) }}</strong>
           <br />
-          <span class="fib-label">Correct answer:</span> <strong>{{ formatAnswer(q.correct_answer) }}</strong>
+          <span class="fib-label">Correct answer:</span> <strong>{{ formatAnswer(q, q.correct_answer) }}</strong>
         </div>
       }
 

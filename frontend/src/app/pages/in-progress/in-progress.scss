@@ -85,3 +85,36 @@
   padding: 0.3rem 0.65rem;
   font-size: 0.78rem;
 }
+
+// ── Mobile ──────────────────────────────────────────────────────
+@media (max-width: 640px) {
+  .ip-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.65rem;
+  }
+
+  .ip-left {
+    flex-shrink: 1;
+  }
+
+  .ip-center {
+    max-width: 100%;
+    margin: 0;
+  }
+
+  .ip-right {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  // full-width search
+  .exams-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .search-filter {
+    width: 100% !important;
+  }
+}

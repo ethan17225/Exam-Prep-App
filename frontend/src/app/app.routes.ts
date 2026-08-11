@@ -5,6 +5,7 @@ export const routes: Routes = [
   { path: 'overview', loadComponent: () => import('./pages/overview/overview').then(m => m.OverviewPage) },
   { path: 'upload', loadComponent: () => import('./pages/upload/upload').then(m => m.UploadPage) },
   { path: 'exams', loadComponent: () => import('./pages/exams/exams').then(m => m.ExamsPage) },
+  { path: 'exams/:id/edit', loadComponent: () => import('./pages/edit-exam/edit-exam').then(m => m.EditExamPage) },
   { path: 'in-progress', loadComponent: () => import('./pages/in-progress/in-progress').then(m => m.InProgressPage) },
   { path: 'exam/:id', loadComponent: () => import('./pages/take-exam/take-exam').then(m => m.TakeExamPage) },
   { path: 'flashcards/:id', loadComponent: () => import('./pages/flashcards/flashcards').then(m => m.FlashcardsPage) },

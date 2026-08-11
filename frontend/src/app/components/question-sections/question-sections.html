@@ -1,0 +1,75 @@
+@if (hasSections()) {
+  <!-- Stop propagation so tab clicks don't trigger parent handlers (e.g. flashcard flip) -->
+  <div class="chart" [class.chart-collapsed]="!expanded()" (click)="$event.stopPropagation()">
+    <div class="chart-bar">
+      <span class="chart-label">Patient Data</span>
+      <button class="chart-toggle" (click)="toggleExpanded()">
+        {{ expanded() ? 'Hide' : 'Show' }}
+      </button>
+    </div>
+
+    @if (expanded()) {
+      @if (isTabbed()) {
+        <div class="chart-tabs" role="tablist">
+          @for (section of visibleSections(); track section.title; let i = $index) {
+            <button
+              class="chart-tab"
+              role="tab"
+              [class.active]="i === activeIndex()"
+              [attr.aria-selected]="i === activeIndex()"
+              (click)="selectTab(i)"
+            >
+              {{ section.title }}
+            </button>
+          }
+        </div>
+      }
+
+      @if (activeSection(); as section) {
+        <div class="chart-panel" role="tabpanel">
+          @if (!isTabbed() && section.title) {
+            <p class="panel-title">{{ section.title }}</p>
+          }
+
+          @for (block of section.blocks; track $index) {
+            @if (isText(block)) {
+              <p class="block-text">{{ asText(block).text }}</p>
+            } @else if (isList(block)) {
+              <ul class="block-list">
+                @for (item of listItems(block); track $index) {
+                  <li>{{ item }}</li>
+                }
+              </ul>
+            } @else if (isTable(block)) {
+              @if (asTable(block).caption) {
+                <p class="table-caption">{{ asTable(block).caption }}</p>
+              }
+              <div class="table-scroll">
+                <table class="data-table">
+                  @if (tableHeaders(block).length) {
+                    <thead>
+                      <tr>
+                        @for (header of tableHeaders(block); track $index) {
+                          <th>{{ header }}</th>
+                        }
+                      </tr>
+                    </thead>
+                  }
+                  <tbody>
+                    @for (row of tableRows(block); track $index) {
+                      <tr>
+                        @for (cell of row; track $index) {
+                          <td>{{ cell }}</td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+        </div>
+      }
+    }
+  </div>
+}

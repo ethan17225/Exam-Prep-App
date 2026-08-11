@@ -25,10 +25,11 @@
               <span class="fc-topic">{{ q.topic }}</span>
             }
           </div>
+          <app-question-sections [sections]="q.sections" [startCollapsed]="true" />
           <p class="fc-question">{{ q.question }}</p>
-          @if (!isTextQuestion(q) && q.options) {
+          @if (frontOptionLines(q).length) {
             <ul class="fc-options-front">
-              @for (opt of q.options; track opt) {
+              @for (opt of frontOptionLines(q); track opt) {
                 <li>{{ opt }}</li>
               }
             </ul>

@@ -66,9 +66,30 @@
 <div class="format-hint card">
   <strong>Supported question types:</strong>
   <ul>
-    <li><code>MCQ</code> — single correct answer (A, B, C, D…)</li>
+    <li><code>MCQ</code> — single correct answer (answer is a letter, e.g. "C")</li>
     <li><code>SATA</code> — select all that apply (answer is an array, e.g. ["A","C"])</li>
-    <li><code>FIB</code> — fill in the blank (answer is a text string)</li>
+    <li><code>FIB</code> — fill in the blank (answer is a text or numeric string)</li>
+    <li><code>MATRIX</code> — grid of rows × columns with checkboxes (answer maps row index to correct column names)</li>
+    <li><code>CLOZE</code> — statement with dropdown blanks (answer is one choice per blank, in order)</li>
+    <li><code>BOWTIE</code> — assign choices to categories, e.g. condition / findings / interventions (answer maps category name to correct choices)</li>
+    <li><code>RANKING</code> — put items in the correct order (options is the display order, answer is the correct order)</li>
+    <li><code>HIGHLIGHT</code> — click phrases in a passage (answer is the list of correct token indices, 0-based)</li>
+    <li><code>HOTSPOT</code> — click a region on an image (regions use percent coordinates; upload the image afterwards via <em>Edit Questions</em>)</li>
+  </ul>
+  <p class="format-note">Any question type can also carry an image (e.g. an ECG strip) — attach it after upload via the exam's <em>Edit Questions</em> menu.</p>
+
+  <strong>Patient data sections (optional):</strong>
+  <p class="format-note">
+    Add a <code>sections</code> array to any question to attach supporting case-study data such as
+    nurses' notes, vital signs, labs, orders or medication records. Each section is one tab:
+    two or more sections render as a tabbed chart above the question.
+  </p>
+  <ul>
+    <li><code>title</code> — the tab label, e.g. "Laboratory Results"</li>
+    <li><code>blocks</code> — the tab content, in order. Each block is one of:</li>
+    <li class="sub"><code>{{ '{' }} "type": "text", "text": "..." {{ '}' }}</code> — a paragraph (line breaks are preserved)</li>
+    <li class="sub"><code>{{ '{' }} "type": "list", "items": ["...", "..."] {{ '}' }}</code> — a bulleted list</li>
+    <li class="sub"><code>{{ '{' }} "type": "table", "caption": "...", "headers": [...], "rows": [[...]] {{ '}' }}</code> — a data table; <code>caption</code> is optional</li>
   </ul>
 </div>
 
@@ -78,44 +99,7 @@
     <span class="example-toggle">{{ showExample() ? '▾ Hide' : '▸ Show' }}</span>
   </div>
   @if (showExample()) {
-    <pre class="example-json">[
-  &#123;
-    "number": 1,
-    "topic": "Pharmacology",
-    "type": "MCQ",
-    "question": "Which medication is a beta-blocker?",
-    "options": [
-      "A. Metoprolol",
-      "B. Lisinopril",
-      "C. Amlodipine",
-      "D. Losartan"
-    ],
-    "answer": "A",
-    "rationale": "Metoprolol is a selective beta-1 blocker."
-  &#125;,
-  &#123;
-    "number": 2,
-    "topic": "Infection Control",
-    "type": "SATA",
-    "question": "Which are standard precautions? Select all that apply.",
-    "options": [
-      "A. Hand hygiene",
-      "B. Use of PPE",
-      "C. Reverse isolation",
-      "D. Safe injection practices"
-    ],
-    "answer": ["A", "B", "D"],
-    "rationale": "Standard precautions include hand hygiene, PPE, and safe injection practices."
-  &#125;,
-  &#123;
-    "number": 3,
-    "topic": "Anatomy",
-    "type": "FIB",
-    "question": "The largest organ of the human body is the ____.",
-    "answer": "skin",
-    "rationale": "The skin is the largest organ by surface area."
-  &#125;
-]</pre>
+    <pre class="example-json">{{ exampleJson }}</pre>
     <button class="btn btn-secondary btn-sm copy-btn" (click)="copyExample()">
       {{ copied() ? 'Copied!' : 'Copy to clipboard' }}
     </button>

@@ -1,8 +1,9 @@
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Depends, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Any
 from uuid import uuid4
 import pathlib
 from sqlalchemy.orm import Session, joinedload
@@ -29,6 +30,17 @@ with engine.connect() as _conn:
     _exam_cols = [c["name"] for c in sa_inspect(engine).get_columns("exams")]
     if "course_id" not in _exam_cols:
         _conn.execute(text("ALTER TABLE exams ADD COLUMN course_id VARCHAR(8) REFERENCES courses(id) ON DELETE SET NULL"))
+        _conn.commit()
+
+    # -- Question image migration --
+    _q_cols = [c["name"] for c in sa_inspect(engine).get_columns("questions")]
+    if "image" not in _q_cols:
+        _conn.execute(text("ALTER TABLE questions ADD COLUMN image TEXT"))
+        _conn.commit()
+
+    # -- Question sections (tabbed case-study data) migration --
+    if "sections" not in _q_cols:
+        _conn.execute(text("ALTER TABLE questions ADD COLUMN sections JSONB"))
         _conn.commit()
 
     # Ensure a default "Lab 4" course exists and backfill existing exams
@@ -62,20 +74,112 @@ DOCS_ROOT.mkdir(exist_ok=True)
 # Mount static file serving for the Docs folder (PDFs and HTML)
 app.mount("/docs-files", StaticFiles(directory=str(DOCS_ROOT)), name="docs-files")
 
+UPLOADS_ROOT = pathlib.Path(__file__).resolve().parent / "uploads"
+UPLOADS_ROOT.mkdir(exist_ok=True)
+
+# Question images are stored under /api/uploads so the frontend proxy forwards them
+app.mount("/api/uploads", StaticFiles(directory=str(UPLOADS_ROOT)), name="uploads")
+
 PASS_THRESHOLD = 0.72
 
+# Next-Gen NCLEX style question types with structured options/answers
+ADVANCED_TYPES = {"MATRIX", "CLOZE", "BOWTIE", "RANKING", "HIGHLIGHT", "HOTSPOT"}
 
-def _question_type_counts(questions: list) -> tuple[int, int, int]:
-    """Return (mcq, sata, fib) using the same rules as submit grading."""
-    mcq = sata = fib = 0
+
+def _question_type_counts(questions: list) -> tuple[int, int, int, int]:
+    """Return (mcq, sata, fib, other) using the same rules as submit grading."""
+    mcq = sata = fib = other = 0
     for q in questions:
-        if q.type == "SATA":
+        qtype = (q.type or "").strip().upper()
+        if qtype in ADVANCED_TYPES:
+            other += 1
+        elif qtype == "SATA":
             sata += 1
-        elif q.type in ("FIB", "Fill-in-the-blank") or not q.options:
+        elif qtype in ("FIB", "FILL-IN-THE-BLANK") or not q.options:
             fib += 1
         else:
             mcq += 1
-    return mcq, sata, fib
+    return mcq, sata, fib, other
+
+
+def _norm_str_set(values) -> set[str]:
+    if values is None:
+        return set()
+    if isinstance(values, (list, tuple, set)):
+        return {str(v).strip() for v in values if str(v).strip()}
+    s = str(values).strip()
+    return {p.strip() for p in s.split(",") if p.strip()} if s else set()
+
+
+def _norm_str_list(values) -> list[str]:
+    if values is None:
+        return []
+    if isinstance(values, (list, tuple)):
+        return [str(v).strip() for v in values]
+    return [str(values).strip()]
+
+
+def _grouped_answer_map(value) -> dict[str, set[str]]:
+    """Normalize MATRIX/BOWTIE answers: dict of key -> set of selections."""
+    if not isinstance(value, dict):
+        return {}
+    out: dict[str, set[str]] = {}
+    for k, v in value.items():
+        selections = _norm_str_set(v)
+        if selections:
+            out[str(k).strip()] = selections
+    return out
+
+
+def _is_fib_question(q) -> bool:
+    qtype = (q.type or "").strip().upper()
+    if qtype in ADVANCED_TYPES:
+        return False
+    return qtype in ("FIB", "FILL-IN-THE-BLANK") or not q.options
+
+
+def _grade_question(q, user_answer) -> bool:
+    """Shared grading logic for all question types (except FIB self-marking)."""
+    expected = q.answer
+    qtype = (q.type or "").strip().upper()
+
+    if qtype in ("MATRIX", "BOWTIE"):
+        return _grouped_answer_map(user_answer) == _grouped_answer_map(expected)
+
+    if qtype == "CLOZE":
+        user_list = _norm_str_list(user_answer if isinstance(user_answer, list) else None)
+        expected_list = _norm_str_list(expected)
+        return len(user_list) == len(expected_list) and all(
+            u.lower() == e.lower() for u, e in zip(user_list, expected_list)
+        )
+
+    if qtype == "RANKING":
+        user_list = _norm_str_list(user_answer if isinstance(user_answer, list) else None)
+        expected_list = _norm_str_list(expected)
+        return len(user_list) == len(expected_list) and user_list == expected_list
+
+    if qtype == "HIGHLIGHT":
+        return _norm_str_set(user_answer) == _norm_str_set(expected)
+
+    if qtype == "HOTSPOT":
+        return bool(user_answer) and str(user_answer).strip() == str(expected).strip()
+
+    if qtype == "SATA":
+        return _norm_str_set(expected) == _norm_str_set(user_answer)
+
+    if _is_fib_question(q):
+        user_str = str(user_answer or "").strip().lower()
+        expected_str = str(expected).strip().lower()
+        try:
+            return float(user_str) == float(expected_str)
+        except (ValueError, TypeError):
+            return (
+                user_str == expected_str
+                or (len(user_str) >= 3 and user_str in expected_str)
+                or (len(expected_str) >= 3 and expected_str in user_str)
+            )
+
+    return str(user_answer or "").strip() == str(expected).strip()
 
 
 # ── Pydantic schemas ─────────────────────────────────────────────
@@ -84,10 +188,23 @@ class QuestionIn(BaseModel):
     number: int
     topic: str
     type: str
+    sections: Any = None
     question: str
-    options: list[str] | None = None
-    answer: str | list[str]
+    options: Any = None
+    answer: Any
     rationale: str = ""
+    image: str | None = None
+
+
+class QuestionUpdate(BaseModel):
+    number: int | None = None
+    topic: str | None = None
+    type: str | None = None
+    question: str | None = None
+    sections: Any = None
+    options: Any = None
+    answer: Any = None
+    rationale: str | None = None
 
 
 class ExamCreate(BaseModel):
@@ -106,7 +223,7 @@ class ExamTimeLimitUpdate(BaseModel):
 
 class AnswerSubmission(BaseModel):
     question_number: int
-    answer: str | list[str]
+    answer: Any = None
     fib_correct: bool | None = None
 
 
@@ -121,7 +238,7 @@ class ExamSubmission(BaseModel):
 class SaveProgressPayload(BaseModel):
     exam_id: str
     mode: str = "exam"
-    answers: dict[str, str | list[str]]
+    answers: dict[str, Any]
     flagged: list[int]
     question_order: list[int]
     remaining_seconds: int
@@ -246,9 +363,11 @@ def create_exam(payload: ExamCreate, db: Session = Depends(get_db)):
             topic=q.topic,
             type=q.type,
             question=q.question,
+            sections=q.sections,
             options=q.options,
             answer=q.answer,
             rationale=q.rationale,
+            image=q.image,
         ))
     db.commit()
     return {"exam_id": exam_id, "total_questions": len(payload.questions)}
@@ -262,7 +381,7 @@ def list_exams(course_id: str | None = Query(None), db: Session = Depends(get_db
     exams = query.order_by(Exam.created_at).all()
     out = []
     for exam in exams:
-        mcq, sata, fib = _question_type_counts(exam.questions)
+        mcq, sata, fib, other = _question_type_counts(exam.questions)
         total = len(exam.questions)
         out.append(
             {
@@ -275,6 +394,7 @@ def list_exams(course_id: str | None = Query(None), db: Session = Depends(get_db
                 "mcq_count": mcq,
                 "sata_count": sata,
                 "fib_count": fib,
+                "other_count": other,
                 "created_at": exam.created_at.isoformat(),
             }
         )
@@ -289,11 +409,14 @@ def get_exam(exam_id: str, include_answers: bool = False, db: Session = Depends(
     questions = []
     for q in exam.questions:
         qdict = {
+            "id": q.id,
             "number": q.number,
             "topic": q.topic,
             "type": q.type,
             "question": q.question,
+            "sections": q.sections,
             "options": q.options,
+            "image": q.image,
         }
         if include_answers:
             qdict["answer"] = q.answer
@@ -325,9 +448,12 @@ def update_exam_title(exam_id: str, payload: ExamTitleUpdate, db: Session = Depe
     db.commit()
     db.refresh(exam)
 
-    qs = db.query(Question).filter(Question.exam_id == exam_id).all()
-    mcq, sata, fib = _question_type_counts(qs)
-    total_questions = len(qs)
+    return _exam_summary(exam, db)
+
+
+def _exam_summary(exam: Exam, db: Session) -> dict:
+    qs = db.query(Question).filter(Question.exam_id == exam.id).all()
+    mcq, sata, fib, other = _question_type_counts(qs)
     course = exam.course if exam.course_id else None
     if not course and exam.course_id:
         course = db.query(Course).filter(Course.id == exam.course_id).first()
@@ -336,12 +462,154 @@ def update_exam_title(exam_id: str, payload: ExamTitleUpdate, db: Session = Depe
         "title": exam.title,
         "course_id": exam.course_id,
         "course_name": course.name if course else None,
-        "total_questions": total_questions,
+        "time_limit_minutes": exam.time_limit_minutes,
+        "total_questions": len(qs),
         "mcq_count": mcq,
         "sata_count": sata,
         "fib_count": fib,
+        "other_count": other,
         "created_at": exam.created_at.isoformat(),
     }
+
+
+@app.patch("/api/exams/{exam_id}/time-limit")
+def update_exam_time_limit(exam_id: str, payload: ExamTimeLimitUpdate, db: Session = Depends(get_db)):
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(404, "Exam not found")
+    limit = payload.time_limit_minutes
+    if limit is not None and limit <= 0:
+        limit = None
+    exam.time_limit_minutes = limit
+    db.commit()
+    db.refresh(exam)
+    return _exam_summary(exam, db)
+
+
+# ── Question CRUD (exam editor) ───────────────────────────────────
+
+def _question_to_dict(q: Question) -> dict:
+    return {
+        "id": q.id,
+        "number": q.number,
+        "topic": q.topic,
+        "type": q.type,
+        "question": q.question,
+        "sections": q.sections,
+        "options": q.options,
+        "answer": q.answer,
+        "rationale": q.rationale or "",
+        "image": q.image,
+    }
+
+
+@app.post("/api/exams/{exam_id}/questions")
+def add_question(exam_id: str, payload: QuestionIn, db: Session = Depends(get_db)):
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(404, "Exam not found")
+    number = payload.number
+    if not number or number <= 0:
+        max_num = max((q.number for q in exam.questions), default=0)
+        number = max_num + 1
+    q = Question(
+        exam_id=exam_id,
+        number=number,
+        topic=payload.topic,
+        type=payload.type,
+        question=payload.question,
+        sections=payload.sections,
+        options=payload.options,
+        answer=payload.answer,
+        rationale=payload.rationale,
+        image=payload.image,
+    )
+    db.add(q)
+    db.commit()
+    db.refresh(q)
+    return _question_to_dict(q)
+
+
+@app.patch("/api/exams/{exam_id}/questions/{question_id}")
+def update_question(exam_id: str, question_id: int, payload: QuestionUpdate, db: Session = Depends(get_db)):
+    q = db.query(Question).filter(Question.id == question_id, Question.exam_id == exam_id).first()
+    if not q:
+        raise HTTPException(404, "Question not found")
+    fields = payload.model_fields_set
+    if "number" in fields and payload.number is not None:
+        q.number = payload.number
+    if "topic" in fields and payload.topic is not None:
+        q.topic = payload.topic
+    if "type" in fields and payload.type is not None:
+        q.type = payload.type
+    if "question" in fields and payload.question is not None:
+        q.question = payload.question
+    if "sections" in fields:
+        q.sections = payload.sections
+    if "options" in fields:
+        q.options = payload.options
+    if "answer" in fields:
+        q.answer = payload.answer
+    if "rationale" in fields and payload.rationale is not None:
+        q.rationale = payload.rationale
+    db.commit()
+    db.refresh(q)
+    return _question_to_dict(q)
+
+
+@app.delete("/api/exams/{exam_id}/questions/{question_id}")
+def delete_question(exam_id: str, question_id: int, db: Session = Depends(get_db)):
+    q = db.query(Question).filter(Question.id == question_id, Question.exam_id == exam_id).first()
+    if not q:
+        raise HTTPException(404, "Question not found")
+    _remove_image_file(q.image)
+    db.delete(q)
+    db.commit()
+    return {"deleted": True}
+
+
+ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
+
+
+def _remove_image_file(image_url: str | None) -> None:
+    if not image_url:
+        return
+    filename = image_url.rsplit("/", 1)[-1]
+    path = UPLOADS_ROOT / filename
+    if path.is_file():
+        try:
+            path.unlink()
+        except OSError:
+            pass
+
+
+@app.post("/api/questions/{question_id}/image")
+def upload_question_image(question_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    q = db.query(Question).filter(Question.id == question_id).first()
+    if not q:
+        raise HTTPException(404, "Question not found")
+    ext = pathlib.Path(file.filename or "").suffix.lower()
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        raise HTTPException(400, f"Unsupported image type '{ext}'. Allowed: {', '.join(sorted(ALLOWED_IMAGE_EXTENSIONS))}")
+    _remove_image_file(q.image)
+    filename = f"q{question_id}_{uuid4().hex[:10]}{ext}"
+    dest = UPLOADS_ROOT / filename
+    dest.write_bytes(file.file.read())
+    q.image = f"/api/uploads/{filename}"
+    db.commit()
+    db.refresh(q)
+    return {"image": q.image}
+
+
+@app.delete("/api/questions/{question_id}/image")
+def delete_question_image(question_id: int, db: Session = Depends(get_db)):
+    q = db.query(Question).filter(Question.id == question_id).first()
+    if not q:
+        raise HTTPException(404, "Question not found")
+    _remove_image_file(q.image)
+    q.image = None
+    db.commit()
+    return {"image": None}
 
 
 @app.post("/api/exams/{exam_id}/submit")
@@ -364,37 +632,11 @@ def submit_exam(exam_id: str, submission: ExamSubmission, db: Session = Depends(
 
     for q in selected_questions:
         user_answer = answer_map.get(q.number)
-        expected = q.answer
 
-        is_fib = q.type in ("FIB", "Fill-in-the-blank") or not q.options
-
-        if is_fib and q.number in fib_mark_map:
+        if _is_fib_question(q) and q.number in fib_mark_map:
             is_correct = fib_mark_map[q.number]
-        elif q.type == "SATA":
-            if isinstance(expected, list):
-                expected_set = set(e.strip() for e in expected)
-            else:
-                expected_set = set(e.strip() for e in str(expected).split(","))
-            if isinstance(user_answer, list):
-                user_set = set(u.strip() for u in user_answer)
-            elif user_answer:
-                user_set = set(u.strip() for u in str(user_answer).split(","))
-            else:
-                user_set = set()
-            is_correct = expected_set == user_set
-        elif is_fib:
-            user_str = str(user_answer or "").strip().lower()
-            expected_str = str(expected).strip().lower()
-            try:
-                is_correct = float(user_str) == float(expected_str)
-            except (ValueError, TypeError):
-                is_correct = (
-                    user_str == expected_str
-                    or (len(user_str) >= 3 and user_str in expected_str)
-                    or (len(expected_str) >= 3 and expected_str in user_str)
-                )
         else:
-            is_correct = str(user_answer or "").strip() == str(expected).strip()
+            is_correct = _grade_question(q, user_answer)
 
         if is_correct:
             correct_count += 1
@@ -404,9 +646,11 @@ def submit_exam(exam_id: str, submission: ExamSubmission, db: Session = Depends(
             "question": q.question,
             "topic": q.topic,
             "type": q.type,
+            "sections": q.sections,
             "options": q.options,
+            "image": q.image,
             "user_answer": user_answer,
-            "correct_answer": expected,
+            "correct_answer": q.answer,
             "is_correct": is_correct,
             "rationale": q.rationale or "",
         })
@@ -559,33 +803,7 @@ def admin_dashboard(db: Session = Depends(get_db)):
             q = q_map.get(int(qnum_str))
             if not q:
                 continue
-            expected = q.answer
-            is_fib = q.type in ("FIB", "Fill-in-the-blank") or not q.options
-            if q.type == "SATA":
-                if isinstance(expected, list):
-                    expected_set = set(e.strip() for e in expected)
-                else:
-                    expected_set = set(e.strip() for e in str(expected).split(","))
-                if isinstance(user_answer, list):
-                    user_set = set(u.strip() for u in user_answer)
-                elif user_answer:
-                    user_set = set(u.strip() for u in str(user_answer).split(","))
-                else:
-                    user_set = set()
-                is_correct = expected_set == user_set
-            elif is_fib:
-                user_str = str(user_answer or "").strip().lower()
-                expected_str = str(expected).strip().lower()
-                try:
-                    is_correct = float(user_str) == float(expected_str)
-                except (ValueError, TypeError):
-                    is_correct = (
-                        user_str == expected_str
-                        or (len(user_str) >= 3 and user_str in expected_str)
-                        or (len(expected_str) >= 3 and expected_str in user_str)
-                    )
-            else:
-                is_correct = str(user_answer or "").strip() == str(expected).strip()
+            is_correct = _grade_question(q, user_answer)
 
             if is_correct:
                 correct_count += 1

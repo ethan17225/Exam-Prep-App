@@ -28,7 +28,7 @@
 </div>
 
 @if (filteredExams().length === 0) {
-  <p class="empty-state">No exams available. Go to <strong>Upload</strong> to add one, or seed the database.</p>
+  <p class="empty-state">No exams available. Go to <strong>Upload</strong> to add one.</p>
 } @else {
   <div class="exam-list" (click)="closeMenu()">
     @for (exam of filteredExams(); track exam.id) {
@@ -69,6 +69,9 @@
                 <span class="exam-type-count pill-mcq">MCQ {{ exam.mcq_count }}</span>
                 <span class="exam-type-count pill-sata">SATA {{ exam.sata_count }}</span>
                 <span class="exam-type-count pill-fib">FIB {{ exam.fib_count }}</span>
+                @if (exam.other_count) {
+                  <span class="exam-type-count pill-other">Other {{ exam.other_count }}</span>
+                }
               </span>
             </div>
             <div class="exam-actions">
@@ -118,6 +121,7 @@
             <button class="btn btn-secondary btn-sm menu-btn" (click)="toggleMenu(exam.id, $event)" aria-label="More options">⋮</button>
             @if (menuOpen() === exam.id && !editMode()[exam.id]) {
               <div class="menu-panel card">
+                <button class="menu-option" (mousedown)="editQuestions(exam)">Edit Questions</button>
                 <button class="menu-option" (mousedown)="pickMenuOption(exam.id, 'rename')">Rename Exam</button>
                 <button class="menu-option" (mousedown)="pickMenuOption(exam.id, 'count')">Modify Number of Questions</button>
                 <button class="menu-option" (mousedown)="pickMenuOption(exam.id, 'time-limit')">Set Time Limit</button>
