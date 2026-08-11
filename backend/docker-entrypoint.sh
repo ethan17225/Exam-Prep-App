@@ -21,5 +21,4 @@ else:
     raise SystemExit("Could not connect to the database")
 PY
 
-python seed.py
 exec uvicorn main:app --host 0.0.0.0 --port 8000

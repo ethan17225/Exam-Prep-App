@@ -41,6 +41,8 @@ class Question(Base):
     options = Column(JSONB, nullable=True)
     answer = Column(JSONB, nullable=False)
     rationale = Column(Text, nullable=False, default="")
+    image = Column(Text, nullable=True)
+    sections = Column(JSONB, nullable=True)
 
     exam = relationship("Exam", back_populates="questions")
 

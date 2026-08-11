@@ -1,0 +1,417 @@
+@if (loading()) {
+  <p class="empty-state">Loading exam...</p>
+} @else if (loadError()) {
+  <p class="empty-state">{{ loadError() }}</p>
+} @else {
+  <div class="edit-header">
+    <button class="btn btn-secondary btn-sm" (click)="goBack()">← Back to Exams</button>
+    <h1 class="page-title">Edit Questions — {{ examTitle() }}</h1>
+    <button class="btn btn-primary btn-sm" (click)="addQuestion()" [disabled]="addingQuestion()">
+      {{ addingQuestion() ? 'Adding...' : '+ Add Question' }}
+    </button>
+  </div>
+
+  <p class="edit-hint">
+    Click a question to edit it. You can change the type, options and correct answer, and attach an image
+    (e.g. an ECG strip or an anatomy diagram for hotspot questions).
+  </p>
+
+  @for (d of drafts(); track d.id) {
+    <div class="card q-card" [class.expanded]="d.expanded">
+      <div class="q-summary" (click)="toggleExpand(d)">
+        <span class="q-num">#{{ d.number }}</span>
+        <span class="badge"
+          [class.badge-mcq]="kindOf(d) === 'MCQ'"
+          [class.badge-sata]="kindOf(d) === 'SATA'"
+          [class.badge-fib]="kindOf(d) === 'FIB'"
+          [class.badge-other]="kindOf(d) !== 'MCQ' && kindOf(d) !== 'SATA' && kindOf(d) !== 'FIB'">
+          {{ d.type }}
+        </span>
+        @if (d.image) {
+          <span class="img-indicator" title="Has image">IMG</span>
+        }
+        <span class="q-preview">{{ preview(d) }}</span>
+        <span class="expand-icon">{{ d.expanded ? '▾' : '▸' }}</span>
+      </div>
+
+      @if (d.expanded) {
+        <div class="q-form" (click)="$event.stopPropagation()">
+          <div class="form-row form-row-inline">
+            <label>
+              <span class="field-label">Number</span>
+              <input class="num-input" type="number" [ngModel]="d.number" (ngModelChange)="d.number = $event" />
+            </label>
+            <label>
+              <span class="field-label">Topic</span>
+              <input type="text" [ngModel]="d.topic" (ngModelChange)="d.topic = $event" placeholder="e.g. Pharmacology" />
+            </label>
+            <label>
+              <span class="field-label">Type</span>
+              <select [ngModel]="d.type" (ngModelChange)="onTypeChange(d, $event)">
+                @for (t of questionTypes; track t) {
+                  <option [value]="t">{{ t }}</option>
+                }
+              </select>
+            </label>
+          </div>
+
+          <div class="form-row">
+            <span class="field-label">Question</span>
+            <textarea rows="4" [ngModel]="d.question" (ngModelChange)="d.question = $event"></textarea>
+          </div>
+
+          <!-- Tabbed patient data sections -->
+          <div class="form-row">
+            <span class="field-label">
+              Patient Data Sections (optional)
+              <small class="field-hint">Two or more sections display as tabs when taking the exam.</small>
+            </span>
+
+            <div class="sections-editor">
+              @for (section of d.sections; track $index; let si = $index) {
+                <div class="section-card">
+                  <div class="section-head">
+                    <input
+                      class="section-title-input"
+                      placeholder="Tab title (e.g. Nurses' Notes)"
+                      [ngModel]="section.title"
+                      (ngModelChange)="section.title = $event"
+                    />
+                    <div class="section-head-actions">
+                      <button class="icon-btn" title="Move up" (click)="moveSection(d, si, -1)">↑</button>
+                      <button class="icon-btn" title="Move down" (click)="moveSection(d, si, 1)">↓</button>
+                      <button class="icon-btn" (click)="toggleSection(section)">
+                        {{ section.collapsed ? 'Expand' : 'Collapse' }}
+                      </button>
+                      <button class="icon-btn danger" title="Remove tab" (click)="removeSection(d, si)">✕</button>
+                    </div>
+                  </div>
+
+                  @if (!section.collapsed) {
+                    <div class="section-body">
+                      @for (block of section.blocks; track $index; let bi = $index) {
+                        <div class="block-card">
+                          <div class="block-head">
+                            <span class="block-kind">{{ block.kind }}</span>
+                            <div class="section-head-actions">
+                              <button class="icon-btn" title="Move up" (click)="moveBlock(section, bi, -1)">↑</button>
+                              <button class="icon-btn" title="Move down" (click)="moveBlock(section, bi, 1)">↓</button>
+                              <button class="icon-btn danger" title="Remove block" (click)="removeBlock(section, bi)">✕</button>
+                            </div>
+                          </div>
+
+                          @if (block.kind === 'text') {
+                            <textarea
+                              rows="3"
+                              placeholder="Paragraph of chart text"
+                              [ngModel]="block.text"
+                              (ngModelChange)="block.text = $event"
+                            ></textarea>
+                          } @else if (block.kind === 'list') {
+                            <textarea
+                              rows="3"
+                              placeholder="One bullet per line"
+                              [ngModel]="block.itemsText"
+                              (ngModelChange)="block.itemsText = $event"
+                            ></textarea>
+                          } @else {
+                            <input
+                              class="table-caption-input"
+                              placeholder="Table caption (optional)"
+                              [ngModel]="block.caption"
+                              (ngModelChange)="block.caption = $event"
+                            />
+
+                            <div class="table-edit-scroll">
+                              <table class="table-editor">
+                                <thead>
+                                  <tr>
+                                    @for (header of block.headers; track $index; let hi = $index) {
+                                      <th>
+                                        <input
+                                          [ngModel]="header"
+                                          (ngModelChange)="setHeader(block, hi, $event)"
+                                          placeholder="Header"
+                                        />
+                                        <button class="col-del" title="Remove column" (click)="removeTableColumn(block, hi)">✕</button>
+                                      </th>
+                                    }
+                                    <th class="row-actions-col"></th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  @for (row of block.rows; track $index; let ri = $index) {
+                                    <tr>
+                                      @for (cell of row; track $index; let ci = $index) {
+                                        <td>
+                                          <input [ngModel]="cell" (ngModelChange)="setCell(block, ri, ci, $event)" />
+                                        </td>
+                                      }
+                                      <td class="row-actions-col">
+                                        <button class="icon-btn danger" title="Remove row" (click)="removeTableRow(block, ri)">✕</button>
+                                      </td>
+                                    </tr>
+                                  }
+                                </tbody>
+                              </table>
+                            </div>
+
+                            <div class="block-actions">
+                              <button class="btn btn-ghost btn-xs" (click)="addTableRow(block)">+ Row</button>
+                              <button class="btn btn-ghost btn-xs" (click)="addTableColumn(block)">+ Column</button>
+                              <button class="btn btn-ghost btn-xs" (click)="togglePaste(block)">
+                                {{ block.pasteOpen ? 'Cancel Paste' : 'Paste Table' }}
+                              </button>
+                            </div>
+
+                            @if (block.pasteOpen) {
+                              <div class="paste-box">
+                                <textarea
+                                  rows="4"
+                                  placeholder="Paste rows from a spreadsheet or CSV. First line becomes the headers."
+                                  [ngModel]="block.pasteText"
+                                  (ngModelChange)="block.pasteText = $event"
+                                ></textarea>
+                                <button class="btn btn-secondary btn-xs" (click)="applyPastedTable(block)">Apply</button>
+                              </div>
+                            }
+                          }
+                        </div>
+                      }
+
+                      <div class="block-actions">
+                        <button class="btn btn-ghost btn-xs" (click)="addBlock(section, 'text')">+ Text</button>
+                        <button class="btn btn-ghost btn-xs" (click)="addBlock(section, 'list')">+ List</button>
+                        <button class="btn btn-ghost btn-xs" (click)="addBlock(section, 'table')">+ Table</button>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+
+              <button class="btn btn-secondary btn-xs add-section-btn" (click)="addSection(d)">
+                + Add Section Tab
+              </button>
+            </div>
+          </div>
+
+          <!-- Image -->
+          <div class="form-row">
+            <span class="field-label">Image (optional)</span>
+            @if (d.image) {
+              <div class="image-block">
+                @if (kindOf(d) === 'HOTSPOT') {
+                  <!-- Hotspot region editor: draw rectangles on the image -->
+                  <div
+                    class="hs-editor"
+                    #hsWrap
+                    (mousedown)="startRegionDraw($event, d, hsWrap)"
+                    (mousemove)="moveRegionDraw($event, hsWrap)"
+                    (mouseup)="endRegionDraw()"
+                    (mouseleave)="endRegionDraw()"
+                  >
+                    <img [src]="d.image" alt="Question image" draggable="false" />
+                    @for (region of d.regions; track region.id; let ri = $index) {
+                      <div
+                        class="hs-region"
+                        [class.hs-correct]="d.hotspotAnswer === region.id"
+                        [style.left.%]="region.x"
+                        [style.top.%]="region.y"
+                        [style.width.%]="region.w"
+                        [style.height.%]="region.h"
+                      >
+                        <span class="hs-region-num">{{ ri + 1 }}</span>
+                      </div>
+                    }
+                  </div>
+                  <p class="hs-hint">Drag on the image to draw a clickable region.</p>
+                } @else {
+                  <img class="image-preview" [src]="d.image" alt="Question image" />
+                }
+                <div class="image-actions">
+                  <label class="btn btn-secondary btn-sm file-btn">
+                    {{ d.uploading ? 'Uploading...' : 'Replace Image' }}
+                    <input type="file" accept="image/*" (change)="onImageSelected($event, d)" hidden />
+                  </label>
+                  <button class="btn btn-danger btn-sm" (click)="removeImage(d)">Remove Image</button>
+                </div>
+              </div>
+            } @else {
+              <label class="btn btn-secondary btn-sm file-btn">
+                {{ d.uploading ? 'Uploading...' : 'Upload Image' }}
+                <input type="file" accept="image/*" (change)="onImageSelected($event, d)" hidden />
+              </label>
+            }
+          </div>
+
+          <!-- Type-specific editors -->
+          @if (kindOf(d) === 'MCQ' || kindOf(d) === 'SATA') {
+            <div class="form-row">
+              <span class="field-label">Options (one per line, prefixed with a letter, e.g. "A. Text")</span>
+              <textarea rows="5" [ngModel]="d.optionsText" (ngModelChange)="d.optionsText = $event"></textarea>
+            </div>
+            <div class="form-row">
+              <span class="field-label">
+                {{ kindOf(d) === 'SATA' ? 'Correct letters (comma-separated, e.g. A, B, D)' : 'Correct letter (e.g. C)' }}
+              </span>
+              <input type="text" [ngModel]="d.answerText" (ngModelChange)="d.answerText = $event" />
+            </div>
+          } @else if (kindOf(d) === 'FIB') {
+            <div class="form-row">
+              <span class="field-label">Expected answer (numeric or short text)</span>
+              <input type="text" [ngModel]="d.answerText" (ngModelChange)="d.answerText = $event" />
+            </div>
+          } @else if (kindOf(d) === 'MATRIX') {
+            <div class="form-row form-row-inline">
+              <label class="grow">
+                <span class="field-label">Rows (one per line)</span>
+                <textarea rows="6" [ngModel]="d.matrixRowsText" (ngModelChange)="d.matrixRowsText = $event"></textarea>
+              </label>
+              <label class="grow">
+                <span class="field-label">Columns (one per line)</span>
+                <textarea rows="6" [ngModel]="d.matrixColsText" (ngModelChange)="d.matrixColsText = $event"></textarea>
+              </label>
+            </div>
+            @if (matrixRowLines(d).length && matrixColLines(d).length) {
+              <div class="form-row">
+                <span class="field-label">Correct answers (check all correct cells)</span>
+                <div class="matrix-wrap">
+                  <table class="matrix-table">
+                    <thead>
+                      <tr>
+                        <th></th>
+                        @for (col of matrixColLines(d); track col) {
+                          <th>{{ col }}</th>
+                        }
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (row of matrixRowLines(d); track $index; let ri = $index) {
+                        <tr>
+                          <td class="matrix-row-label">{{ row }}</td>
+                          @for (col of matrixColLines(d); track col) {
+                            <td>
+                              <input
+                                type="checkbox"
+                                [checked]="isMatrixAnswerChecked(d, ri, col)"
+                                (change)="toggleMatrixAnswer(d, ri, col)"
+                              />
+                            </td>
+                          }
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
+          } @else if (kindOf(d) === 'CLOZE') {
+            <div class="form-row">
+              <span class="field-label">Dropdown blanks</span>
+              @for (blank of d.clozeBlanks; track $index; let bi = $index) {
+                <div class="sub-card">
+                  <div class="sub-card-head">
+                    <input class="grow" type="text" [ngModel]="blank.label" (ngModelChange)="blank.label = $event" placeholder="Blank label" />
+                    <button class="btn btn-danger btn-sm" (click)="removeClozeBlank(d, bi)">Remove</button>
+                  </div>
+                  <span class="field-label">Choices (one per line)</span>
+                  <textarea rows="3" [ngModel]="blank.choicesText" (ngModelChange)="blank.choicesText = $event"></textarea>
+                  <span class="field-label">Correct choice</span>
+                  <select [ngModel]="blank.answer" (ngModelChange)="blank.answer = $event">
+                    <option value="" disabled>Select...</option>
+                    @for (choice of clozeChoiceLines(blank); track choice) {
+                      <option [value]="choice">{{ choice }}</option>
+                    }
+                  </select>
+                </div>
+              }
+              <button class="btn btn-secondary btn-sm" (click)="addClozeBlank(d)">+ Add Blank</button>
+            </div>
+          } @else if (kindOf(d) === 'BOWTIE') {
+            <div class="form-row">
+              <span class="field-label">Categories (drop zones)</span>
+              @for (cat of d.bowtieCategories; track $index; let ci = $index) {
+                <div class="sub-card">
+                  <div class="sub-card-head">
+                    <input class="grow" type="text" [ngModel]="cat.name" (ngModelChange)="cat.name = $event" placeholder="Category name" />
+                    <label class="count-label">
+                      Select
+                      <input class="num-input" type="number" min="1" [ngModel]="cat.count" (ngModelChange)="cat.count = $event" />
+                    </label>
+                    <button class="btn btn-danger btn-sm" (click)="removeBowtieCategory(d, ci)">Remove</button>
+                  </div>
+                  <span class="field-label">Choices (one per line)</span>
+                  <textarea rows="4" [ngModel]="cat.choicesText" (ngModelChange)="cat.choicesText = $event"></textarea>
+                  @if (bowtieChoiceLines(cat).length) {
+                    <span class="field-label">Correct choice(s)</span>
+                    <div class="check-list">
+                      @for (choice of bowtieChoiceLines(cat); track choice) {
+                        <label class="check-item">
+                          <input type="checkbox" [checked]="isBowtieAnswer(cat, choice)" (change)="toggleBowtieAnswer(cat, choice)" />
+                          {{ choice }}
+                        </label>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+              <button class="btn btn-secondary btn-sm" (click)="addBowtieCategory(d)">+ Add Category</button>
+            </div>
+          } @else if (kindOf(d) === 'RANKING') {
+            <div class="form-row">
+              <span class="field-label">Items in the CORRECT order (one per line, best/highest first). They are shown shuffled to the test taker.</span>
+              <textarea rows="5" [ngModel]="d.rankingText" (ngModelChange)="d.rankingText = $event"></textarea>
+            </div>
+          } @else if (kindOf(d) === 'HIGHLIGHT') {
+            <div class="form-row">
+              <span class="field-label">Phrases (check the ones the test taker should highlight)</span>
+              @for (tok of d.highlightTokens; track $index; let ti = $index) {
+                <div class="token-row">
+                  <input type="checkbox" [checked]="tok.correct" (change)="tok.correct = !tok.correct" title="Correct phrase" />
+                  <input class="grow" type="text" [ngModel]="tok.text" (ngModelChange)="tok.text = $event" placeholder="Phrase text" />
+                  <button class="btn btn-danger btn-sm" (click)="removeHighlightToken(d, ti)">✕</button>
+                </div>
+              }
+              <button class="btn btn-secondary btn-sm" (click)="addHighlightToken(d)">+ Add Phrase</button>
+            </div>
+          } @else if (kindOf(d) === 'HOTSPOT') {
+            <div class="form-row">
+              <span class="field-label">Regions</span>
+              @if (!d.image) {
+                <p class="hs-hint">Upload an image above, then drag on it to draw clickable regions. Without an image, regions are shown as text buttons.</p>
+              }
+              @for (region of d.regions; track region.id; let ri = $index) {
+                <div class="token-row">
+                  <span class="region-num">{{ ri + 1 }}</span>
+                  <input class="grow" type="text" [ngModel]="region.label" (ngModelChange)="region.label = $event" placeholder="Region label" />
+                  <label class="check-item">
+                    <input type="radio" [name]="'hs-answer-' + d.id" [checked]="d.hotspotAnswer === region.id" (change)="d.hotspotAnswer = region.id" />
+                    Correct
+                  </label>
+                  <button class="btn btn-danger btn-sm" (click)="removeRegion(d, ri)">✕</button>
+                </div>
+              }
+              <button class="btn btn-secondary btn-sm" (click)="addManualRegion(d)">+ Add Region Manually</button>
+            </div>
+          }
+
+          <div class="form-row">
+            <span class="field-label">Rationale (optional)</span>
+            <textarea rows="3" [ngModel]="d.rationale" (ngModelChange)="d.rationale = $event"></textarea>
+          </div>
+
+          @if (d.error) {
+            <p class="form-error">{{ d.error }}</p>
+          }
+
+          <div class="form-actions">
+            <button class="btn btn-primary" (click)="save(d)" [disabled]="d.saving">
+              {{ d.saving ? 'Saving...' : d.saved ? 'Saved ✓' : 'Save Question' }}
+            </button>
+            <button class="btn btn-danger" (click)="deleteQuestion(d)">Delete Question</button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+}

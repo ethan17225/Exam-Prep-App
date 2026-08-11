@@ -1,10 +1,11 @@
 import { Component, HostListener, OnInit, signal, computed } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { ExamService, Question } from '../../services/exam.service';
+import { QuestionSectionsComponent } from '../../components/question-sections/question-sections';
+import { ExamService, Question, classifyQuestionType, formatAnswerForDisplay } from '../../services/exam.service';
 
 @Component({
   selector: 'app-flashcards',
-  imports: [],
+  imports: [QuestionSectionsComponent],
   templateUrl: './flashcards.html',
   styleUrl: './flashcards.scss',
 })
@@ -106,19 +107,30 @@ export class FlashcardsPage implements OnInit {
   }
 
   isTextQuestion(q: Question): boolean {
-    return !q.options?.length || q.type === 'FIB' || q.type === 'Fill-in-the-blank';
+    return classifyQuestionType(q) === 'FIB';
+  }
+
+  private optionArray(q: Question): string[] {
+    return Array.isArray(q.options) ? q.options : [];
+  }
+
+  private isLetterBased(q: Question): boolean {
+    const kind = classifyQuestionType(q);
+    return (kind === 'MCQ' || kind === 'SATA') && this.optionArray(q).length > 0;
   }
 
   formatAnswer(q: Question): string {
-    const a = q.answer;
-    if (a === undefined || a === null) return '—';
-    if (Array.isArray(a)) return a.join(', ');
-    return String(a);
+    return formatAnswerForDisplay(q, q.answer ?? null);
+  }
+
+  /** Option lines to preview on the front of the card (MCQ/SATA only). */
+  frontOptionLines(q: Question): string[] {
+    return this.isLetterBased(q) ? this.optionArray(q) : [];
   }
 
   /** For MCQ/SATA: full text of each correct option (options are labeled A., B., …). */
   answerOptionContentLines(q: Question): string[] {
-    if (!q.options?.length || this.isTextQuestion(q)) return [];
+    if (!this.isLetterBased(q)) return [];
     const letters = this.answerLetters(q);
     return letters.map((letter) => this.optionMatchingLetter(q, letter) ?? letter);
   }
@@ -131,7 +143,7 @@ export class FlashcardsPage implements OnInit {
     const a = q.answer;
     if (a === undefined || a === null) return [];
     if (Array.isArray(a)) {
-      return a.map((x) => String(x).trim()).filter(Boolean);
+      return (a as string[]).map((x) => String(x).trim()).filter(Boolean);
     }
     const s = String(a).trim();
     if (!s) return [];
@@ -139,10 +151,11 @@ export class FlashcardsPage implements OnInit {
   }
 
   private optionMatchingLetter(q: Question, letter: string): string | null {
-    if (!q.options?.length) return null;
+    const options = this.optionArray(q);
+    if (!options.length) return null;
     const L = letter.trim().charAt(0).toUpperCase();
     if (!L) return null;
-    const found = q.options.find((opt) => opt.trim().charAt(0).toUpperCase() === L);
+    const found = options.find((opt) => opt.trim().charAt(0).toUpperCase() === L);
     return found ?? null;
   }
 }
