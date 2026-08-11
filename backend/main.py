@@ -93,9 +93,9 @@ def _question_type_counts(questions: list) -> tuple[int, int, int, int]:
         qtype = (q.type or "").strip().upper()
         if qtype in ADVANCED_TYPES:
             other += 1
-        elif q.type == "SATA":
+        elif qtype == "SATA":
             sata += 1
-        elif q.type in ("FIB", "Fill-in-the-blank") or not q.options:
+        elif qtype in ("FIB", "FILL-IN-THE-BLANK") or not q.options:
             fib += 1
         else:
             mcq += 1
@@ -135,7 +135,7 @@ def _is_fib_question(q) -> bool:
     qtype = (q.type or "").strip().upper()
     if qtype in ADVANCED_TYPES:
         return False
-    return q.type in ("FIB", "Fill-in-the-blank") or not q.options
+    return qtype in ("FIB", "FILL-IN-THE-BLANK") or not q.options
 
 
 def _grade_question(q, user_answer) -> bool:
@@ -164,7 +164,7 @@ def _grade_question(q, user_answer) -> bool:
     if qtype == "HOTSPOT":
         return bool(user_answer) and str(user_answer).strip() == str(expected).strip()
 
-    if q.type == "SATA":
+    if qtype == "SATA":
         return _norm_str_set(expected) == _norm_str_set(user_answer)
 
     if _is_fib_question(q):
