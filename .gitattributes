@@ -1,0 +1,10 @@
+# Files consumed inside Linux containers must keep LF. With core.autocrlf=true a
+# CRLF checkout gives docker-entrypoint.sh a `\r` in its shebang, and the
+# container dies with "bad interpreter: /bin/sh^M".
+*.sh text eol=lf
+docker-entrypoint.sh text eol=lf
+Dockerfile text eol=lf
+Caddyfile text eol=lf
+*.conf text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf

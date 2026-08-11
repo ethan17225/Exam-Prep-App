@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+
+# Runtime data (Docker volume-mounted; created on demand when running bare metal)
+backend/Docs/
+backend/uploads/
+
+# Database dumps written by the compose `backup` service
+backups/

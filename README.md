@@ -13,7 +13,7 @@ A minimalist web app for taking MCQ, Select All That Apply (SATA), and Fill in t
 
 ```bash
 cp .env.example .env
-# Fill in POSTGRES_PASSWORD, JWT_SECRET, INVITE_CODE, BOOTSTRAP_ADMIN_*
+# Fill in POSTGRES_PASSWORD, AUTH_SECRET, AUTH_INVITE_CODE, BOOTSTRAP_ADMIN_*
 # Generate secrets: python -c "import secrets; print(secrets.token_urlsafe(48))"
 docker compose up --build
 ```
@@ -24,7 +24,8 @@ Caddy on ports 80/443. Compose refuses to start if a required secret is unset.
 
 The first instructor account is created by the database migration from
 `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` — sign in with it and
-change the password. Everyone else registers with the `INVITE_CODE`.
+change the password. Everyone else registers with the `AUTH_INVITE_CODE`.
+Nothing else can mint an instructor, so that migration is not optional.
 
 ### Or run the pieces yourself
 
@@ -36,10 +37,15 @@ Needs PostgreSQL. Copy `backend/.env.example` to `backend/.env` and fill it in.
 cd backend
 pip3 install -r requirements.txt
 alembic upgrade head          # creates the schema and the first instructor
-uvicorn main:app --port 8000 --reload
+uvicorn src.main:app --port 8000 --reload
 ```
 
-API runs at `http://localhost:8000`. Swagger docs at `http://localhost:8000/docs`.
+API runs at `http://localhost:8000`. Swagger docs at `http://localhost:8000/docs`
+when `ENVIRONMENT` is `local` or `staging`; disabled otherwise.
+
+`DATABASE_URL` must use the `postgresql+psycopg://` scheme — the app runs on
+SQLAlchemy's async engine, and a bare `postgresql://` URL selects a sync driver
+that it will refuse.
 
 #### 2. Frontend
 
@@ -89,13 +95,36 @@ gunzip -c backups/mcq_app_<timestamp>.sql.gz | docker compose exec -T db psql -U
 
 ```bash
 cd backend
-python test_auth.py    # auth primitives — no DB or server needed
-python test_api.py     # route guards and input validation — no DB or server needed
-API_BASE=http://localhost:8000/api E2E_EMAIL=... E2E_PASSWORD=... python test_e2e.py
+pip3 install -r requirements-dev.txt
+
+pytest                 # auth primitives, route guards, input validation — no DB needed
+ruff check src tests && ruff format --check src tests
+
+# The one test that exercises real queries. Needs a running server and an account.
+API_BASE=http://localhost:8000/api E2E_EMAIL=... E2E_PASSWORD=... python tests/e2e_live.py
 ```
 
-`test_e2e.py` runs against a live server and creates then deletes a temporary
-exam. Use `http://localhost:8001/api` for the Docker mapping.
+`tests/e2e_live.py` creates and then deletes an exam titled `__e2e_smoke_test__`.
+Use `http://localhost:8001/api` for the Docker mapping.
+
+## Backend layout
+
+Organised by domain, one package per bounded context:
+
+```
+backend/src/
+├── auth/        users, JWT, the CurrentUserDep/InstructorDep dependencies
+├── courses/     course CRUD
+├── exams/       Exam + Question, exam CRUD, the question editor, image uploads
+├── attempts/    in-progress autosave, submit, history
+├── documents/   filesystem-backed course PDFs (no table)
+├── admin/       the instructor dashboard (a cross-domain read view)
+├── grading/     answer grading — a pure leaf, imported by three domains
+└── main.py      app assembly, static mounts, /healthz
+```
+
+Conventions and the invariants that keep the import graph acyclic are documented
+in `.claude/skills/exam-api-practices/SKILL.md`.
 
 ## Features
 

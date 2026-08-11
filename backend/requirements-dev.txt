@@ -1,0 +1,6 @@
+-r requirements.txt
+pytest>=8.0
+pytest-asyncio>=0.24
+# starlette imports httpx2, so this is the package name — not `httpx`.
+httpx2>=0.28
+ruff>=0.6

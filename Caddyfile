@@ -1,0 +1,16 @@
+# TLS terminator. Set APP_DOMAIN in .env:
+#   exams.example.com   -> Caddy obtains and renews a Let's Encrypt certificate
+#   :80                 -> plain HTTP, for local runs with no public DNS
+{$APP_DOMAIN} {
+	encode gzip zstd
+
+	reverse_proxy frontend:80 {
+		health_uri /index.html
+		health_interval 30s
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

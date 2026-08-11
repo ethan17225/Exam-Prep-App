@@ -1,13 +1,14 @@
 #!/bin/sh
 set -e
 
-# Wait for Postgres, then bring the schema to head. Any failure here exits non-zero
-# so the container crash-loops rather than serving a half-migrated schema.
+# Wait for Postgres, then bring the schema to head. Any failure here exits
+# non-zero so the container crash-loops rather than serving a half-migrated
+# schema. psycopg3 is dual-mode, so this sync engine shares the app's URL.
 python - <<'PY'
 import os
 import time
 
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, text
 
 url = os.environ.get("DATABASE_URL")
 if not url:
@@ -28,24 +29,14 @@ else:
     engine.dispose()
     raise SystemExit(f"Could not connect to the database after 60s: {last_error}")
 
-# Baseline any database that predates Alembic: it already has the 0001 schema
-# (created by the old create_all + ALTER guards), so stamp it instead of running 0001.
-tables = set(inspect(engine).get_table_names())
-if "alembic_version" not in tables and "courses" in tables:
-    print("Pre-Alembic database detected — stamping baseline 0001", flush=True)
-    from alembic import command
-    from alembic.config import Config
-
-    command.stamp(Config("alembic.ini"), "0001")
-
 engine.dispose()
 PY
 
 alembic upgrade head
 
-# gunicorn supervises N uvicorn workers: routes are sync `def`, so one worker
-# pinned the app to a single core. --proxy-headers keeps client IPs from nginx.
-exec gunicorn main:app \
+# gunicorn supervises N uvicorn workers. --proxy-headers keeps client IPs from
+# nginx; --forwarded-allow-ips trusts the compose network in front of us.
+exec gunicorn src.main:app \
     --worker-class uvicorn.workers.UvicornWorker \
     --workers "${WEB_CONCURRENCY:-3}" \
     --bind 0.0.0.0:8000 \

@@ -1,11 +1,16 @@
 fastapi>=0.115.0
 uvicorn>=0.32.0
 gunicorn>=23.0.0
-pydantic>=2.9.0
+pydantic>=2.7.0
+pydantic-settings>=2.4.0
 email-validator>=2.2.0
 sqlalchemy>=2.0.0
 alembic>=1.13.0
-psycopg2-binary>=2.9.0
+# psycopg3, not asyncpg: it is dual-mode (the same driver backs create_engine and
+# create_async_engine, so the entrypoint and Alembic stay simple), it ships a
+# pure-Python wheel that works on Python 3.14, and it returns JSONB from raw
+# text() queries as dicts rather than strings.
+psycopg[binary,pool]>=3.2.0
 python-dotenv>=1.0.0
 python-multipart>=0.0.9
 PyJWT>=2.9.0

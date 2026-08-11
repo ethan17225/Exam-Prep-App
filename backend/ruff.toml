@@ -1,0 +1,23 @@
+target-version = "py312"
+line-length = 120
+
+[lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM"]
+ignore = [
+    # Domain exceptions carry their message on the class, so `raise X()` inside
+    # an `except` block is the normal form here.
+    "B904",
+]
+
+[lint.per-file-ignores]
+# Revisions are generated artifacts with a fixed header shape.
+"alembic/versions/*" = ["E501"]
+# conftest sets environment variables before importing src, which must happen
+# before the settings modules are read.
+"tests/conftest.py" = ["E402"]
+# Its TEST_EXAM literal is the canonical reference for every question type's
+# options/answer shape; reflowing it to 120 columns would make it unreadable.
+"tests/e2e_live.py" = ["E501"]
+
+[lint.isort]
+known-first-party = ["src"]

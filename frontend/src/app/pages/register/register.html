@@ -1,0 +1,50 @@
+<div class="auth-page">
+  <div class="card auth-card">
+    <h1 class="page-title">Create account</h1>
+
+    <form (ngSubmit)="submit()">
+      <label class="field">
+        <span>Email</span>
+        <input
+          type="email"
+          name="email"
+          autocomplete="username"
+          [ngModel]="email()"
+          (ngModelChange)="email.set($event)"
+        />
+      </label>
+
+      <label class="field">
+        <span>Password</span>
+        <input
+          type="password"
+          name="password"
+          autocomplete="new-password"
+          [ngModel]="password()"
+          (ngModelChange)="password.set($event)"
+        />
+      </label>
+      <p class="auth-hint">At least 8 characters.</p>
+
+      <label class="field">
+        <span>Invite code</span>
+        <input
+          type="text"
+          name="inviteCode"
+          [ngModel]="inviteCode()"
+          (ngModelChange)="inviteCode.set($event)"
+        />
+      </label>
+
+      @if (error()) {
+        <p class="auth-error">{{ error() }}</p>
+      }
+
+      <button type="submit" class="btn btn-primary auth-submit" [disabled]="loading()">
+        {{ loading() ? 'Creating…' : 'Create account' }}
+      </button>
+    </form>
+
+    <p class="auth-alt">Already have an account? <a routerLink="/login">Sign in</a></p>
+  </div>
+</div>

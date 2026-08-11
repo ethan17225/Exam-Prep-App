@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""End-to-end smoke test for question types (run against a live backend)."""
+"""End-to-end smoke test for question types, run against a live backend.
+
+    API_BASE=http://localhost:8000/api E2E_EMAIL=... E2E_PASSWORD=... \
+        python tests/e2e_live.py
+
+Deliberately NOT a pytest module — hence the name, which keeps pytest from
+collecting it. It talks to a real server over real HTTP using only the stdlib,
+which is exactly what makes it the one test that exercises real queries and real
+ownership rules. It creates and then deletes an exam titled `__e2e_smoke_test__`.
+"""
 
 import json
 import os
@@ -43,8 +52,16 @@ TEST_EXAM = {
             "question": "Select condition and interventions.",
             "options": {
                 "categories": [
-                    {"name": "Potential Condition", "count": 1, "choices": ["Acrocyanosis", "Meconium aspiration syndrome"]},
-                    {"name": "Potential Interventions", "count": 2, "choices": ["Suctioning", "Oxygen therapy", "Phototherapy"]},
+                    {
+                        "name": "Potential Condition",
+                        "count": 1,
+                        "choices": ["Acrocyanosis", "Meconium aspiration syndrome"],
+                    },
+                    {
+                        "name": "Potential Interventions",
+                        "count": 2,
+                        "choices": ["Suctioning", "Oxygen therapy", "Phototherapy"],
+                    },
                 ]
             },
             "answer": {
@@ -76,12 +93,33 @@ TEST_EXAM = {
             "topic": "Hotspot",
             "type": "HOTSPOT",
             "question": "Click the correct region.",
-            "options": {"regions": [{"id": "r1", "label": "Up", "x": 55, "y": 5, "w": 40, "h": 30}, {"id": "r2", "label": "Down", "x": 55, "y": 60, "w": 40, "h": 30}]},
+            "options": {
+                "regions": [
+                    {"id": "r1", "label": "Up", "x": 55, "y": 5, "w": 40, "h": 30},
+                    {"id": "r2", "label": "Down", "x": 55, "y": 60, "w": 40, "h": 30},
+                ]
+            },
             "answer": "r2",
             "rationale": "",
         },
-        {"number": 7, "topic": "MCQ", "type": "MCQ", "question": "Pick one.", "options": ["A. one", "B. two"], "answer": "A", "rationale": ""},
-        {"number": 8, "topic": "SATA", "type": "SATA", "question": "Pick all.", "options": ["A. one", "B. two", "C. three"], "answer": ["A", "C"], "rationale": ""},
+        {
+            "number": 7,
+            "topic": "MCQ",
+            "type": "MCQ",
+            "question": "Pick one.",
+            "options": ["A. one", "B. two"],
+            "answer": "A",
+            "rationale": "",
+        },
+        {
+            "number": 8,
+            "topic": "SATA",
+            "type": "SATA",
+            "question": "Pick all.",
+            "options": ["A. one", "B. two", "C. three"],
+            "answer": ["A", "C"],
+            "rationale": "",
+        },
         {"number": 9, "topic": "FIB", "type": "FIB", "question": "Enter value.", "answer": "42", "rationale": ""},
     ],
 }
@@ -134,10 +172,14 @@ def delete(path):
 def upload_image(question_id, filename, content):
     boundary = "----testboundary123"
     body = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
-        f"Content-Type: image/png\r\n\r\n"
-    ).encode() + content + f"\r\n--{boundary}--\r\n".encode()
+        (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+            f"Content-Type: image/png\r\n\r\n"
+        ).encode()
+        + content
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
     req = urllib.request.Request(
         f"{BASE}/questions/{question_id}/image",
         data=body,
@@ -197,12 +239,15 @@ check("questions include id and image fields", all("id" in q and "image" in q fo
 
 # ── Submit all-correct answers ──────────────────────────────────
 subs = [{"question_number": q["number"], "answer": q["answer"], "fib_correct": None} for q in questions]
-result = post(f"/exams/{exam_id}/submit", {
-    "exam_id": exam_id,
-    "answers": subs,
-    "time_spent_seconds": 60,
-    "mode": "practice",
-})
+result = post(
+    f"/exams/{exam_id}/submit",
+    {
+        "exam_id": exam_id,
+        "answers": subs,
+        "time_spent_seconds": 60,
+        "mode": "practice",
+    },
+)
 check(
     "all-correct submission scores 100%",
     result["score"] == 100.0,
@@ -226,12 +271,15 @@ subs2 = [
     {"question_number": q["number"], "answer": wrong_by_type.get(q["type"].upper(), ""), "fib_correct": None}
     for q in questions
 ]
-result2 = post(f"/exams/{exam_id}/submit", {
-    "exam_id": exam_id,
-    "answers": subs2,
-    "time_spent_seconds": 60,
-    "mode": "practice",
-})
+result2 = post(
+    f"/exams/{exam_id}/submit",
+    {
+        "exam_id": exam_id,
+        "answers": subs2,
+        "time_spent_seconds": 60,
+        "mode": "practice",
+    },
+)
 check("all-wrong submission scores 0%", result2["score"] == 0.0, f"score={result2['score']}")
 delete(f"/history/{result2['id']}")
 
@@ -241,15 +289,18 @@ updated = patch(f"/exams/{exam_id}/questions/{q7['id']}", {"topic": "Updated"})
 check("question PATCH works", updated["topic"] == "Updated")
 patch(f"/exams/{exam_id}/questions/{q7['id']}", {"topic": "MCQ"})
 
-new_q = post(f"/exams/{exam_id}/questions", {
-    "number": 0,
-    "topic": "Test",
-    "type": "MCQ",
-    "question": "Temp question?",
-    "options": ["A. one", "B. two"],
-    "answer": "A",
-    "rationale": "",
-})
+new_q = post(
+    f"/exams/{exam_id}/questions",
+    {
+        "number": 0,
+        "topic": "Test",
+        "type": "MCQ",
+        "question": "Temp question?",
+        "options": ["A. one", "B. two"],
+        "answer": "A",
+        "rationale": "",
+    },
+)
 check("question POST assigns next number", new_q["number"] == 10, str(new_q["number"]))
 
 # ── Image upload ────────────────────────────────────────────────

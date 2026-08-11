@@ -3,6 +3,11 @@ __pycache__
 .env
 .venv
 venv
-test_*.py
+.pytest_cache
+.ruff_cache
+tests
+test_e2e.py
+pytest.ini
+requirements-dev.txt
 Docs
 uploads
