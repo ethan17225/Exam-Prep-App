@@ -62,7 +62,9 @@
   padding: 0.4rem 0.75rem;
   border-radius: 6px 6px 0 0;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 
   &:hover {
     background: #dfe3e8;

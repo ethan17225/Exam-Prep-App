@@ -1,7 +1,13 @@
 import { Component, HostListener, OnInit, signal, computed } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { QuestionSectionsComponent } from '../../components/question-sections/question-sections';
-import { ExamService, Question, classifyQuestionType, formatAnswerForDisplay } from '../../services/exam.service';
+import {
+  ExamService,
+  Question,
+  classifyQuestionType,
+  formatAnswerForDisplay,
+  shuffle,
+} from '../../services/exam.service';
 
 @Component({
   selector: 'app-flashcards',
@@ -41,13 +47,20 @@ export class FlashcardsPage implements OnInit {
   ngOnInit(): void {
     this.examId = this.route.snapshot.paramMap.get('id')!;
     const countParam = Number(this.route.snapshot.queryParamMap.get('count'));
-    const shuffle = this.route.snapshot.queryParamMap.get('shuffle') !== 'false';
+    const shuffleParam = this.route.snapshot.queryParamMap.get('shuffle') !== 'false';
 
     this.examService.getExam(this.examId, true).subscribe({
       next: (exam) => {
+        // Flashcards are the answer key by definition, so the server withholds
+        // it for an assessment-only exam. Fail legibly rather than render blanks.
+        if (!exam.answers_included) {
+          this.loading.set(false);
+          this.error.set('This exam is assessment-only, so flashcards are disabled.');
+          return;
+        }
         this.examTitle.set(exam.title);
         let list = [...exam.questions];
-        if (shuffle) list = this.shuffle(list);
+        if (shuffleParam) list = shuffle(list);
         if (Number.isFinite(countParam) && countParam > 0) {
           list = list.slice(0, Math.min(countParam, list.length));
         }
@@ -74,15 +87,6 @@ export class FlashcardsPage implements OnInit {
       ev.preventDefault();
       this.toggleFlip();
     }
-  }
-
-  private shuffle<T>(arr: T[]): T[] {
-    const a = [...arr];
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
   }
 
   toggleFlip(): void {
@@ -147,7 +151,10 @@ export class FlashcardsPage implements OnInit {
     }
     const s = String(a).trim();
     if (!s) return [];
-    return s.split(',').map((part) => part.trim()).filter(Boolean);
+    return s
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean);
   }
 
   private optionMatchingLetter(q: Question, letter: string): string | null {

@@ -24,7 +24,8 @@ conventions live in the sibling `exam-api-practices` skill.
 | Charts    | Chart.js 4, imperative                               | ng2-charts or another wrapper                     |
 | Forms     | `FormsModule` / `ngModel` only                       | Reactive forms                                    |
 | RxJS      | 7.8 — only as the `HttpClient` return type           | RxJS state pipelines                              |
-| Format    | Prettier (100 cols, single quotes)                   | ESLint (none configured — see Style)              |
+| Format    | Prettier (100 cols, single quotes) + angular-eslint  | a second linter/formatter                          |
+| Tests     | vitest via `@angular/build:unit-test` (`npm test`)   | Karma/Jasmine, TestBed ceremony for pure logic     |
 
 ## Layout & naming
 
@@ -33,7 +34,8 @@ src/app/
 ├── app.ts / app.html / app.scss     # shell: <nav> + <router-outlet>
 ├── app.config.ts                    # providers (router, HttpClient)
 ├── app.routes.ts                    # every route, one line each, lazy
-├── components/question-sections/    # the only shared component
+├── components/question-sections/    # shared: tabbed patient-data chart
+├── components/answer-review/        # shared: one reviewed-question card (results + history-detail)
 ├── pages/<kebab-name>/              # 14 route-level pages (incl. login, register)
 └── services/
     ├── exam.service.ts              # ALL app HTTP + domain types + pure helpers
@@ -109,6 +111,24 @@ server-owned**)**.
   is stored on the class and torn down in `ngOnDestroy` — see `take-exam.ts`
   (timer + 500 ms debounced autosave) and `overview.ts` (`private charts: Chart[]`).
 
+## Security invariants
+
+- **`bypassSecurityTrustHtml` / `bypassSecurityTrust*` are banned.** Binding
+  `[innerHTML]` to a plain string lets Angular's sanitizer strip scripts, iframes
+  and handlers; bypassing it writes attacker markup verbatim. The documents page
+  renders server HTML through `[innerHTML]` with **no** bypass, and it must stay
+  that way — a bypass here was this app's one critical XSS.
+- **Client integrity checks are UX only.** `authGuard`/`instructorGuard` and any
+  `allow_practice`/`is_owner` gate exist to fail legibly; the server enforces all
+  of it. Never treat a client flag as the boundary.
+- **The answer key must not be in the browser during a graded run.** `take-exam`
+  requests `include_answers` only in practice mode; the FIB reveal and self-grade
+  block is wrapped in `@if (mode() === 'practice')`, like the SATA/MCQ paths.
+- **Everything in `localStorage` is keyed by user id and cleared on logout.**
+  `AuthService.clear()` removes the token, the user, and every `exam_progress_*`
+  mirror — an unscoped key leaked one student's answers into another's attempt on
+  a shared machine. The bearer token attaches only to `/api/` requests.
+
 ## Templates
 
 - Built-in control flow only: `@if` / `@else` / `@for (x of xs; track x.id)`.
@@ -152,10 +172,14 @@ export class ExamService {
   `getHistoryRecord()` returns the full `ExamResult`. Don't widen the list type
   back — the blobs are what made that endpoint a DoS.
 - `HttpParams` for query strings; template literals for path params.
-- Pure helpers live here too — `classifyQuestionType`, `countQuestionTypes`,
-  `formatAnswerForDisplay`, `matrixRows`, `clozeBlanks`. New shared logic goes
-  here, not into a page. (`formatDate`/`formatTime` are currently duplicated
-  across pages — if you touch them, hoist rather than copy again.)
+- Pure helpers live here too — `classifyQuestionType`, `kindFromType`,
+  `countQuestionTypes`, `formatAnswerForDisplay`, `matrixRows`, `clozeBlanks`,
+  `formatDate`, `formatDuration`, `formatClock`, `shuffle`, `progressPercent`.
+  New shared logic goes here, not into a page.
+- **`isAnswerCorrect` is a line-for-line port of
+  `backend/src/grading/service.py:grade_question`** — practice-mode feedback must
+  agree with the graded score. Change them together, and keep the parity tests in
+  `exam.service.spec.ts` green.
 - `noPropertyAccessFromIndexSignature` is on, hence `body['course_id']`
   (`exam.service.ts:360`) rather than dot access on an index-signature type.
 - Components `.subscribe()` directly and don't unsubscribe — `HttpClient`
@@ -206,6 +230,13 @@ unless a case has more than one caller.
    status signal (`error: () => this.autoSaveStatus.set('idle')`,
    `take-exam.ts:665`).
 
+**Every page load path** uses the same pattern: `loading = signal(true)` +
+`loadError = signal('')`, an `error:` callback with the `detail || 'Fallback.'`
+idiom, and a template branch showing the message with a Retry button that calls
+the page's `load()`. A GET must never leave the page stuck on "Loading..." or a
+misleading empty state. Per-row deletes get a `deleteError`
+`signal<Record<id, string>>`.
+
 ## Styling
 
 - Global tokens and utility classes live in `src/styles.scss`: `.btn` +
@@ -241,25 +272,32 @@ Don't introduce a fourth breakpoint value. (`documents.scss:319` at 600px and
 
 ## Style & tooling
 
-- **Prettier only** — `.prettierrc`: `printWidth: 100`, `singleQuote: true`,
-  `parser: angular` for `*.html`. There is no `format` npm script; formatting is
-  editor-driven. **No ESLint at all** — don't reference lint rules that don't
-  exist.
+- **Prettier** — `.prettierrc`: `printWidth: 100`, `singleQuote: true`,
+  `parser: angular` for `*.html`. `npm run format` / `npm run format:check`.
+- **angular-eslint** — flat config in `eslint.config.js`, `npm run lint`.
+  `@angular-eslint/prefer-inject` is deliberately off (constructor DI is the
+  project convention) and empty **arrow** functions are allowed (`error: () => {}`
+  is the documented swallow idiom). Pure `$event.stopPropagation()` handlers on
+  divs carry inline eslint-disable comments; genuinely interactive divs get
+  `role="button" tabindex="0" (keydown.enter)`.
 - `.editorconfig`: 2-space indent, final newline, trimmed trailing whitespace.
 - `tsconfig.json` is strict everywhere including `strictTemplates`,
-  `noImplicitReturns`, `noPropertyAccessFromIndexSignature`. Respect it rather
-  than casting around it.
+  `noImplicitReturns`, `noPropertyAccessFromIndexSignature`, `noUnusedLocals`,
+  `noUnusedParameters` (prefix intentionally unused params with `_`). Respect it
+  rather than casting around it.
 - JSDoc one-liners (`/** ... */`) on exported interfaces and non-obvious methods.
 
 ## Tests
 
-**There are none, and `npm test` cannot currently run** — `tsconfig.spec.json`
-references `vitest/globals` but vitest isn't installed, `angular.json` has no
-`test` target, and schematics are `skipTests: true`.
+**vitest**, wired through `angular.json`'s `test` target
+(`@angular/build:unit-test`); `npm test` runs it (`-- --watch=false` in CI).
+Tests cover the risky **pure logic** in `exam.service.ts` — grading parity with
+the backend, format helpers, classification — see `exam.service.spec.ts`.
+Import `describe/it/expect` from `vitest` explicitly. Don't add TestBed
+component-test ceremony unless a component actually warrants it.
 
-Do not generate `.spec.ts` files that can't execute. If tests are wanted,
-installing and wiring vitest is a deliberate separate change — propose it, don't
-smuggle it in.
+CI (`.github/workflows/frontend.yml`) gates every push/PR touching `frontend/`
+on format:check → lint → test → production build.
 
 ## Anti-patterns (check every diff)
 
@@ -281,5 +319,8 @@ smuggle it in.
 | Tailwind or any CSS framework | `styles.scss` utilities + component SCSS |
 | New inline `style="…"` in a template | a class in the component `.scss` |
 | A new breakpoint instead of 640px | `@media (max-width: 640px)` |
-| Adding `.spec.ts` files | no runner is installed — propose wiring vitest first |
-| `setInterval` / Chart.js instance without `ngOnDestroy` teardown | store it on the class and destroy it |
+| A GET with no `error:` callback | `loading`/`loadError` signals + template error branch with Retry |
+| Grading logic that drifts from the backend | change `isAnswerCorrect` with `backend/src/grading/service.py`, keep the parity tests green |
+| Duplicating a review card or format helper in a page | `components/answer-review/` and the `exam.service.ts` helpers already exist |
+| `Chart.register(...registerables)` | register only the controllers/scales/elements the chart uses |
+| `setInterval` / `setTimeout` / Chart.js instance without `ngOnDestroy` teardown | store it on the class and destroy it |

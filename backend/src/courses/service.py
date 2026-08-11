@@ -1,5 +1,4 @@
 from datetime import datetime
-from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +9,7 @@ from src.authz import visible
 from src.courses.exceptions import CourseNameEmpty, CourseNameTaken, CourseNotFound
 from src.courses.models import Course
 from src.courses.schemas import CourseCreate
+from src.identifiers import new_id
 
 
 async def list_visible(user: User, db: AsyncSession) -> list[Course]:
@@ -38,7 +38,7 @@ async def create(payload: CourseCreate, user: User, db: AsyncSession) -> Course:
         raise CourseNameTaken()
 
     course = Course(
-        id=str(uuid4())[:8],
+        id=new_id(),
         owner_id=user.id,
         is_shared=user.role == UserRole.INSTRUCTOR,
         name=name,
@@ -46,5 +46,4 @@ async def create(payload: CourseCreate, user: User, db: AsyncSession) -> Course:
     )
     db.add(course)
     await db.commit()
-    await db.refresh(course)
     return course

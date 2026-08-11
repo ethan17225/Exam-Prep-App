@@ -2,6 +2,7 @@ from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, String, Uni
 from sqlalchemy.orm import relationship
 
 from src.database import Base
+from src.identifiers import ID_LENGTH
 
 
 class Course(Base):
@@ -12,8 +13,8 @@ class Course(Base):
         Index(None, "owner_id"),
     )
 
-    id = Column(String(8), primary_key=True)
-    owner_id = Column(String(8), ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    id = Column(String(ID_LENGTH), primary_key=True)
+    owner_id = Column(String(ID_LENGTH), ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
     # Set server-side from the creator's role; never accepted from the client.
     is_shared = Column(Boolean, nullable=False)
     name = Column(String(255), nullable=False)

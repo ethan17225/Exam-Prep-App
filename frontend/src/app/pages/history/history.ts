@@ -1,7 +1,12 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { ExamService, ExamResultSummary } from '../../services/exam.service';
+import {
+  ExamService,
+  ExamResultSummary,
+  formatDate,
+  formatDuration,
+} from '../../services/exam.service';
 
 @Component({
   selector: 'app-history',
@@ -12,12 +17,18 @@ import { ExamService, ExamResultSummary } from '../../services/exam.service';
 export class HistoryPage implements OnInit {
   records = signal<ExamResultSummary[]>([]);
   searchQuery = signal('');
+  loading = signal(true);
+  loadError = signal('');
+  deleteError = signal<Record<string, string>>({});
 
   filteredRecords = computed(() => {
     const query = this.searchQuery().toLowerCase().trim();
     if (!query) return this.records();
     return this.records().filter((r) => r.exam_title.toLowerCase().includes(query));
   });
+
+  readonly formatDate = formatDate;
+  readonly formatDuration = formatDuration;
 
   constructor(
     private examService: ExamService,
@@ -29,7 +40,18 @@ export class HistoryPage implements OnInit {
   }
 
   load(): void {
-    this.examService.getHistory().subscribe((data) => this.records.set(data));
+    this.loading.set(true);
+    this.loadError.set('');
+    this.examService.getHistory().subscribe({
+      next: (data) => {
+        this.records.set(data);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.loadError.set(err?.error?.detail || 'Failed to load test history.');
+      },
+    });
   }
 
   view(id: string): void {
@@ -38,16 +60,14 @@ export class HistoryPage implements OnInit {
 
   remove(id: string, event: Event): void {
     event.stopPropagation();
-    this.examService.deleteHistoryRecord(id).subscribe(() => this.load());
-  }
-
-  formatTime(seconds: number): string {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}m ${s}s`;
-  }
-
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleString();
+    this.examService.deleteHistoryRecord(id).subscribe({
+      next: () => this.load(),
+      error: (err) => {
+        this.deleteError.set({
+          ...this.deleteError(),
+          [id]: err?.error?.detail || 'Delete failed.',
+        });
+      },
+    });
   }
 }

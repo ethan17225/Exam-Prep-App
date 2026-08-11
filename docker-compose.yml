@@ -5,6 +5,14 @@ x-logging: &default-logging
     max-size: "10m"
     max-file: "5"
 
+networks:
+  # The internet-facing proxy can reach the SPA and nothing else; only the
+  # backend and the backup sidecar can reach Postgres.
+  edge:
+  app:
+  data:
+    internal: true
+
 services:
   db:
     image: postgres:16-alpine
@@ -15,6 +23,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-mcq_app}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks: [data]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
@@ -32,9 +41,13 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-mcq_app}
       AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env}
       AUTH_INVITE_CODE: ${AUTH_INVITE_CODE:?set AUTH_INVITE_CODE in .env}
-      # Read only by Alembic revision 0002, which creates the first instructor.
-      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:?set BOOTSTRAP_ADMIN_EMAIL in .env}
-      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?set BOOTSTRAP_ADMIN_PASSWORD in .env}
+      # Read once, by Alembic revision 0002, to create the first instructor.
+      # Optional on purpose: once that revision has run, blank both in .env so the
+      # standing instructor password stops living in the container environment
+      # (visible via `docker inspect` and /proc/1/environ). Change the password in
+      # the app first — POST /api/auth/password, which also revokes every token.
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
       ENVIRONMENT: ${ENVIRONMENT:-production}
       WEB_CONCURRENCY: ${WEB_CONCURRENCY:-3}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -42,6 +55,7 @@ services:
       # Loopback only — public traffic reaches the API through caddy -> frontend.
       # Kept published so test_e2e.py and debugging can hit it directly.
       - "127.0.0.1:8001:8000"
+    networks: [app, data]
     volumes:
       - uploads:/app/uploads
       # Course PDFs/HTML used to live only in the image layer and were destroyed
@@ -56,8 +70,7 @@ services:
   frontend:
     build: ./frontend
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:4200:80"
+    networks: [edge, app]
     depends_on:
       backend:
         condition: service_healthy
@@ -73,20 +86,32 @@ services:
     environment:
       APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env (use :80 for plain local HTTP)}
       ACME_EMAIL: ${ACME_EMAIL:-}
+    networks: [edge]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - frontend
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     logging: *default-logging
     mem_limit: 256m
 
   backup:
     image: postgres:16-alpine
     restart: unless-stopped
+    # Not root: the default entrypoint only drops privilege when the command is
+    # `postgres`, so a bare `sh -c` would run as uid 0 and write world-readable
+    # dumps of every password hash and answer key to the host.
+    user: "70:70"
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD}
+    networks: [data]
     volumes:
       - ./backups:/backups
     depends_on:
@@ -94,13 +119,23 @@ services:
         condition: service_healthy
     # Daily dump, 14 days retained. Restore with:
     #   gunzip -c backups/<file>.sql.gz | docker compose exec -T db psql -U postgres mcq_app
+    #
+    # pipefail is load-bearing: a shell pipeline exits with the status of its
+    # LAST command, so without it a failed pg_dump still produced a valid empty
+    # .gz, logged success, and the prune below then deleted the good backups.
+    # The prune only runs after a dump has been verified.
     command: >
-      sh -c 'while true; do
+      sh -c 'umask 077; set -o pipefail; while true; do
         f=/backups/mcq_app_$$(date +%Y%m%d_%H%M%S).sql.gz;
-        pg_dump -h db -U ${POSTGRES_USER:-postgres} ${POSTGRES_DB:-mcq_app} | gzip > $$f
-          && echo "backup written: $$f"
-          || echo "BACKUP FAILED";
-        find /backups -name "mcq_app_*.sql.gz" -mtime +14 -delete;
+        if pg_dump -h db -U ${POSTGRES_USER:-postgres} ${POSTGRES_DB:-mcq_app} | gzip > $$f
+           && gzip -t $$f
+           && [ "$$(stat -c%s $$f)" -gt 1000 ]; then
+          echo "backup ok: $$f ($$(stat -c%s $$f) bytes)";
+          find /backups -name "mcq_app_*.sql.gz" -mtime +14 -delete;
+        else
+          echo "BACKUP FAILED - keeping existing backups, not pruning";
+          rm -f $$f;
+        fi;
         sleep 86400;
       done'
     logging: *default-logging

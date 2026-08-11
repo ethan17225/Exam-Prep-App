@@ -8,7 +8,7 @@ from src.auth import service
 from src.auth.constants import UserRole
 from src.auth.exceptions import InstructorRequired, InvalidToken, NotAuthenticated
 from src.auth.models import User
-from src.auth.utils import bearer_token
+from src.auth.utils import bearer_token, static_mount_token
 from src.database import SessionDep
 
 
@@ -54,7 +54,7 @@ def make_static_mount_guard(prefixes: Iterable[str]):
 
     async def protect_static_mounts(request: Request, call_next):
         if request.url.path.startswith(guarded):
-            token = bearer_token(request)
+            token = static_mount_token(request)
             if not token:
                 return JSONResponse({"detail": NotAuthenticated.DETAIL}, status_code=401)
             if not service.decode_token(token):

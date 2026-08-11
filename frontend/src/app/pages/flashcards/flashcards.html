@@ -16,11 +16,19 @@
   @if (currentQuestion(); as q) {
     <div class="flashcard-hint">Click the card or press Space to flip · ← → to move</div>
 
+    <!-- Space/Enter flip via the document-level key handler in flashcards.ts -->
+    <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
     <div class="flashcard-scene" (click)="toggleFlip()">
       <div class="flashcard-inner" [class.flipped]="flipped()">
         <div class="flashcard-face flashcard-front card">
           <div class="fc-badges">
-            <span class="badge" [class.badge-mcq]="q.type === 'MCQ'" [class.badge-sata]="q.type === 'SATA'" [class.badge-fib]="isTextQuestion(q)">{{ q.type }}</span>
+            <span
+              class="badge"
+              [class.badge-mcq]="q.type === 'MCQ'"
+              [class.badge-sata]="q.type === 'SATA'"
+              [class.badge-fib]="isTextQuestion(q)"
+              >{{ q.type }}</span
+            >
             @if (q.topic) {
               <span class="fc-topic">{{ q.topic }}</span>
             }
@@ -61,8 +69,20 @@
     </div>
 
     <div class="flashcard-nav">
-      <button class="btn btn-secondary" (click)="prev(); $event.stopPropagation()" [disabled]="currentIndex() === 0">Previous</button>
-      <button class="btn btn-secondary" (click)="next(); $event.stopPropagation()" [disabled]="currentIndex() >= total() - 1">Next</button>
+      <button
+        class="btn btn-secondary"
+        (click)="prev(); $event.stopPropagation()"
+        [disabled]="currentIndex() === 0"
+      >
+        Previous
+      </button>
+      <button
+        class="btn btn-secondary"
+        (click)="next(); $event.stopPropagation()"
+        [disabled]="currentIndex() >= total() - 1"
+      >
+        Next
+      </button>
     </div>
   }
 }

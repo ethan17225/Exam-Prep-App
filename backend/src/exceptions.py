@@ -1,5 +1,3 @@
-from typing import Any
-
 from fastapi import HTTPException
 
 
@@ -16,5 +14,5 @@ class DetailedHTTPException(HTTPException):
     STATUS_CODE: int = 500
     DETAIL: str = "Internal server error"
 
-    def __init__(self, detail: str | None = None, headers: dict[str, Any] | None = None) -> None:
-        super().__init__(status_code=self.STATUS_CODE, detail=detail or self.DETAIL, headers=headers)
+    def __init__(self, detail: str | None = None) -> None:
+        super().__init__(status_code=self.STATUS_CODE, detail=detail or self.DETAIL)

@@ -3,9 +3,16 @@ from typing import Annotated
 from fastapi import APIRouter, Query, status
 
 from src.attempts import service
-from src.attempts.exceptions import NoValidQuestions, RecordNotFound
+from src.attempts.constants import AttemptMode
+from src.attempts.exceptions import (
+    AttemptExpired,
+    AttemptNotDiscardable,
+    AttemptNotOpen,
+    NoValidQuestions,
+    PracticeDisabled,
+    RecordNotFound,
+)
 from src.attempts.schemas import (
-    DeletedOut,
     ExamSubmission,
     HistoryOut,
     HistorySummaryOut,
@@ -17,6 +24,7 @@ from src.auth.dependencies import CurrentUserDep
 from src.database import SessionDep
 from src.exams import service as exams_service
 from src.exams.exceptions import ExamNotFound
+from src.schemas import DeletedOut
 
 # Submit is addressed under /api/exams but writes History, so it lives here with
 # the rest of the attempt lifecycle.
@@ -34,7 +42,9 @@ NO_RECORD = {status.HTTP_404_NOT_FOUND: {"description": RecordNotFound.DETAIL}}
     description="Grades the submission, stores a history record and returns it in full.",
     responses={
         status.HTTP_400_BAD_REQUEST: {"description": NoValidQuestions.DETAIL},
+        status.HTTP_403_FORBIDDEN: {"description": PracticeDisabled.DETAIL},
         status.HTTP_404_NOT_FOUND: {"description": ExamNotFound.DETAIL},
+        status.HTTP_409_CONFLICT: {"description": AttemptNotOpen.DETAIL},
     },
 )
 async def submit_exam(exam_id: str, submission: ExamSubmission, user: CurrentUserDep, db: SessionDep):
@@ -47,7 +57,11 @@ async def submit_exam(exam_id: str, submission: ExamSubmission, user: CurrentUse
     response_model=InProgressOut,
     summary="Save exam progress",
     description=("Upserts the caller's autosave for this exam and mode. Safe to call concurrently from multiple tabs."),
-    responses={status.HTTP_404_NOT_FOUND: {"description": ExamNotFound.DETAIL}},
+    responses={
+        status.HTTP_403_FORBIDDEN: {"description": PracticeDisabled.DETAIL},
+        status.HTTP_404_NOT_FOUND: {"description": ExamNotFound.DETAIL},
+        status.HTTP_409_CONFLICT: {"description": AttemptExpired.DETAIL},
+    },
 )
 async def save_progress(payload: SaveProgressPayload, user: CurrentUserDep, db: SessionDep):
     exam = await exams_service.get_visible_exam_or_404(payload.exam_id, user, db)
@@ -69,9 +83,18 @@ async def list_in_progress(user: CurrentUserDep, db: SessionDep):
     "/by-exam/{exam_id}",
     response_model=DeletedOut,
     summary="Discard progress for an exam",
-    description="Deletes the caller's autosave for this exam and mode. Idempotent.",
+    description=(
+        "Deletes the caller's autosave for this exam and mode. Idempotent. "
+        "Graded attempts cannot be discarded — that would reset their clock."
+    ),
+    responses={status.HTTP_403_FORBIDDEN: {"description": AttemptNotDiscardable.DETAIL}},
 )
-async def delete_in_progress_by_exam(exam_id: str, user: CurrentUserDep, db: SessionDep, mode: str = "exam"):
+async def delete_in_progress_by_exam(
+    exam_id: str,
+    user: CurrentUserDep,
+    db: SessionDep,
+    mode: Annotated[AttemptMode, Query()] = AttemptMode.EXAM,
+):
     await service.delete_in_progress_by_exam(exam_id, mode, user, db)
     return {"deleted": True}
 
@@ -84,16 +107,18 @@ async def delete_in_progress_by_exam(exam_id: str, user: CurrentUserDep, db: Ses
     responses=NO_RECORD,
 )
 async def get_in_progress(record_id: str, user: CurrentUserDep, db: SessionDep):
-    record = await service.get_in_progress_or_404(record_id, user, db)
-    return service.in_progress_to_dict(record)
+    return await service.get_in_progress_or_404(record_id, user, db)
 
 
 @progress_router.delete(
     "/{record_id}",
     response_model=DeletedOut,
     summary="Discard an in-progress attempt",
-    description="Deletes one of the caller's saved attempts by id.",
-    responses=NO_RECORD,
+    description=(
+        "Deletes one of the caller's saved attempts by id. Graded attempts "
+        "cannot be discarded — ask an instructor to reset one."
+    ),
+    responses={**NO_RECORD, status.HTTP_403_FORBIDDEN: {"description": AttemptNotDiscardable.DETAIL}},
 )
 async def delete_in_progress(record_id: str, user: CurrentUserDep, db: SessionDep):
     await service.delete_in_progress(record_id, user, db)
@@ -138,8 +163,7 @@ async def get_topic_stats(user: CurrentUserDep, db: SessionDep):
     responses=NO_RECORD,
 )
 async def get_history_record(record_id: str, user: CurrentUserDep, db: SessionDep):
-    record = await service.get_history_or_404(record_id, user, db)
-    return service.history_to_dict(record)
+    return await service.get_history_or_404(record_id, user, db)
 
 
 @history_router.delete(

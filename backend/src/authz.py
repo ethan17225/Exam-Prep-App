@@ -1,12 +1,14 @@
 from typing import TYPE_CHECKING
 
 from sqlalchemy import or_
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.sql.elements import ColumnElement
 
 if TYPE_CHECKING:  # keeps this module a true runtime leaf, so it can never cycle
     from src.auth.models import User
 
 
-def visible(model, user: "User"):
+def visible(model: type[DeclarativeBase], user: "User") -> ColumnElement[bool]:
     """Read predicate for owned content: shared with everyone, or mine.
 
     Applied identically for instructors — a role bypass here is where a leak

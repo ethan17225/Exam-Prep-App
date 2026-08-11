@@ -90,6 +90,33 @@ models.
 **5. Cross-domain imports use the module, never a deep path:**
 `from src.exams import service as exams_service`.
 
+### Abstractions: what deliberately does not exist
+
+No repository classes, no `Protocol`/ABC with a single implementation, no
+service base class, no DI container, no event bus. This was decided explicitly,
+not overlooked:
+
+- Each interface would have exactly one implementor forever, so it could only
+  ever mirror that implementor — a hand-maintained copy of the class shape, which
+  is a DRY violation wearing a dependency-inversion costume.
+- The testability argument does not hold here. Faking a repository proves a
+  service calls a method you invented; it does not exercise the visibility
+  predicate, the ownership filter, the eager loads or the upsert — where every
+  real bug in this codebase has actually lived.
+- `Depends` is already the injection seam and `dependency_overrides` already
+  swaps it in tests.
+
+Where dependency inversion genuinely applies, it is already satisfied:
+`grading/` is pure domain logic with zero infrastructure imports, which is why
+three domains depend on it without a cycle. Extend that pattern rather than
+adding interfaces.
+
+Related, and also deliberate: `grade_question` is a type switch rather than a
+strategy registry. The rules are interdependent — the FIB branch depends on
+`options` being empty and the advanced-types check gates everything above it —
+so scattering them across per-type handlers would hide exactly the drift this
+module is written to prevent.
+
 ## Endpoints — the house shape
 
 ```python
@@ -119,6 +146,19 @@ async def create_course(payload: CourseCreate, user: CurrentUserDep, db: Session
 - Fixed paths are declared **before** parameterized siblings in the same router
   (`/by-exam/{exam_id}` before `/{record_id}`; `/topic-stats` before
   `/{record_id}`). A test asserts this — breaking it is a silent 404.
+
+### Routers do not touch the database
+
+A route resolves its dependencies, calls **one** service function and returns
+it. No `db.commit()`, no attribute mutation, no filesystem work, no partial-
+update mapping. There is exactly one exception, and it is documented in place:
+`update_exam_title` sequences `exams.service.rename` (which stages the change
+without committing) and `attempts_service.rename_exam` (which commits both),
+because the denormalized `exam_title` copies must land in the same transaction
+and `exams` may not import `attempts`.
+
+If a route needs a gate but never reads the identity, use
+`dependencies=[Depends(...)]` on the decorator rather than an unused parameter.
 
 ### Ownership helpers are functions, not dependencies
 
@@ -161,13 +201,26 @@ it returns 422 today. That is why `src/exams/dependencies.py` does not exist.
 
 ## Schemas
 
+**A response shape is declared once — in `schemas.py`, never also as a dict in a
+service.** For a response whose fields are all columns, the service returns the
+ORM object and the model carries `from_attributes=True`; there is no serializer
+function. Only genuinely computed shapes (`ExamSummaryOut`, `DashboardItemOut`,
+`ExamDetailOut`) are assembled by hand, and each has exactly one builder.
+
+- **Datetimes use `ISODateTime`** from `src/schemas.py` — a `PlainSerializer`
+  that renders `.isoformat()`. Never hand-write `.isoformat()` in a service and
+  never type a timestamp as `str`; the three-way split that used to exist is
+  what the shared annotation replaced.
 - Bounds are not optional: every string field carries `max_length` matching its
   column, every int is bounded by `MAX_INT`. Without them the driver raises and
-  the route 500s — and a 500 on submit costs a student their attempt.
+  the route 500s — and a 500 on submit costs a student their attempt. The same
+  reasoning applies to NOT NULL columns: `answer` uses the `Answer` annotation so
+  an explicit `null` is a 422 rather than a driver error.
 - `QuestionIn.type` is a plain `str`, **not** the `QuestionType` enum: the
   documented JSON upload format allows arbitrary type strings and grading
   normalizes them.
-- Response models fed by ORM rows need `model_config = ConfigDict(from_attributes=True)`.
+- Primary keys come from `new_id()` (`src/identifiers.py`). Never inline a uuid
+  slice — the width is a correctness property, not a style choice.
 - `GET /api/exams/{id}` pairs `ExamQuestionOut` with
   `response_model_exclude_unset=True` so `answer`/`rationale` are **absent**, not
   null, when `include_answers` is false — the frontend distinguishes the two.
@@ -205,6 +258,11 @@ is consulted in exactly two places: setting `is_shared` at creation, and the
 shared content. `get_owned_exam_or_404` for writes, `get_visible_exam_or_404` for
 reads — never one for the other.
 
+**Not-owned and not-found are the same 404.** A 403 tells the caller that an id
+exists, which is an enumeration oracle on ids they cannot see. Every lookup
+helper raises `*NotFound`, and no `responses=` block advertises a 403 except the
+instructor gate.
+
 `is_shared` is **never** accepted from the client.
 
 **Attempts** filter strictly on `user_id`. The single exception is
@@ -216,7 +274,54 @@ an inner join silently drops history for deleted exams.
 
 Any route reaching a `Question` by bare id must join `Exam` and check
 `owner_id` (`get_owned_question_or_404`): `question.id` is a serial integer and
-trivially enumerable, unlike the 8-char ids everywhere else.
+trivially enumerable, unlike the random ids everywhere else.
+
+**Never accept a filesystem path or an object-store URL from a client.** A
+question's `image` is set only by the upload route; the delete paths `unlink()`
+whatever it references, so a client-supplied value let one user delete another's
+files. If a field becomes a path, derive it server-side.
+
+## Exam integrity
+
+Graded exams are trusted, so `submit` never believes the client about anything
+that affects the score:
+
+- **The attempt is the token.** `submit` requires an open `in_progress_exam` row
+  (`SELECT … FOR UPDATE`), grades, writes `History`, and deletes the attempt — all
+  in one transaction. No row → 409. That is what makes submission at-most-once and
+  two concurrent submits safe.
+- **The clock is the server's.** For `mode="exam"`, elapsed time is computed from
+  `started_at` (set once on insert, never rewritten by the upsert). Past the limit
+  plus `SUBMIT_GRACE_SECONDS`, the attempt is graded against the last autosave the
+  server accepted before the deadline — never destroyed by a 4xx.
+- **`question_numbers` and `fib_correct` are ignored for graded runs** — both let
+  a student inflate their own score. They stay in the schema (wire contract) but
+  the service drops them unless `mode="practice"`.
+- **The answer key is gated by `Exam.allow_practice`.** `include_answers` is
+  honoured only for the owner or when `allow_practice` is true, so an
+  assessment-only exam never yields its key before submission. `detail` returns
+  `answers_included` explicitly — the client must not infer the gate from a
+  missing field.
+- **`grade_question(..., fuzzy_fib=False)`** for graded runs: the lenient
+  substring match is a study aid, and self-marking is gone, so it would otherwise
+  decide real marks. The admin dashboard passes the same flag so its live grade
+  matches the final one.
+- `mode` is `AttemptMode` (a StrEnum) in schemas and query params, with a CHECK
+  constraint as backstop — it is the third component of the attempt's unique key,
+  so a free-form value meant unlimited rows.
+
+## Auth hardening
+
+- The auth cookie authenticates **only the two StaticFiles mounts**
+  (`static_mount_token`); every `/api/*` route requires the bearer header, so a
+  cookie alone can never drive a state-changing request.
+- Tokens carry `ver`, compared against `User.token_version`. Bumping it (password
+  change, sign-out-everywhere) revokes every outstanding token — the only way to
+  kill a stolen 12-hour JWT before it expires.
+- Login always runs bcrypt, against a dummy hash when the account is absent, so an
+  unknown email is not distinguishable by timing.
+- `AUTH_SECRET` is a `SecretStr`, and `load_settings` renders validation errors
+  with `include_input=False` — a rejected near-miss secret must not reach a log.
 
 ## Configuration
 
@@ -285,7 +390,15 @@ Alembic owns the schema; **nothing runs DDL at import time.**
 
 | Anti-pattern | Fix |
 |---|---|
+| **A repository/service interface, ABC or Protocol with one implementation** | none of these exist here on purpose — see Abstractions below |
 | A non-empty `__init__.py` | keep them empty — this one breaks the import graph |
+| `db.commit()` in a router | move it into the service (one documented exception) |
+| A dict built in a service that mirrors an `*Out` model | return the ORM object; declare the shape once |
+| `.isoformat()` in a service, or a timestamp typed `str` | `ISODateTime` |
+| `str(uuid4())[:n]` for a primary key | `new_id()` |
+| A 403 for "you do not own this" | 404 — do not confirm the id exists |
+| `db.refresh()` after setting every column explicitly | delete it; `expire_on_commit=False` already keeps them |
+| An unused `user` parameter kept as a gate | `dependencies=[Depends(...)]` |
 | `service.py` importing a higher domain's `service.py` | hoist the call into `router.py` |
 | A `router.py` importing another domain's `models`/`schemas` | call that domain's `service` |
 | `models.py` importing another `models.py` | FK and relationship targets are strings |

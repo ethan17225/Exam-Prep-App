@@ -1,7 +1,7 @@
 <h1 class="page-title">Upload Exam</h1>
 
 <div class="card upload-card">
-  <label class="field-label">Course</label>
+  <label class="field-label" for="upload-course-select">Course</label>
   <div class="course-selector">
     <select
       id="upload-course-select"
@@ -33,20 +33,41 @@
           {{ courseLoading() ? 'Creating…' : 'Create' }}
         </button>
       </div>
-      @if (courseError()) {
-        <span class="course-error">{{ courseError() }}</span>
-      }
+    }
+    @if (courseError()) {
+      <span class="course-error">{{ courseError() }}</span>
     }
   </div>
 
-  <label class="field-label" style="margin-top: 1rem">Exam Title</label>
-  <input type="text" [ngModel]="title()" (ngModelChange)="title.set($event)" placeholder="e.g. Nursing Practice Exam 1" />
+  <label class="field-label" for="upload-title">Exam Title</label>
+  <input
+    id="upload-title"
+    type="text"
+    [ngModel]="title()"
+    (ngModelChange)="title.set($event)"
+    placeholder="e.g. Nursing Practice Exam 1"
+  />
 
-  <label class="field-label" style="margin-top: 1rem">Time Limit (minutes) <span style="font-weight: normal; color: #666; font-size: 0.9em;">(Leave blank for no limit)</span></label>
-  <input type="number" [ngModel]="timeLimitMinutes()" (ngModelChange)="timeLimitMinutes.set($event)" placeholder="e.g. 60" min="1" />
+  <label class="field-label" for="upload-time-limit"
+    >Time Limit (minutes) <span class="field-hint">(Leave blank for no limit)</span></label
+  >
+  <input
+    id="upload-time-limit"
+    type="number"
+    [ngModel]="timeLimitMinutes()"
+    (ngModelChange)="timeLimitMinutes.set($event)"
+    placeholder="e.g. 60"
+    min="1"
+  />
 
-  <label class="field-label" style="margin-top: 1rem">Questions JSON</label>
-  <textarea rows="16" [ngModel]="jsonText()" (ngModelChange)="jsonText.set($event)" placeholder='Paste your JSON array here, or use the file picker below...'></textarea>
+  <label class="field-label" for="upload-json">Questions JSON</label>
+  <textarea
+    id="upload-json"
+    rows="16"
+    [ngModel]="jsonText()"
+    (ngModelChange)="jsonText.set($event)"
+    placeholder="Paste your JSON array here, or use the file picker below..."
+  ></textarea>
 
   <div class="upload-actions">
     <label class="btn btn-secondary file-btn">
@@ -69,32 +90,69 @@
     <li><code>MCQ</code> — single correct answer (answer is a letter, e.g. "C")</li>
     <li><code>SATA</code> — select all that apply (answer is an array, e.g. ["A","C"])</li>
     <li><code>FIB</code> — fill in the blank (answer is a text or numeric string)</li>
-    <li><code>MATRIX</code> — grid of rows × columns with checkboxes (answer maps row index to correct column names)</li>
-    <li><code>CLOZE</code> — statement with dropdown blanks (answer is one choice per blank, in order)</li>
-    <li><code>BOWTIE</code> — assign choices to categories, e.g. condition / findings / interventions (answer maps category name to correct choices)</li>
-    <li><code>RANKING</code> — put items in the correct order (options is the display order, answer is the correct order)</li>
-    <li><code>HIGHLIGHT</code> — click phrases in a passage (answer is the list of correct token indices, 0-based)</li>
-    <li><code>HOTSPOT</code> — click a region on an image (regions use percent coordinates; upload the image afterwards via <em>Edit Questions</em>)</li>
+    <li>
+      <code>MATRIX</code> — grid of rows × columns with checkboxes (answer maps row index to correct
+      column names)
+    </li>
+    <li>
+      <code>CLOZE</code> — statement with dropdown blanks (answer is one choice per blank, in order)
+    </li>
+    <li>
+      <code>BOWTIE</code> — assign choices to categories, e.g. condition / findings / interventions
+      (answer maps category name to correct choices)
+    </li>
+    <li>
+      <code>RANKING</code> — put items in the correct order (options is the display order, answer is
+      the correct order)
+    </li>
+    <li>
+      <code>HIGHLIGHT</code> — click phrases in a passage (answer is the list of correct token
+      indices, 0-based)
+    </li>
+    <li>
+      <code>HOTSPOT</code> — click a region on an image (regions use percent coordinates; upload the
+      image afterwards via <em>Edit Questions</em>)
+    </li>
   </ul>
-  <p class="format-note">Any question type can also carry an image (e.g. an ECG strip) — attach it after upload via the exam's <em>Edit Questions</em> menu.</p>
+  <p class="format-note">
+    Any question type can also carry an image (e.g. an ECG strip) — attach it after upload via the
+    exam's <em>Edit Questions</em> menu.
+  </p>
 
   <strong>Patient data sections (optional):</strong>
   <p class="format-note">
     Add a <code>sections</code> array to any question to attach supporting case-study data such as
-    nurses' notes, vital signs, labs, orders or medication records. Each section is one tab:
-    two or more sections render as a tabbed chart above the question.
+    nurses' notes, vital signs, labs, orders or medication records. Each section is one tab: two or
+    more sections render as a tabbed chart above the question.
   </p>
   <ul>
     <li><code>title</code> — the tab label, e.g. "Laboratory Results"</li>
     <li><code>blocks</code> — the tab content, in order. Each block is one of:</li>
-    <li class="sub"><code>{{ '{' }} "type": "text", "text": "..." {{ '}' }}</code> — a paragraph (line breaks are preserved)</li>
-    <li class="sub"><code>{{ '{' }} "type": "list", "items": ["...", "..."] {{ '}' }}</code> — a bulleted list</li>
-    <li class="sub"><code>{{ '{' }} "type": "table", "caption": "...", "headers": [...], "rows": [[...]] {{ '}' }}</code> — a data table; <code>caption</code> is optional</li>
+    <li class="sub">
+      <code>{{ '{' }} "type": "text", "text": "..." {{ '}' }}</code> — a paragraph (line breaks are
+      preserved)
+    </li>
+    <li class="sub">
+      <code>{{ '{' }} "type": "list", "items": ["...", "..."] {{ '}' }}</code> — a bulleted list
+    </li>
+    <li class="sub">
+      <code
+        >{{ '{' }} "type": "table", "caption": "...", "headers": [...], "rows": [[...]]
+        {{ '}' }}</code
+      >
+      — a data table; <code>caption</code> is optional
+    </li>
   </ul>
 </div>
 
 <div class="example-section card">
-  <div class="example-header" (click)="showExample.set(!showExample())">
+  <div
+    class="example-header"
+    role="button"
+    tabindex="0"
+    (click)="showExample.set(!showExample())"
+    (keydown.enter)="showExample.set(!showExample())"
+  >
     <strong>JSON Example</strong>
     <span class="example-toggle">{{ showExample() ? '▾ Hide' : '▸ Show' }}</span>
   </div>

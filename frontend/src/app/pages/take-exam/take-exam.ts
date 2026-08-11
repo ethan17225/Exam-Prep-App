@@ -1,7 +1,9 @@
 import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { map, of, switchMap } from 'rxjs';
 import { QuestionSectionsComponent } from '../../components/question-sections/question-sections';
+import { AuthService, PROGRESS_KEY_PREFIX } from '../../services/auth.service';
 import {
   ExamService,
   Question,
@@ -16,6 +18,9 @@ import {
   countQuestionTypes,
   classifyQuestionType,
   formatAnswerForDisplay,
+  formatClock,
+  isAnswerCorrect,
+  shuffle,
   matrixRows,
   matrixColumns,
   clozeBlanks,
@@ -24,6 +29,28 @@ import {
   hotspotRegions,
   rankingItems,
 } from '../../services/exam.service';
+
+/** Static per-question structure, parsed once per page instead of on every change-detection pass. */
+interface QuestionStructVm {
+  kind: QuestionKind;
+  advanced: boolean;
+  options: string[];
+  matrixRows: string[];
+  matrixCols: string[];
+  cloze: ClozeBlank[];
+  bowtie: BowtieCategory[];
+  tokens: string[];
+  regions: HotspotRegion[];
+}
+
+/** Answer-dependent per-question state; recomputes on interaction, never on the 1 Hz timer tick. */
+interface QuestionStateVm {
+  correct: boolean;
+  fullyAnswered: boolean;
+  rankOrder: string[];
+  hotspotLabel: string;
+  correctText: string;
+}
 
 @Component({
   selector: 'app-take-exam',
@@ -38,6 +65,8 @@ export class TakeExamPage implements OnInit, OnDestroy {
   flagged = signal<Set<number>>(new Set());
   submitting = signal(false);
   showNav = signal(false);
+  loading = signal(true);
+  loadError = signal('');
   autoSaveStatus = signal<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   mode = signal<'exam' | 'practice'>('exam');
@@ -60,7 +89,9 @@ export class TakeExamPage implements OnInit, OnDestroy {
   typeCounts = computed(() => countQuestionTypes(this.questions()));
   answeredCount = computed(() => this.answers().size);
   progress = computed(() =>
-    this.totalQuestions() > 0 ? Math.round((this.answeredCount() / this.totalQuestions()) * 100) : 0,
+    this.totalQuestions() > 0
+      ? Math.round((this.answeredCount() / this.totalQuestions()) * 100)
+      : 0,
   );
 
   totalPages = computed(() => Math.ceil(this.totalQuestions() / this.questionsPerPage));
@@ -69,16 +100,60 @@ export class TakeExamPage implements OnInit, OnDestroy {
     return this.questions().slice(start, start + this.questionsPerPage);
   });
   pageStartNum = computed(() => this.currentPage() * this.questionsPerPage + 1);
-  pageEndNum = computed(() => Math.min((this.currentPage() + 1) * this.questionsPerPage, this.totalQuestions()));
+  pageEndNum = computed(() =>
+    Math.min((this.currentPage() + 1) * this.questionsPerPage, this.totalQuestions()),
+  );
 
-  formattedTime = computed(() => {
-    const s = this.remainingSeconds();
-    const hrs = Math.floor(s / 3600);
-    const mins = Math.floor((s % 3600) / 60);
-    const secs = s % 60;
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+  structVm = computed<Map<number, QuestionStructVm>>(() => {
+    const vms = new Map<number, QuestionStructVm>();
+    for (const q of this.pageQuestions()) {
+      const kind = classifyQuestionType(q);
+      vms.set(q.number, {
+        kind,
+        advanced: kind !== 'MCQ' && kind !== 'SATA' && kind !== 'FIB',
+        options: Array.isArray(q.options) ? q.options : [],
+        matrixRows: kind === 'MATRIX' ? matrixRows(q) : [],
+        matrixCols: kind === 'MATRIX' ? matrixColumns(q) : [],
+        cloze: kind === 'CLOZE' ? clozeBlanks(q) : [],
+        bowtie: kind === 'BOWTIE' ? bowtieCategories(q) : [],
+        tokens: kind === 'HIGHLIGHT' ? highlightTokens(q) : [],
+        regions: kind === 'HOTSPOT' ? hotspotRegions(q) : [],
+      });
+    }
+    return vms;
   });
+
+  stateVm = computed<Map<number, QuestionStateVm>>(() => {
+    const struct = this.structVm();
+    const vms = new Map<number, QuestionStateVm>();
+    for (const q of this.pageQuestions()) {
+      const s = struct.get(q.number)!;
+      const revealed = this.revealed().has(q.number);
+      vms.set(q.number, {
+        correct: revealed && this.isQuestionCorrect(q),
+        fullyAnswered: this.isFullyAnswered(q),
+        rankOrder: s.kind === 'RANKING' ? this.rankOrder(q) : [],
+        hotspotLabel: s.kind === 'HOTSPOT' ? this.hotspotSelectedLabel(q) : '',
+        correctText: revealed && s.advanced ? formatAnswerForDisplay(q, q.answer ?? null) : '',
+      });
+    }
+    return vms;
+  });
+
+  navVm = computed(() => {
+    const answers = this.answers();
+    const flagged = this.flagged();
+    const page = this.currentPage();
+    return this.questions().map((q, i) => ({
+      number: q.number,
+      index: i,
+      answered: this.isAnsweredValue(answers.get(q.number)),
+      flagged: flagged.has(q.number),
+      current: Math.floor(i / this.questionsPerPage) === page,
+    }));
+  });
+
+  formattedTime = computed(() => formatClock(this.remainingSeconds()));
 
   timerWarning = computed(() => this.remainingSeconds() <= 300 && this.remainingSeconds() > 60);
   timerDanger = computed(() => this.remainingSeconds() <= 60);
@@ -87,6 +162,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private examService: ExamService,
+    private auth: AuthService,
   ) {}
 
   ngOnInit(): void {
@@ -99,31 +175,79 @@ export class TakeExamPage implements OnInit, OnDestroy {
       this.selectedQuestionCount = Math.floor(countParam);
     }
 
-    this.examService.getExam(this.examId, true).subscribe((exam) => {
-      this.examTitle.set(exam.title);
-      
-      const limit = exam.time_limit_minutes ? exam.time_limit_minutes * 60 : 180 * 60;
-      this.timeLimitSeconds.set(limit);
+    this.load();
+  }
 
-      if (this.resumeId) {
-        this.examService.getInProgress(this.resumeId).subscribe((saved) => {
-          this.restoreProgress(exam.questions, saved);
-          this.startTimer();
-        });
-      } else {
-        const shuffled = this.shuffle(exam.questions);
-        const takeCount = this.selectedQuestionCount
-          ? Math.min(Math.max(this.selectedQuestionCount, 1), shuffled.length)
-          : shuffled.length;
-        this.questions.set(shuffled.slice(0, takeCount));
-        this.remainingSeconds.set(limit);
-        this.startTimer();
-        this.persistProgress();
-      }
-    });
+  load(): void {
+    this.loading.set(true);
+    this.loadError.set('');
+
+    const practice = this.mode() === 'practice';
+
+    this.examService
+      // Answers are requested ONLY for practice. A graded run must never have the
+      // key in the browser — it is one devtools panel away from the student.
+      .getExam(this.examId, practice)
+      .pipe(
+        switchMap((exam) =>
+          this.resumeId
+            ? this.examService
+                .getInProgress(this.resumeId)
+                .pipe(map((saved) => ({ exam, saved: saved as InProgressExam | null })))
+            : of({ exam, saved: null as InProgressExam | null }),
+        ),
+      )
+      .subscribe({
+        next: ({ exam, saved }) => {
+          if (practice && !exam.allow_practice) {
+            this.loading.set(false);
+            this.loadError.set('This exam is assessment-only, so practice mode is disabled.');
+            return;
+          }
+
+          this.examTitle.set(exam.title);
+
+          const limit = exam.time_limit_minutes ? exam.time_limit_minutes * 60 : 180 * 60;
+          this.timeLimitSeconds.set(limit);
+
+          if (saved) {
+            this.restoreProgress(exam.questions, saved);
+            this.loading.set(false);
+            this.startTimer();
+          } else {
+            const shuffled = shuffle(exam.questions);
+            const takeCount = this.selectedQuestionCount
+              ? Math.min(Math.max(this.selectedQuestionCount, 1), shuffled.length)
+              : shuffled.length;
+            this.questions.set(shuffled.slice(0, takeCount));
+            this.remainingSeconds.set(limit);
+            // The first save is what creates the attempt server-side. If it
+            // fails there is nothing to submit into later, so block rather than
+            // let someone sit a whole paper they cannot hand in.
+            this.persistProgress({
+              onError: () =>
+                this.loadError.set(
+                  'Could not start this attempt. Check your connection and try again — ' +
+                    'do not begin answering until it starts.',
+                ),
+              onSuccess: () => {
+                this.loading.set(false);
+                this.startTimer();
+              },
+            });
+          }
+        },
+        error: (err) => {
+          this.loading.set(false);
+          this.loadError.set(
+            err?.error?.detail || 'Failed to load the exam. Check your connection and try again.',
+          );
+        },
+      });
   }
 
   private startTimer(): void {
+    if (this.timerInterval) clearInterval(this.timerInterval);
     this.timerInterval = setInterval(() => {
       const remaining = this.remainingSeconds();
       if (remaining <= 1) {
@@ -162,15 +286,6 @@ export class TakeExamPage implements OnInit, OnDestroy {
     if (this.autoSaveTimeout) clearTimeout(this.autoSaveTimeout);
   }
 
-  private shuffle<T>(arr: T[]): T[] {
-    const a = [...arr];
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-  }
-
   // ── Page Navigation ─────────────────────────────────────────
 
   goTo(index: number): void {
@@ -197,27 +312,10 @@ export class TakeExamPage implements OnInit, OnDestroy {
     this.showNav.update((v) => !v);
   }
 
-  isOnCurrentPage(index: number): boolean {
-    return Math.floor(index / this.questionsPerPage) === this.currentPage();
-  }
-
   // ── Answering ───────────────────────────────────────────────
 
-  kind(q: Question): QuestionKind {
+  private kind(q: Question): QuestionKind {
     return classifyQuestionType(q);
-  }
-
-  isAdvanced(q: Question): boolean {
-    const k = this.kind(q);
-    return k !== 'MCQ' && k !== 'SATA' && k !== 'FIB';
-  }
-
-  isTextInput(q: Question): boolean {
-    return this.kind(q) === 'FIB';
-  }
-
-  mcqOptions(q: Question): string[] {
-    return Array.isArray(q.options) ? q.options : [];
   }
 
   private setAnswer(qNum: number, value: AnswerValue): void {
@@ -262,17 +360,11 @@ export class TakeExamPage implements OnInit, OnDestroy {
 
   // ── MATRIX ──────────────────────────────────────────────────
 
-  matrixRows(q: Question): string[] {
-    return matrixRows(q);
-  }
-
-  matrixCols(q: Question): string[] {
-    return matrixColumns(q);
-  }
-
   private matrixAnswer(qNum: number): Record<string, string[]> {
     const ans = this.answers().get(qNum);
-    return ans && typeof ans === 'object' && !Array.isArray(ans) ? (ans as Record<string, string[]>) : {};
+    return ans && typeof ans === 'object' && !Array.isArray(ans)
+      ? (ans as Record<string, string[]>)
+      : {};
   }
 
   toggleMatrix(qNum: number, rowIdx: number, col: string): void {
@@ -300,10 +392,6 @@ export class TakeExamPage implements OnInit, OnDestroy {
 
   // ── CLOZE ───────────────────────────────────────────────────
 
-  clozeBlanks(q: Question): ClozeBlank[] {
-    return clozeBlanks(q);
-  }
-
   private clozeAnswer(qNum: number, blankCount: number): string[] {
     const ans = this.answers().get(qNum);
     const list = Array.isArray(ans) ? [...(ans as string[])] : [];
@@ -313,7 +401,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
 
   setClozeAnswer(q: Question, blankIdx: number, value: string): void {
     if (this.isRevealed(q.number)) return;
-    const list = this.clozeAnswer(q.number, this.clozeBlanks(q).length);
+    const list = this.clozeAnswer(q.number, clozeBlanks(q).length);
     list[blankIdx] = value;
     this.setAnswer(q.number, list);
   }
@@ -334,13 +422,11 @@ export class TakeExamPage implements OnInit, OnDestroy {
 
   // ── BOWTIE ──────────────────────────────────────────────────
 
-  bowtieCategories(q: Question): BowtieCategory[] {
-    return bowtieCategories(q);
-  }
-
   private bowtieAnswer(qNum: number): Record<string, string[]> {
     const ans = this.answers().get(qNum);
-    return ans && typeof ans === 'object' && !Array.isArray(ans) ? (ans as Record<string, string[]>) : {};
+    return ans && typeof ans === 'object' && !Array.isArray(ans)
+      ? (ans as Record<string, string[]>)
+      : {};
   }
 
   toggleBowtie(qNum: number, cat: BowtieCategory, choice: string): void {
@@ -378,7 +464,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
 
   // ── RANKING ─────────────────────────────────────────────────
 
-  rankOrder(q: Question): string[] {
+  private rankOrder(q: Question): string[] {
     const ans = this.answers().get(q.number);
     if (Array.isArray(ans) && ans.length > 0) return ans as string[];
     return rankingItems(q);
@@ -411,10 +497,6 @@ export class TakeExamPage implements OnInit, OnDestroy {
 
   // ── HIGHLIGHT ───────────────────────────────────────────────
 
-  highlightTokens(q: Question): string[] {
-    return highlightTokens(q);
-  }
-
   private highlightAnswer(qNum: number): number[] {
     const ans = this.answers().get(qNum);
     return Array.isArray(ans) ? (ans as number[]).map(Number) : [];
@@ -440,10 +522,6 @@ export class TakeExamPage implements OnInit, OnDestroy {
 
   // ── HOTSPOT ─────────────────────────────────────────────────
 
-  hotspotRegions(q: Question): HotspotRegion[] {
-    return hotspotRegions(q);
-  }
-
   selectHotspot(qNum: number, regionId: string): void {
     if (this.isRevealed(qNum)) return;
     this.setAnswer(qNum, regionId);
@@ -457,10 +535,10 @@ export class TakeExamPage implements OnInit, OnDestroy {
     return String(q.answer ?? '') === regionId;
   }
 
-  hotspotSelectedLabel(q: Question): string {
+  private hotspotSelectedLabel(q: Question): string {
     const ans = this.answers().get(q.number);
     if (!ans || typeof ans !== 'string') return '';
-    return this.hotspotRegions(q).find((r) => r.id === ans)?.label ?? '';
+    return hotspotRegions(q).find((r) => r.id === ans)?.label ?? '';
   }
 
   isSataSelected(qNum: number, option: string): boolean {
@@ -491,82 +569,16 @@ export class TakeExamPage implements OnInit, OnDestroy {
   isCorrectOption(q: Question, option: string): boolean {
     const letter = option.charAt(0);
     if (Array.isArray(q.answer)) return (q.answer as string[]).map(String).includes(letter);
-    const letters = String(q.answer ?? '').split(',').map((s) => s.trim());
+    const letters = String(q.answer ?? '')
+      .split(',')
+      .map((s) => s.trim());
     return letters.includes(letter);
   }
 
-  correctAnswerText(q: Question): string {
-    return formatAnswerForDisplay(q, q.answer ?? null);
-  }
-
-  isQuestionCorrect(q: Question): boolean {
-    const kind = this.kind(q);
-    if (kind === 'FIB') {
-      return this.getFibMark(q.number) === true;
-    }
-    if (q.answer === undefined || q.answer === null) return false;
-    const answer = this.getAnswer(q.number);
-
-    if (kind === 'MATRIX' || kind === 'BOWTIE') {
-      const expected = q.answer && typeof q.answer === 'object' && !Array.isArray(q.answer)
-        ? (q.answer as Record<string, string[]>)
-        : {};
-      const user = answer && typeof answer === 'object' && !Array.isArray(answer)
-        ? (answer as Record<string, string[]>)
-        : {};
-      return this.groupedEqual(expected, user);
-    }
-    if (kind === 'CLOZE') {
-      const expected = Array.isArray(q.answer) ? (q.answer as string[]) : [];
-      const user = Array.isArray(answer) ? (answer as string[]) : [];
-      return (
-        expected.length === user.length &&
-        expected.every((e, i) => String(user[i] ?? '').trim().toLowerCase() === String(e).trim().toLowerCase())
-      );
-    }
-    if (kind === 'RANKING') {
-      const expected = Array.isArray(q.answer) ? (q.answer as string[]).map(String) : [];
-      const user = Array.isArray(answer) ? (answer as string[]).map(String) : [];
-      return expected.length === user.length && expected.every((e, i) => e.trim() === user[i].trim());
-    }
-    if (kind === 'HIGHLIGHT') {
-      const expected = new Set(Array.isArray(q.answer) ? (q.answer as number[]).map(Number) : []);
-      const user = new Set(Array.isArray(answer) ? (answer as number[]).map(Number) : []);
-      return expected.size === user.size && [...expected].every((e) => user.has(e));
-    }
-    if (kind === 'HOTSPOT') {
-      return String(answer ?? '') === String(q.answer);
-    }
-    if (kind === 'SATA') {
-      const expectedArr = Array.isArray(q.answer)
-        ? (q.answer as string[]).map(String)
-        : String(q.answer).split(',').map((s) => s.trim());
-      const expected = new Set(expectedArr);
-      const userArr = Array.isArray(answer) ? (answer as string[]).map(String) : [];
-      const userSet = new Set(userArr);
-      return expected.size === userSet.size && [...expected].every((e) => userSet.has(e));
-    }
-    return answer === (Array.isArray(q.answer) ? String(q.answer[0]) : q.answer);
-  }
-
-  private groupedEqual(a: Record<string, string[]>, b: Record<string, string[]>): boolean {
-    const norm = (m: Record<string, string[]>) => {
-      const out: Record<string, Set<string>> = {};
-      for (const [k, v] of Object.entries(m)) {
-        const s = new Set((v ?? []).map((x) => String(x).trim()).filter(Boolean));
-        if (s.size) out[String(k).trim()] = s;
-      }
-      return out;
-    };
-    const na = norm(a);
-    const nb = norm(b);
-    const keysA = Object.keys(na);
-    if (keysA.length !== Object.keys(nb).length) return false;
-    return keysA.every((k) => {
-      const sa = na[k];
-      const sb = nb[k];
-      return !!sb && sa.size === sb.size && [...sa].every((x) => sb.has(x));
-    });
+  private isQuestionCorrect(q: Question): boolean {
+    // FIB is self-marked in practice mode; everything else grades exactly as the server does.
+    if (this.kind(q) === 'FIB') return this.getFibMark(q.number) === true;
+    return isAnswerCorrect(q, this.getAnswer(q.number) ?? null);
   }
 
   // ── FIB Confirm & Self-Grade ────────────────────────────────
@@ -606,8 +618,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
     return this.flagged().has(qNum);
   }
 
-  isAnswered(qNum: number): boolean {
-    const ans = this.answers().get(qNum);
+  private isAnsweredValue(ans: AnswerValue | undefined): boolean {
     if (ans === undefined || ans === null) return false;
     if (Array.isArray(ans)) return ans.length > 0;
     if (typeof ans === 'object') {
@@ -616,20 +627,24 @@ export class TakeExamPage implements OnInit, OnDestroy {
     return ans !== '';
   }
 
+  isAnswered(qNum: number): boolean {
+    return this.isAnsweredValue(this.answers().get(qNum));
+  }
+
   /** True when every part of a multi-part question has a selection (used to enable Check Answer). */
-  isFullyAnswered(q: Question): boolean {
+  private isFullyAnswered(q: Question): boolean {
     const kind = this.kind(q);
     if (kind === 'MATRIX') {
       const ans = this.matrixAnswer(q.number);
-      return this.matrixRows(q).every((_, i) => (ans[String(i)] ?? []).length > 0);
+      return matrixRows(q).every((_, i) => (ans[String(i)] ?? []).length > 0);
     }
     if (kind === 'CLOZE') {
-      const blanks = this.clozeBlanks(q);
+      const blanks = clozeBlanks(q);
       return blanks.length > 0 && blanks.every((_, i) => this.getClozeAnswer(q.number, i) !== '');
     }
     if (kind === 'BOWTIE') {
       const ans = this.bowtieAnswer(q.number);
-      return this.bowtieCategories(q).every((c) => (ans[c.name] ?? []).length >= (c.count || 1));
+      return bowtieCategories(q).every((c) => (ans[c.name] ?? []).length >= (c.count || 1));
     }
     return this.isAnswered(q.number);
   }
@@ -643,10 +658,12 @@ export class TakeExamPage implements OnInit, OnDestroy {
 
   /** Key for the local mirror of this attempt. */
   private localKey(): string {
-    return `exam_progress_${this.examId}_${this.mode()}`;
+    // Scoped by user: without it, two students sharing a browser resume each
+    // other's answers, because restoreProgress prefers the newer mirror.
+    return `${PROGRESS_KEY_PREFIX}${this.auth.user()?.id ?? 'anon'}_${this.examId}_${this.mode()}`;
   }
 
-  private persistProgress(): void {
+  private persistProgress(hooks?: { onSuccess?: () => void; onError?: () => void }): void {
     if (this.questions().length === 0) return;
     this.autoSaveStatus.set('saving');
 
@@ -674,15 +691,26 @@ export class TakeExamPage implements OnInit, OnDestroy {
     }
 
     this.examService.saveProgress(payload).subscribe({
-      next: () => {
+      next: (saved) => {
         this.autoSaveStatus.set('saved');
+        // Re-sync the countdown from the server's started_at. The local mirror
+        // is student-writable, so it must not be what decides how much time is
+        // left on a graded attempt.
+        if (this.mode() === 'exam' && saved?.started_at) {
+          const elapsed = (Date.now() - new Date(saved.started_at).getTime()) / 1000;
+          this.remainingSeconds.set(Math.max(0, Math.round(this.timeLimitSeconds() - elapsed)));
+        }
         setTimeout(() => {
           if (this.autoSaveStatus() === 'saved') this.autoSaveStatus.set('idle');
         }, 2000);
+        hooks?.onSuccess?.();
       },
       // 'idle' looked identical to "nothing to save", so a whole exam could fail
       // to save with no visible hint. Surface it.
-      error: () => this.autoSaveStatus.set('error'),
+      error: () => {
+        this.autoSaveStatus.set('error');
+        hooks?.onError?.();
+      },
     });
   }
 
@@ -691,7 +719,10 @@ export class TakeExamPage implements OnInit, OnDestroy {
     try {
       const raw = localStorage.getItem(this.localKey());
       if (!raw) return null;
-      const { savedAt, payload } = JSON.parse(raw) as { savedAt: number; payload: SaveProgressPayload };
+      const { savedAt, payload } = JSON.parse(raw) as {
+        savedAt: number;
+        payload: SaveProgressPayload;
+      };
       if (serverSavedAt && new Date(serverSavedAt).getTime() >= savedAt) return null;
       return payload;
     } catch {
@@ -719,35 +750,50 @@ export class TakeExamPage implements OnInit, OnDestroy {
     }
 
     this.submitting.set(true);
+    const practice = this.mode() === 'practice';
     const timeSpent = this.timeLimitSeconds() - this.remainingSeconds();
     const subs: AnswerSubmission[] = this.questions().map((q) => ({
       question_number: q.number,
-      answer: this.answers().get(q.number) ?? (q.type === 'SATA' ? [] : ''),
-      fib_correct: this.getFibMark(q.number) ?? null,
+      answer: this.answers().get(q.number) ?? (this.kind(q) === 'SATA' ? [] : ''),
+      // Self-marking is a study aid. The server ignores it for a graded run, so
+      // do not imply a contract that no longer exists.
+      fib_correct: practice ? (this.getFibMark(q.number) ?? null) : null,
     }));
 
     this.examService
       .submitExam({
         exam_id: this.examId,
         answers: subs,
+        // Ignored for graded runs — the server times the attempt from its own
+        // started_at — but practice attempts still report their own duration.
         time_spent_seconds: timeSpent,
         mode: this.mode(),
-        question_numbers: this.questions().map((q) => q.number),
+        // Likewise ignored when graded: the whole paper is scored.
+        ...(practice ? { question_numbers: this.questions().map((q) => q.number) } : {}),
       })
       .subscribe({
         next: (result) => {
           this.submitting.set(false);
           this.clearLocalProgress();
-          this.examService
-            .deleteInProgressByExam(this.examId, this.mode())
-            .subscribe({ error: () => {} });
+          // The server consumes the attempt inside the submit transaction, so
+          // there is nothing left to discard here.
           this.router.navigate(['/results', result.id]);
         },
-        error: () => {
+        error: (err) => {
           this.submitting.set(false);
-          // The local mirror is deliberately left in place: reopening the exam
-          // restores these answers rather than losing them.
-          alert('Submission failed. Your answers are saved on this device — sign in again and reopen the exam to retry.');
+          if (err?.status === 409) {
+            // Already submitted, or the attempt was reset. Nothing to retry.
+            this.clearLocalProgress();
+            alert(err?.error?.detail || 'This attempt is no longer open.');
+            this.router.navigate(['/history']);
+            return;
+          }
+          // Otherwise the local mirror is deliberately left in place: reopening
+          // the exam restores these answers rather than losing them.
+          alert(
+            err?.error?.detail ||
+              'Submission failed. Your answers are saved on this device — sign in again and reopen the exam to retry.',
+          );
         },
       });
   }

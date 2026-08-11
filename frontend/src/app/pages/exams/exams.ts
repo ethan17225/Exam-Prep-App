@@ -23,6 +23,9 @@ export class ExamsPage implements OnInit {
   menuOpen = signal<string | null>(null);
   editMode = signal<Record<string, 'rename' | 'count' | 'time-limit' | null>>({});
   searchQuery = signal('');
+  loading = signal(true);
+  loadError = signal('');
+  deleteError = signal<Record<string, string>>({});
 
   filteredExams = computed(() => {
     const courseId = this.selectedCourseId();
@@ -49,23 +52,32 @@ export class ExamsPage implements OnInit {
   }
 
   loadCourses(): void {
+    // The course filter is a convenience — the exam list itself surfaces load failures.
     this.examService.listCourses().subscribe((data) => this.courses.set(data));
   }
 
   load(): void {
-    this.examService.listExams().subscribe((data) => {
-      this.exams.set(data);
-      const titleDrafts: Record<string, string> = {};
-      const limitDrafts: Record<string, number | null> = {};
-      const counts: Record<string, number> = {};
-      for (const exam of data) {
-        titleDrafts[exam.id] = exam.title;
-        limitDrafts[exam.id] = exam.time_limit_minutes;
-        counts[exam.id] = counts[exam.id] ?? exam.total_questions;
-      }
-      this.titleDrafts.set(titleDrafts);
-      this.timeLimitDrafts.set(limitDrafts);
-      this.questionCounts.set(counts);
+    this.loadError.set('');
+    this.examService.listExams().subscribe({
+      next: (data) => {
+        this.exams.set(data);
+        const titleDrafts: Record<string, string> = {};
+        const limitDrafts: Record<string, number | null> = {};
+        const counts: Record<string, number> = {};
+        for (const exam of data) {
+          titleDrafts[exam.id] = exam.title;
+          limitDrafts[exam.id] = exam.time_limit_minutes;
+          counts[exam.id] = counts[exam.id] ?? exam.total_questions;
+        }
+        this.titleDrafts.set(titleDrafts);
+        this.timeLimitDrafts.set(limitDrafts);
+        this.questionCounts.set(counts);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.loadError.set(err?.error?.detail || 'Failed to load exams.');
+      },
     });
   }
 
@@ -75,9 +87,37 @@ export class ExamsPage implements OnInit {
 
   start(exam: ExamSummary, mode: 'exam' | 'practice'): void {
     this.menuOpen.set(null);
+    if (mode === 'exam') {
+      // A graded run is always the whole paper — the server ignores any subset,
+      // because choosing one let a student be scored over only what they knew.
+      this.router.navigate(['/exam', exam.id], { queryParams: { mode } });
+      return;
+    }
     const selected = this.questionCounts()[exam.id] ?? exam.total_questions;
     const count = Math.max(1, Math.min(exam.total_questions, Math.floor(selected)));
     this.router.navigate(['/exam', exam.id], { queryParams: { mode, count } });
+  }
+
+  toggleAllowPractice(exam: ExamSummary): void {
+    this.menuOpen.set(null);
+    if (exam.allow_practice) {
+      const ok = confirm(
+        'Make this exam assessment-only?\n\n' +
+          'Practice mode and flashcards will be disabled, the answer key will no ' +
+          'longer be sent to students, and any practice attempt in progress will ' +
+          'stop saving.',
+      );
+      if (!ok) return;
+    }
+    this.examService.updateAllowPractice(exam.id, !exam.allow_practice).subscribe({
+      next: () => this.load(),
+      error: (err) => {
+        this.deleteError.set({
+          ...this.deleteError(),
+          [exam.id]: err?.error?.detail || 'Could not change practice mode.',
+        });
+      },
+    });
   }
 
   editQuestions(exam: ExamSummary): void {
@@ -98,7 +138,9 @@ export class ExamsPage implements OnInit {
 
   updateQuestionCount(exam: ExamSummary, value: string): void {
     const parsed = Number(value);
-    const count = Number.isFinite(parsed) ? Math.max(1, Math.min(exam.total_questions, Math.floor(parsed))) : exam.total_questions;
+    const count = Number.isFinite(parsed)
+      ? Math.max(1, Math.min(exam.total_questions, Math.floor(parsed)))
+      : exam.total_questions;
     this.questionCounts.set({ ...this.questionCounts(), [exam.id]: count });
   }
 
@@ -122,7 +164,10 @@ export class ExamsPage implements OnInit {
       },
       error: (err) => {
         this.loadingRename.set({ ...this.loadingRename(), [exam.id]: false });
-        this.renameError.set({ ...this.renameError(), [exam.id]: err?.error?.detail || 'Rename failed.' });
+        this.renameError.set({
+          ...this.renameError(),
+          [exam.id]: err?.error?.detail || 'Rename failed.',
+        });
       },
     });
   }
@@ -149,7 +194,10 @@ export class ExamsPage implements OnInit {
       },
       error: (err) => {
         this.loadingTimeLimit.set({ ...this.loadingTimeLimit(), [exam.id]: false });
-        this.timeLimitError.set({ ...this.timeLimitError(), [exam.id]: err?.error?.detail || 'Update failed.' });
+        this.timeLimitError.set({
+          ...this.timeLimitError(),
+          [exam.id]: err?.error?.detail || 'Update failed.',
+        });
       },
     });
   }
@@ -179,6 +227,15 @@ export class ExamsPage implements OnInit {
 
   remove(id: string, event: Event): void {
     event.stopPropagation();
-    this.examService.deleteExam(id).subscribe(() => this.load());
+    if (!confirm('Delete this exam and all of its questions?')) return;
+    this.examService.deleteExam(id).subscribe({
+      next: () => this.load(),
+      error: (err) => {
+        this.deleteError.set({
+          ...this.deleteError(),
+          [id]: err?.error?.detail || 'Delete failed.',
+        });
+      },
+    });
   }
 }

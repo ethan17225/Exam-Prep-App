@@ -1,7 +1,13 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { ExamService, InProgressExam } from '../../services/exam.service';
+import {
+  ExamService,
+  InProgressExam,
+  formatDate,
+  formatDuration,
+  progressPercent,
+} from '../../services/exam.service';
 
 @Component({
   selector: 'app-in-progress',
@@ -12,12 +18,19 @@ import { ExamService, InProgressExam } from '../../services/exam.service';
 export class InProgressPage implements OnInit {
   records = signal<InProgressExam[]>([]);
   searchQuery = signal('');
+  loading = signal(true);
+  loadError = signal('');
+  deleteError = signal<Record<string, string>>({});
 
   filteredRecords = computed(() => {
     const query = this.searchQuery().toLowerCase().trim();
     if (!query) return this.records();
     return this.records().filter((r) => r.exam_title.toLowerCase().includes(query));
   });
+
+  readonly formatDate = formatDate;
+  readonly formatDuration = formatDuration;
+  readonly progressPercent = progressPercent;
 
   constructor(
     private examService: ExamService,
@@ -29,7 +42,18 @@ export class InProgressPage implements OnInit {
   }
 
   load(): void {
-    this.examService.listInProgress().subscribe((data) => this.records.set(data));
+    this.loading.set(true);
+    this.loadError.set('');
+    this.examService.listInProgress().subscribe({
+      next: (data) => {
+        this.records.set(data);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.loadError.set(err?.error?.detail || 'Failed to load in-progress exams.');
+      },
+    });
   }
 
   resume(record: InProgressExam): void {
@@ -41,22 +65,14 @@ export class InProgressPage implements OnInit {
   remove(id: string, event: Event): void {
     event.stopPropagation();
     if (!confirm('Discard this in-progress exam?')) return;
-    this.examService.deleteInProgress(id).subscribe(() => this.load());
-  }
-
-  formatTime(seconds: number): string {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    if (hrs > 0) return `${hrs}h ${mins}m remaining`;
-    return `${mins}m remaining`;
-  }
-
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleString();
-  }
-
-  progressPercent(record: InProgressExam): number {
-    if (record.total_questions === 0) return 0;
-    return Math.round((record.answered_count / record.total_questions) * 100);
+    this.examService.deleteInProgress(id).subscribe({
+      next: () => this.load(),
+      error: (err) => {
+        this.deleteError.set({
+          ...this.deleteError(),
+          [id]: err?.error?.detail || 'Discard failed.',
+        });
+      },
+    });
   }
 }

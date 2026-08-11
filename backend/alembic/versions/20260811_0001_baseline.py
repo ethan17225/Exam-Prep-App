@@ -18,6 +18,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 from alembic import op
+from src.attempts.models import _MODE_IN as MODE_IN
+from src.identifiers import ID_LENGTH
 
 revision: str = "0001"
 down_revision: str | None = None
@@ -29,10 +31,11 @@ def upgrade() -> None:
     # "user" is a Postgres reserved word; SQLAlchemy quotes it automatically.
     op.create_table(
         "user",
-        sa.Column("id", sa.String(length=8), nullable=False),
+        sa.Column("id", sa.String(length=ID_LENGTH), nullable=False),
         sa.Column("email", sa.String(length=255), nullable=False),
         sa.Column("password_hash", sa.String(length=60), nullable=False),
         sa.Column("role", sa.String(length=10), nullable=False),
+        sa.Column("token_version", sa.Integer(), server_default="0", nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint("id", name="user_pkey"),
         sa.UniqueConstraint("email", name="user_email_key"),
@@ -40,8 +43,8 @@ def upgrade() -> None:
 
     op.create_table(
         "course",
-        sa.Column("id", sa.String(length=8), nullable=False),
-        sa.Column("owner_id", sa.String(length=8), nullable=False),
+        sa.Column("id", sa.String(length=ID_LENGTH), nullable=False),
+        sa.Column("owner_id", sa.String(length=ID_LENGTH), nullable=False),
         sa.Column("is_shared", sa.Boolean(), nullable=False),
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
@@ -54,10 +57,11 @@ def upgrade() -> None:
 
     op.create_table(
         "exam",
-        sa.Column("id", sa.String(length=8), nullable=False),
-        sa.Column("owner_id", sa.String(length=8), nullable=False),
+        sa.Column("id", sa.String(length=ID_LENGTH), nullable=False),
+        sa.Column("owner_id", sa.String(length=ID_LENGTH), nullable=False),
         sa.Column("is_shared", sa.Boolean(), nullable=False),
-        sa.Column("course_id", sa.String(length=8), nullable=True),
+        sa.Column("allow_practice", sa.Boolean(), nullable=False),
+        sa.Column("course_id", sa.String(length=ID_LENGTH), nullable=True),
         sa.Column("title", sa.String(length=255), nullable=False),
         sa.Column("time_limit_minutes", sa.Integer(), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False),
@@ -71,7 +75,7 @@ def upgrade() -> None:
     op.create_table(
         "question",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column("exam_id", sa.String(length=8), nullable=False),
+        sa.Column("exam_id", sa.String(length=ID_LENGTH), nullable=False),
         sa.Column("number", sa.Integer(), nullable=False),
         sa.Column("topic", sa.Text(), nullable=False),
         sa.Column("type", sa.String(length=30), nullable=False),
@@ -88,9 +92,9 @@ def upgrade() -> None:
 
     op.create_table(
         "in_progress_exam",
-        sa.Column("id", sa.String(length=8), nullable=False),
-        sa.Column("user_id", sa.String(length=8), nullable=False),
-        sa.Column("exam_id", sa.String(length=8), nullable=False),
+        sa.Column("id", sa.String(length=ID_LENGTH), nullable=False),
+        sa.Column("user_id", sa.String(length=ID_LENGTH), nullable=False),
+        sa.Column("exam_id", sa.String(length=ID_LENGTH), nullable=False),
         sa.Column("exam_title", sa.String(length=255), nullable=False),
         sa.Column("mode", sa.String(length=10), nullable=False),
         sa.Column(
@@ -115,10 +119,11 @@ def upgrade() -> None:
         sa.Column("current_page", sa.Integer(), nullable=False),
         sa.Column("total_questions", sa.Integer(), nullable=False),
         sa.Column("answered_count", sa.Integer(), nullable=False),
-        sa.Column("started_at", sa.DateTime(), nullable=True),
+        sa.Column("started_at", sa.DateTime(), nullable=False),
         sa.Column("saved_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(["exam_id"], ["exam.id"], name="in_progress_exam_exam_id_fkey", ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["user_id"], ["user.id"], name="in_progress_exam_user_id_fkey", ondelete="CASCADE"),
+        sa.CheckConstraint(MODE_IN, name="mode_valid"),
         sa.PrimaryKeyConstraint("id", name="in_progress_exam_pkey"),
         # The autosave upsert depends on this constraint existing.
         sa.UniqueConstraint("user_id", "exam_id", "mode", name="in_progress_exam_user_id_exam_id_mode_key"),
@@ -129,9 +134,9 @@ def upgrade() -> None:
     # deletion, which is why nothing may join(Exam) on a history query.
     op.create_table(
         "history",
-        sa.Column("id", sa.String(length=8), nullable=False),
-        sa.Column("user_id", sa.String(length=8), nullable=False),
-        sa.Column("exam_id", sa.String(length=8), nullable=False),
+        sa.Column("id", sa.String(length=ID_LENGTH), nullable=False),
+        sa.Column("user_id", sa.String(length=ID_LENGTH), nullable=False),
+        sa.Column("exam_id", sa.String(length=ID_LENGTH), nullable=False),
         sa.Column("exam_title", sa.String(length=255), nullable=False),
         sa.Column("score", sa.Float(), nullable=False),
         sa.Column("correct", sa.Integer(), nullable=False),
@@ -139,9 +144,11 @@ def upgrade() -> None:
         sa.Column("passed", sa.Boolean(), nullable=False),
         sa.Column("time_spent_seconds", sa.Integer(), nullable=False),
         sa.Column("results", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
-        sa.Column("mode", sa.String(length=10), server_default="exam", nullable=True),
+        sa.Column("mode", sa.String(length=10), server_default="exam", nullable=False),
+        sa.Column("over_time", sa.Boolean(), nullable=False),
         sa.Column("taken_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(["user_id"], ["user.id"], name="history_user_id_fkey", ondelete="CASCADE"),
+        sa.CheckConstraint(MODE_IN, name="mode_valid"),
         sa.PrimaryKeyConstraint("id", name="history_pkey"),
     )
     op.create_index("history_exam_id_idx", "history", ["exam_id"])

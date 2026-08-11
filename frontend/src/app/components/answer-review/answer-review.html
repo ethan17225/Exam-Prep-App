@@ -1,0 +1,63 @@
+@let q = question();
+<div class="card review-card" [class.correct]="q.is_correct" [class.wrong]="!q.is_correct">
+  <div class="review-header">
+    <span class="review-num">Q{{ q.question_number }}</span>
+    <span
+      class="badge"
+      [class.badge-mcq]="kind() === 'MCQ'"
+      [class.badge-sata]="kind() === 'SATA'"
+      [class.badge-fib]="kind() === 'FIB'"
+      [class.badge-other]="isAdvanced()"
+      >{{ q.type }}</span
+    >
+    <span class="review-status">{{ q.is_correct ? '✓ Correct' : '✗ Incorrect' }}</span>
+  </div>
+
+  <app-question-sections [sections]="q.sections" [startCollapsed]="true" />
+
+  <p class="review-question">{{ q.question }}</p>
+
+  @if (q.image) {
+    <img class="review-image" [src]="q.image" alt="Question illustration" />
+  }
+
+  @if (showOptionList()) {
+    <div class="review-options">
+      @for (opt of options(); track opt) {
+        <div
+          class="review-opt"
+          [class.sata-correct-only]="isSata() && isCorrectOpt(opt) && !isUserPick(opt)"
+          [class.sata-correct-picked]="isSata() && isCorrectOpt(opt) && isUserPick(opt)"
+          [class.correct-answer]="!isSata() && isCorrectOpt(opt)"
+          [class.wrong-pick]="isUserPick(opt) && !isCorrectOpt(opt)"
+        >
+          @if (isSata() && isCorrectOpt(opt) && isUserPick(opt)) {
+            <span class="opt-indicator opt-correct">✓</span>
+          } @else if (isSata() && isCorrectOpt(opt) && !isUserPick(opt)) {
+            <span class="opt-indicator opt-yellow">✓</span>
+          } @else if (isCorrectOpt(opt)) {
+            <span class="opt-indicator opt-correct">✓</span>
+          } @else if (isUserPick(opt)) {
+            <span class="opt-indicator opt-wrong">✗</span>
+          }
+          {{ opt }}
+        </div>
+      }
+    </div>
+    <div class="review-answer-summary">
+      <span class="fib-label">Your answer:</span> <strong>{{ userAnswerText() }}</strong>
+      <span class="answer-sep">|</span>
+      <span class="fib-label">Correct answer:</span> <strong>{{ correctAnswerText() }}</strong>
+    </div>
+  } @else {
+    <div class="review-fib">
+      <span class="fib-label">Your answer:</span> <strong>{{ userAnswerText() }}</strong>
+      <br />
+      <span class="fib-label">Correct answer:</span> <strong>{{ correctAnswerText() }}</strong>
+    </div>
+  }
+
+  @if (q.rationale) {
+    <div class="rationale"><strong>Rationale:</strong> {{ q.rationale }}</div>
+  }
+</div>

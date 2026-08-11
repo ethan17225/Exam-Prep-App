@@ -1,27 +1,47 @@
-<div class="exams-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
-  <h1 class="page-title" style="margin-bottom: 0;">Past Tests</h1>
-  <div class="search-filter" style="width: 280px; max-width: 100%;">
+<div class="exams-header">
+  <h1 class="page-title">Past Tests</h1>
+  <div class="search-filter">
     <input
       type="text"
       placeholder="Search history..."
+      aria-label="Search history"
       [ngModel]="searchQuery()"
       (ngModelChange)="searchQuery.set($event)"
     />
   </div>
 </div>
 
-@if (filteredRecords().length === 0) {
+@if (loadError()) {
+  <div class="empty-state">
+    <p>{{ loadError() }}</p>
+    <button class="btn btn-primary" (click)="load()">Retry</button>
+  </div>
+} @else if (loading()) {
+  <p class="empty-state">Loading...</p>
+} @else if (filteredRecords().length === 0) {
   <p class="empty-state">No test history found.</p>
 } @else {
   <div class="history-list">
     @for (r of filteredRecords(); track r.id) {
-      <div class="card history-card" (click)="view(r.id)">
+      <div
+        class="card history-card"
+        role="button"
+        tabindex="0"
+        (click)="view(r.id)"
+        (keydown.enter)="view(r.id)"
+      >
         <div class="history-left">
           <span class="history-title">{{ r.exam_title }}</span>
-          <span class="history-meta">{{ formatDate(r.taken_at) }} · {{ formatTime(r.time_spent_seconds) }}</span>
+          <span class="history-meta"
+            >{{ formatDate(r.taken_at) }} · {{ formatDuration(r.time_spent_seconds) }}</span
+          >
         </div>
         <div class="history-right">
-          <span class="badge" [class.badge-exam]="r.mode !== 'practice'" [class.badge-practice]="r.mode === 'practice'">
+          <span
+            class="badge"
+            [class.badge-exam]="r.mode !== 'practice'"
+            [class.badge-practice]="r.mode === 'practice'"
+          >
             {{ r.mode === 'practice' ? 'Practice' : 'Exam' }}
           </span>
           <span class="history-score">{{ r.score }}%</span>
@@ -29,6 +49,9 @@
             {{ r.passed ? 'PASS' : 'FAIL' }}
           </span>
           <button class="btn btn-danger btn-sm" (click)="remove(r.id, $event)">Delete</button>
+          @if (deleteError()[r.id]) {
+            <span class="action-error">{{ deleteError()[r.id] }}</span>
+          }
         </div>
       </div>
     }

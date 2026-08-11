@@ -14,10 +14,14 @@ from src.auth.models import User
 from src.authz import visible
 from src.courses.models import Course
 
+# SecretStr keeps the value out of crash logs; tests need the raw key to forge
+# and verify tokens.
+SECRET = auth_settings.secret.get_secret_value()
+
 
 def _decodes(token: str) -> bool:
     try:
-        jwt.decode(token, auth_settings.secret, algorithms=[JWT_ALGORITHM])
+        jwt.decode(token, SECRET, algorithms=[JWT_ALGORITHM])
         return True
     except jwt.InvalidTokenError:
         return False
@@ -65,13 +69,13 @@ def instructor_user() -> User:
 
 
 def test_token_carries_subject_and_role(instructor_user: User):
-    payload = jwt.decode(service.create_token(instructor_user), auth_settings.secret, algorithms=[JWT_ALGORITHM])
+    payload = jwt.decode(service.create_token(instructor_user), SECRET, algorithms=[JWT_ALGORITHM])
     assert payload["sub"] == "abc12345"
     assert payload["role"] == UserRole.INSTRUCTOR
 
 
 def test_token_ttl_is_12_hours(instructor_user: User):
-    payload = jwt.decode(service.create_token(instructor_user), auth_settings.secret, algorithms=[JWT_ALGORITHM])
+    payload = jwt.decode(service.create_token(instructor_user), SECRET, algorithms=[JWT_ALGORITHM])
     assert payload["exp"] - payload["iat"] == int(timedelta(hours=12).total_seconds())
 
 
@@ -85,7 +89,7 @@ def test_expired_token_is_rejected():
     now = datetime.now(UTC)
     expired = jwt.encode(
         {"sub": "abc12345", "iat": now - timedelta(hours=24), "exp": now - timedelta(hours=1)},
-        auth_settings.secret,
+        SECRET,
         algorithm="HS256",
     )
     assert not _decodes(expired)

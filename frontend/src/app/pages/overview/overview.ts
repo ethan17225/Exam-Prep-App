@@ -1,10 +1,46 @@
 import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { ExamService, ExamResultSummary, TopicStat } from '../../services/exam.service';
-import { Chart, registerables } from 'chart.js';
+import { forkJoin } from 'rxjs';
+import {
+  ExamService,
+  ExamResultSummary,
+  TopicStat,
+  formatDate,
+  formatDuration,
+} from '../../services/exam.service';
+import {
+  ArcElement,
+  BarController,
+  BarElement,
+  CategoryScale,
+  Chart,
+  DoughnutController,
+  Filler,
+  Legend,
+  LinearScale,
+  LineController,
+  LineElement,
+  PointElement,
+  Tooltip,
+} from 'chart.js';
 
-Chart.register(...registerables);
+// Only the pieces the three charts below use — `registerables` would pull all of
+// chart.js (~220 kB) onto the default landing route.
+Chart.register(
+  LineController,
+  LineElement,
+  PointElement,
+  BarController,
+  BarElement,
+  DoughnutController,
+  ArcElement,
+  CategoryScale,
+  LinearScale,
+  Legend,
+  Tooltip,
+  Filler,
+);
 
 @Component({
   selector: 'app-overview',
@@ -19,6 +55,8 @@ export class OverviewPage implements OnInit, OnDestroy {
   selectedTopic = signal('');
   topicSearch = signal('');
   topicDropdownOpen = signal(false);
+  loading = signal(true);
+  loadError = signal('');
   private charts: Chart[] = [];
 
   totalExams = computed(() => this.records().length);
@@ -35,7 +73,9 @@ export class OverviewPage implements OnInit, OnDestroy {
     return Math.round((r.filter((rec) => rec.passed).length / r.length) * 100);
   });
 
-  totalStudySeconds = computed(() => this.records().reduce((s, rec) => s + rec.time_spent_seconds, 0));
+  totalStudySeconds = computed(() =>
+    this.records().reduce((s, rec) => s + rec.time_spent_seconds, 0),
+  );
 
   formattedStudyTime = computed(() => {
     const secs = this.totalStudySeconds();
@@ -67,16 +107,29 @@ export class OverviewPage implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.examService.getTopicStats().subscribe((stats) => {
-      this.topicStats.set(stats);
-      if (stats.length > 0) {
-        this.selectedTopic.set(stats[0].topic);
-      }
-    });
+    this.load();
+  }
 
-    this.examService.getHistory().subscribe((data) => {
-      this.records.set(data);
-      setTimeout(() => this.renderCharts(), 0);
+  load(): void {
+    this.loading.set(true);
+    this.loadError.set('');
+    forkJoin({
+      stats: this.examService.getTopicStats(),
+      records: this.examService.getHistory(),
+    }).subscribe({
+      next: ({ stats, records }) => {
+        this.topicStats.set(stats);
+        if (stats.length > 0) {
+          this.selectedTopic.set(stats[0].topic);
+        }
+        this.records.set(records);
+        this.loading.set(false);
+        setTimeout(() => this.renderCharts(), 0);
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.loadError.set(err?.error?.detail || 'Failed to load your progress.');
+      },
     });
   }
 
@@ -88,15 +141,8 @@ export class OverviewPage implements OnInit, OnDestroy {
     this.router.navigate(['/history', id]);
   }
 
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString();
-  }
-
-  formatTime(seconds: number): string {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}m ${s}s`;
-  }
+  readonly formatDate = formatDate;
+  readonly formatDuration = formatDuration;
 
   onTopicSearchInput(value: string): void {
     this.topicSearch.set(value);
@@ -124,6 +170,13 @@ export class OverviewPage implements OnInit, OnDestroy {
     this.topicDropdownOpen.set(false);
   }
 
+  /** Enter in the search box commits the current best match and closes the list. */
+  confirmTopicSelection(): void {
+    const topic = this.selectedTopic();
+    if (topic) this.selectTopic(topic);
+    else this.closeTopicDropdown();
+  }
+
   private renderCharts(): void {
     this.charts.forEach((c) => c.destroy());
     this.charts = [];
@@ -139,7 +192,7 @@ export class OverviewPage implements OnInit, OnDestroy {
     if (!canvas) return;
 
     const sorted = [...this.records()].reverse();
-    const labels = sorted.map((r, i) => `#${i + 1}`);
+    const labels = sorted.map((_r, i) => `#${i + 1}`);
     const data = sorted.map((r) => r.score);
 
     this.charts.push(
@@ -175,7 +228,12 @@ export class OverviewPage implements OnInit, OnDestroy {
           maintainAspectRatio: false,
           plugins: { legend: { display: false } },
           scales: {
-            y: { min: 0, max: 100, ticks: { callback: (v) => `${v}%` }, grid: { color: '#f0f0f0' } },
+            y: {
+              min: 0,
+              max: 100,
+              ticks: { callback: (v) => `${v}%` },
+              grid: { color: '#f0f0f0' },
+            },
             x: { grid: { display: false } },
           },
         },
@@ -210,7 +268,10 @@ export class OverviewPage implements OnInit, OnDestroy {
           maintainAspectRatio: false,
           cutout: '65%',
           plugins: {
-            legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, pointStyle: 'circle' } },
+            legend: {
+              position: 'bottom',
+              labels: { padding: 16, usePointStyle: true, pointStyle: 'circle' },
+            },
           },
         },
       }),
@@ -237,7 +298,9 @@ export class OverviewPage implements OnInit, OnDestroy {
             {
               label: 'Attempts',
               data: buckets,
-              backgroundColor: buckets.map((_, i) => (i >= 8 ? '#0a7' : i >= 5 ? '#4361ee' : '#e8e8e8')),
+              backgroundColor: buckets.map((_, i) =>
+                i >= 8 ? '#0a7' : i >= 5 ? '#4361ee' : '#e8e8e8',
+              ),
               borderRadius: 4,
             },
           ],

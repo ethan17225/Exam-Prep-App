@@ -1,11 +1,22 @@
 <!-- HTML Content Viewer Overlay -->
 @if (viewingDoc(); as doc) {
+  <!-- Backdrop click-to-close; keyboard users close with Escape or the Close button. -->
+  <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
   <div class="viewer-overlay" (click)="closeViewer()">
-    <div class="viewer-container" (click)="$event.stopPropagation()">
+    <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events -->
+    <div
+      class="viewer-container"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-label]="doc.title"
+      (click)="$event.stopPropagation()"
+    >
       <div class="viewer-header">
         <span class="viewer-title">{{ doc.title }}</span>
         <div class="viewer-actions">
-          <a class="btn btn-secondary btn-sm" [href]="doc.pdf_url" target="_blank" rel="noopener">Open PDF</a>
+          <a class="btn btn-secondary btn-sm" [href]="doc.pdf_url" target="_blank" rel="noopener"
+            >Open PDF</a
+          >
           <a class="btn btn-secondary btn-sm" [href]="doc.pdf_url" download>Download</a>
           <button class="btn btn-danger btn-sm" (click)="closeViewer()">Close</button>
         </div>
@@ -19,7 +30,9 @@
         } @else if (viewerError()) {
           <div class="viewer-error">
             <p>{{ viewerError() }}</p>
-            <a class="btn btn-primary btn-sm" [href]="doc.pdf_url" target="_blank" rel="noopener">Open as PDF instead</a>
+            <a class="btn btn-primary btn-sm" [href]="doc.pdf_url" target="_blank" rel="noopener"
+              >Open as PDF instead</a
+            >
           </div>
         } @else {
           <article class="doc-content" [innerHTML]="viewingHtml()"></article>
@@ -30,9 +43,9 @@
 }
 
 <!-- Document List -->
-<div class="docs-header" style="align-items: center; margin-bottom: 1.25rem;">
-  <h1 class="page-title" style="margin-bottom: 0;">Documents</h1>
-  <div class="header-controls" style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+<div class="docs-header">
+  <h1 class="page-title">Documents</h1>
+  <div class="header-controls">
     @if (courses().length > 0) {
       <div class="course-filter">
         <select
@@ -48,10 +61,11 @@
         </select>
       </div>
     }
-    <div class="search-filter" style="width: 280px; max-width: 100%;">
+    <div class="search-filter">
       <input
         type="text"
         placeholder="Search documents..."
+        aria-label="Search documents"
         [ngModel]="searchQuery()"
         (ngModelChange)="searchQuery.set($event)"
       />
@@ -59,7 +73,14 @@
   </div>
 </div>
 
-@if (groupedDocuments().length === 0) {
+@if (loadError()) {
+  <div class="empty-state">
+    <p>{{ loadError() }}</p>
+    <button class="btn btn-primary" (click)="loadDocuments()">Retry</button>
+  </div>
+} @else if (loading()) {
+  <p class="empty-state">Loading...</p>
+} @else if (groupedDocuments().length === 0) {
   <p class="empty-state">No documents available.</p>
 } @else {
   @for (group of groupedDocuments(); track group.courseName) {
@@ -67,18 +88,32 @@
       <h2 class="doc-group-title">
         <span class="doc-group-icon">📁</span>
         {{ group.courseName }}
-        <span class="doc-group-count">{{ group.docs.length }} file{{ group.docs.length === 1 ? '' : 's' }}</span>
+        <span class="doc-group-count"
+          >{{ group.docs.length }} file{{ group.docs.length === 1 ? '' : 's' }}</span
+        >
       </h2>
       <div class="doc-list">
         @for (doc of group.docs; track doc.filename) {
-          <div class="card doc-card" (click)="openDoc(doc)">
+          <div
+            class="card doc-card"
+            role="button"
+            tabindex="0"
+            (click)="openDoc(doc)"
+            (keydown.enter)="openDoc(doc)"
+          >
             <div class="doc-icon">📄</div>
             <div class="doc-info">
               <span class="doc-title">{{ doc.title }}</span>
               <span class="doc-meta">PDF · {{ formatSize(doc.size_bytes) }}</span>
             </div>
             <div class="doc-actions">
-              <a class="btn btn-secondary btn-sm" [href]="doc.pdf_url" target="_blank" rel="noopener" (click)="$event.stopPropagation()">
+              <a
+                class="btn btn-secondary btn-sm"
+                [href]="doc.pdf_url"
+                target="_blank"
+                rel="noopener"
+                (click)="$event.stopPropagation()"
+              >
                 Open PDF
               </a>
             </div>

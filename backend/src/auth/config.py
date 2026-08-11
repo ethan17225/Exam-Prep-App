@@ -1,14 +1,16 @@
-from pydantic import Field, ValidationError
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, SecretStr
+from pydantic_settings import BaseSettings
 
-from src.config import BASE_DIR
+from src.config import load_settings, settings_config
 
 
 class AuthConfig(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="AUTH_", env_file=BASE_DIR / ".env", extra="ignore")
+    model_config = settings_config("AUTH_")
 
     # AUTH_SECRET. 32 chars is the HMAC-SHA256 key length; PyJWT warns below it.
-    secret: str = Field(min_length=32)
+    # SecretStr so a rejected value is never echoed into a crash log — pydantic
+    # includes input_value in its error text, and the container crash-loops.
+    secret: SecretStr = Field(min_length=32)
 
     # AUTH_INVITE_CODE. Registration is gated by a shared code: it keeps the open
     # internet out without building email verification. Empty closes registration.
@@ -20,14 +22,7 @@ class AuthConfig(BaseSettings):
     token_ttl_hours: int = 12
 
 
-def _load() -> AuthConfig:
-    try:
-        return AuthConfig()
-    except ValidationError as exc:
-        raise SystemExit(
-            f"Invalid auth settings:\n{exc}\n\n"
-            'Generate a secret with: python -c "import secrets; print(secrets.token_urlsafe(48))"'
-        ) from exc
-
-
-auth_settings = _load()
+auth_settings = load_settings(
+    AuthConfig,
+    'Generate a secret with: python -c "import secrets; print(secrets.token_urlsafe(48))"',
+)

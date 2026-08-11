@@ -11,7 +11,7 @@ export const authGuard: CanActivateFn = (_route, state) => {
 };
 
 /** Instructor-only routes. Students are sent to the overview, not to login. */
-export const instructorGuard: CanActivateFn = (route, state) => {
+export const instructorGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
   if (!auth.isLoggedIn()) {

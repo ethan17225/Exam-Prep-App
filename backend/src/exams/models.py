@@ -3,6 +3,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from src.database import Base
+from src.identifiers import ID_LENGTH
 
 
 class Exam(Base):
@@ -13,11 +14,15 @@ class Exam(Base):
         Index(None, "course_id"),
     )
 
-    id = Column(String(8), primary_key=True)
-    owner_id = Column(String(8), ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    id = Column(String(ID_LENGTH), primary_key=True)
+    owner_id = Column(String(ID_LENGTH), ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
     # Set server-side from the creator's role; never accepted from the client.
     is_shared = Column(Boolean, nullable=False)
-    course_id = Column(String(8), ForeignKey("course.id", ondelete="SET NULL"), nullable=True)
+    # Whether the answer key may leave the server for a non-owner. False makes an
+    # exam assessment-only: no practice mode, no flashcards, no answers in the
+    # take-exam payload. This is the single gate on answer-key disclosure.
+    allow_practice = Column(Boolean, nullable=False)
+    course_id = Column(String(ID_LENGTH), ForeignKey("course.id", ondelete="SET NULL"), nullable=True)
     title = Column(String(255), nullable=False)
     time_limit_minutes = Column(Integer, nullable=True)
     created_at = Column(DateTime, nullable=False)
@@ -33,14 +38,14 @@ class Question(Base):
 
     Any route that reaches a question by bare id must join Exam and check
     Exam.owner_id: `question.id` is a serial integer and trivially enumerable,
-    unlike the 8-char ids used everywhere else.
+    unlike the random ids used everywhere else.
     """
 
     __tablename__ = "question"
     __table_args__ = (Index(None, "exam_id"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    exam_id = Column(String(8), ForeignKey("exam.id", ondelete="CASCADE"), nullable=False)
+    exam_id = Column(String(ID_LENGTH), ForeignKey("exam.id", ondelete="CASCADE"), nullable=False)
     number = Column(Integer, nullable=False)
     topic = Column(Text, nullable=False, default="")
     type = Column(String(30), nullable=False, default="MCQ")

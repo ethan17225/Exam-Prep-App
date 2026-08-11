@@ -1,6 +1,15 @@
 # TLS terminator. Set APP_DOMAIN in .env:
-#   exams.example.com   -> Caddy obtains and renews a Let's Encrypt certificate
-#   :80                 -> plain HTTP, for local runs with no public DNS
+#   exams.example.com   -> Caddy obtains and renews a Let's Encrypt certificate,
+#                          and automatically redirects HTTP to HTTPS
+#   :80                 -> plain HTTP. LOCAL DEVELOPMENT ONLY. There is no
+#                          redirect and no TLS, so passwords, the invite code and
+#                          the session token all cross the network in the clear.
+{
+	# Without a contact address the ACME account gets no expiry or revocation
+	# notifications.
+	email {$ACME_EMAIL}
+}
+
 {$APP_DOMAIN} {
 	encode gzip zstd
 

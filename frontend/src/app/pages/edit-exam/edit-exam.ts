@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal, WritableSignal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import {
@@ -10,6 +10,7 @@ import {
   SectionBlock,
   TableBlock,
   classifyQuestionType,
+  kindFromType,
   matrixRows,
   matrixColumns,
   clozeBlanks,
@@ -84,15 +85,19 @@ interface QuestionDraft {
   // HOTSPOT
   regions: HotspotRegion[];
   hotspotAnswer: string;
-  // UI state
-  expanded: boolean;
-  saving: boolean;
-  uploading: boolean;
-  error: string;
-  saved: boolean;
 }
 
-export const QUESTION_TYPES = ['MCQ', 'SATA', 'FIB', 'MATRIX', 'CLOZE', 'BOWTIE', 'RANKING', 'HIGHLIGHT', 'HOTSPOT'];
+export const QUESTION_TYPES = [
+  'MCQ',
+  'SATA',
+  'FIB',
+  'MATRIX',
+  'CLOZE',
+  'BOWTIE',
+  'RANKING',
+  'HIGHLIGHT',
+  'HOTSPOT',
+];
 
 @Component({
   selector: 'app-edit-exam',
@@ -100,22 +105,28 @@ export const QUESTION_TYPES = ['MCQ', 'SATA', 'FIB', 'MATRIX', 'CLOZE', 'BOWTIE'
   templateUrl: './edit-exam.html',
   styleUrl: './edit-exam.scss',
 })
-export class EditExamPage implements OnInit {
+export class EditExamPage implements OnInit, OnDestroy {
   examTitle = signal('');
   drafts = signal<QuestionDraft[]>([]);
   loading = signal(true);
   loadError = signal('');
   addingQuestion = signal(false);
 
+  // Per-draft UI state, keyed by question id (never stored on the draft objects —
+  // drafts are replaced copy-on-write and would lose it).
+  expanded = signal<Record<number, boolean>>({});
+  saving = signal<Record<number, boolean>>({});
+  saved = signal<Record<number, boolean>>({});
+  uploading = signal<Record<number, boolean>>({});
+  draftError = signal<Record<number, string>>({});
+
   readonly questionTypes = QUESTION_TYPES;
 
   private examId = '';
-  private drawing: {
-    draft: QuestionDraft;
-    startX: number;
-    startY: number;
-    region: HotspotRegion;
-  } | null = null;
+  private savedTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  // Ids, not object references — draft objects are replaced on every edit.
+  private drawing: { draftId: number; regionId: string; startX: number; startY: number } | null =
+    null;
 
   constructor(
     private route: ActivatedRoute,
@@ -125,30 +136,43 @@ export class EditExamPage implements OnInit {
 
   ngOnInit(): void {
     this.examId = this.route.snapshot.paramMap.get('id')!;
+    this.load();
+  }
+
+  load(): void {
+    this.loading.set(true);
+    this.loadError.set('');
     this.examService.getExam(this.examId, true).subscribe({
       next: (exam) => {
+        // Every write here already 404s for a non-owner, but the read did not —
+        // so opening the editor on someone else's exam used to display its key.
+        if (!exam.is_owner) {
+          this.loading.set(false);
+          this.loadError.set('You can only edit exams you created.');
+          return;
+        }
         this.examTitle.set(exam.title);
         this.drafts.set(exam.questions.map((q) => this.toDraft(q)));
         this.loading.set(false);
       },
-      error: () => {
+      error: (err) => {
         this.loading.set(false);
-        this.loadError.set('Could not load this exam.');
+        this.loadError.set(err?.error?.detail || 'Could not load this exam.');
       },
     });
+  }
+
+  ngOnDestroy(): void {
+    for (const t of this.savedTimers.values()) clearTimeout(t);
+    this.savedTimers.clear();
   }
 
   goBack(): void {
     this.router.navigate(['/exams']);
   }
 
-  /** Trigger re-render after mutating a draft object in place. */
-  private bump(): void {
-    this.drafts.update((list) => [...list]);
-  }
-
   kindOf(d: QuestionDraft): QuestionKind {
-    return classifyQuestionType({ type: d.type, options: ['x'] });
+    return kindFromType(d.type);
   }
 
   preview(d: QuestionDraft): string {
@@ -157,8 +181,29 @@ export class EditExamPage implements OnInit {
   }
 
   toggleExpand(d: QuestionDraft): void {
-    d.expanded = !d.expanded;
-    this.bump();
+    this.expanded.set({ ...this.expanded(), [d.id]: !this.expanded()[d.id] });
+  }
+
+  // ── Copy-on-write draft updates ─────────────────────────────
+
+  private updateDraft(id: number, patch: Partial<QuestionDraft>): void {
+    this.drafts.update((list) => list.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  }
+
+  setDraftField<K extends keyof QuestionDraft>(
+    d: QuestionDraft,
+    key: K,
+    value: QuestionDraft[K],
+  ): void {
+    this.updateDraft(d.id, { [key]: value } as Partial<QuestionDraft>);
+  }
+
+  private setFlag(sig: WritableSignal<Record<number, boolean>>, id: number, value: boolean): void {
+    sig.set({ ...sig(), [id]: value });
+  }
+
+  private setError(id: number, message: string): void {
+    this.draftError.set({ ...this.draftError(), [id]: message });
   }
 
   // ── Draft <-> Question mapping ──────────────────────────────
@@ -185,16 +230,13 @@ export class EditExamPage implements OnInit {
       highlightTokens: [],
       regions: [],
       hotspotAnswer: '',
-      expanded: false,
-      saving: false,
-      uploading: false,
-      error: '',
-      saved: false,
     };
 
     if (kind === 'MCQ' || kind === 'SATA') {
       draft.optionsText = (Array.isArray(q.options) ? q.options : []).join('\n');
-      draft.answerText = Array.isArray(q.answer) ? (q.answer as string[]).join(', ') : String(q.answer ?? '');
+      draft.answerText = Array.isArray(q.answer)
+        ? (q.answer as string[]).join(', ')
+        : String(q.answer ?? '');
     } else if (kind === 'FIB') {
       draft.answerText = String(q.answer ?? '');
     } else if (kind === 'MATRIX') {
@@ -203,7 +245,10 @@ export class EditExamPage implements OnInit {
       const ans = q.answer;
       if (ans && typeof ans === 'object' && !Array.isArray(ans)) {
         draft.matrixAnswer = Object.fromEntries(
-          Object.entries(ans as Record<string, string[]>).map(([k, v]) => [String(k), [...(v ?? [])]]),
+          Object.entries(ans as Record<string, string[]>).map(([k, v]) => [
+            String(k),
+            [...(v ?? [])],
+          ]),
         );
       }
     } else if (kind === 'CLOZE') {
@@ -229,7 +274,10 @@ export class EditExamPage implements OnInit {
       draft.rankingText = correct.map(String).join('\n');
     } else if (kind === 'HIGHLIGHT') {
       const correct = new Set(Array.isArray(q.answer) ? (q.answer as number[]).map(Number) : []);
-      draft.highlightTokens = highlightTokens(q).map((t, i) => ({ text: t, correct: correct.has(i) }));
+      draft.highlightTokens = highlightTokens(q).map((t, i) => ({
+        text: t,
+        correct: correct.has(i),
+      }));
     } else if (kind === 'HOTSPOT') {
       draft.regions = hotspotRegions(q).map((r) => ({ ...r }));
       draft.hotspotAnswer = String(q.answer ?? '');
@@ -311,30 +359,43 @@ export class EditExamPage implements OnInit {
     return out.length ? out : null;
   }
 
-  addSection(d: QuestionDraft): void {
-    d.sections.push({
-      title: `Tab ${d.sections.length + 1}`,
-      collapsed: false,
-      blocks: [this.newBlockDraft('text')],
+  private updateSection(d: QuestionDraft, si: number, patch: Partial<SectionDraft>): void {
+    this.updateDraft(d.id, {
+      sections: d.sections.map((s, i) => (i === si ? { ...s, ...patch } : s)),
     });
-    this.bump();
   }
 
-  removeSection(d: QuestionDraft, index: number): void {
-    d.sections.splice(index, 1);
-    this.bump();
+  setSectionTitle(d: QuestionDraft, si: number, title: string): void {
+    this.updateSection(d, si, { title });
   }
 
-  moveSection(d: QuestionDraft, index: number, delta: number): void {
-    const target = index + delta;
+  addSection(d: QuestionDraft): void {
+    this.updateDraft(d.id, {
+      sections: [
+        ...d.sections,
+        {
+          title: `Tab ${d.sections.length + 1}`,
+          collapsed: false,
+          blocks: [this.newBlockDraft('text')],
+        },
+      ],
+    });
+  }
+
+  removeSection(d: QuestionDraft, si: number): void {
+    this.updateDraft(d.id, { sections: d.sections.filter((_, i) => i !== si) });
+  }
+
+  moveSection(d: QuestionDraft, si: number, delta: number): void {
+    const target = si + delta;
     if (target < 0 || target >= d.sections.length) return;
-    [d.sections[index], d.sections[target]] = [d.sections[target], d.sections[index]];
-    this.bump();
+    const sections = [...d.sections];
+    [sections[si], sections[target]] = [sections[target], sections[si]];
+    this.updateDraft(d.id, { sections });
   }
 
-  toggleSection(section: SectionDraft): void {
-    section.collapsed = !section.collapsed;
-    this.bump();
+  toggleSection(d: QuestionDraft, si: number): void {
+    this.updateSection(d, si, { collapsed: !d.sections[si].collapsed });
   }
 
   private newBlockDraft(kind: BlockKind): SectionBlockDraft {
@@ -355,75 +416,104 @@ export class EditExamPage implements OnInit {
     return block;
   }
 
-  addBlock(section: SectionDraft, kind: BlockKind): void {
-    section.blocks.push(this.newBlockDraft(kind));
-    this.bump();
+  private updateBlock(
+    d: QuestionDraft,
+    si: number,
+    bi: number,
+    patch: Partial<SectionBlockDraft>,
+  ): void {
+    this.updateSection(d, si, {
+      blocks: d.sections[si].blocks.map((b, i) => (i === bi ? { ...b, ...patch } : b)),
+    });
   }
 
-  removeBlock(section: SectionDraft, index: number): void {
-    section.blocks.splice(index, 1);
-    this.bump();
+  setBlockField<K extends keyof SectionBlockDraft>(
+    d: QuestionDraft,
+    si: number,
+    bi: number,
+    key: K,
+    value: SectionBlockDraft[K],
+  ): void {
+    this.updateBlock(d, si, bi, { [key]: value } as Partial<SectionBlockDraft>);
   }
 
-  moveBlock(section: SectionDraft, index: number, delta: number): void {
-    const target = index + delta;
-    if (target < 0 || target >= section.blocks.length) return;
-    [section.blocks[index], section.blocks[target]] = [section.blocks[target], section.blocks[index]];
-    this.bump();
+  addBlock(d: QuestionDraft, si: number, kind: BlockKind): void {
+    this.updateSection(d, si, { blocks: [...d.sections[si].blocks, this.newBlockDraft(kind)] });
+  }
+
+  removeBlock(d: QuestionDraft, si: number, bi: number): void {
+    this.updateSection(d, si, { blocks: d.sections[si].blocks.filter((_, i) => i !== bi) });
+  }
+
+  moveBlock(d: QuestionDraft, si: number, bi: number, delta: number): void {
+    const blocks = [...d.sections[si].blocks];
+    const target = bi + delta;
+    if (target < 0 || target >= blocks.length) return;
+    [blocks[bi], blocks[target]] = [blocks[target], blocks[bi]];
+    this.updateSection(d, si, { blocks });
   }
 
   // ── Table block editing ─────────────────────────────────────
 
-  setHeader(block: SectionBlockDraft, index: number, value: string): void {
-    block.headers[index] = value;
+  setHeader(d: QuestionDraft, si: number, bi: number, hi: number, value: string): void {
+    const block = d.sections[si].blocks[bi];
+    this.updateBlock(d, si, bi, { headers: block.headers.map((h, i) => (i === hi ? value : h)) });
   }
 
-  setCell(block: SectionBlockDraft, rowIdx: number, colIdx: number, value: string): void {
-    block.rows[rowIdx][colIdx] = value;
+  setCell(d: QuestionDraft, si: number, bi: number, ri: number, ci: number, value: string): void {
+    const block = d.sections[si].blocks[bi];
+    this.updateBlock(d, si, bi, {
+      rows: block.rows.map((row, r) =>
+        r === ri ? row.map((c, i) => (i === ci ? value : c)) : row,
+      ),
+    });
   }
 
-  addTableRow(block: SectionBlockDraft): void {
-    block.rows.push(new Array(Math.max(1, block.headers.length)).fill(''));
-    this.bump();
+  addTableRow(d: QuestionDraft, si: number, bi: number): void {
+    const block = d.sections[si].blocks[bi];
+    this.updateBlock(d, si, bi, {
+      rows: [...block.rows, new Array(Math.max(1, block.headers.length)).fill('')],
+    });
   }
 
-  removeTableRow(block: SectionBlockDraft, index: number): void {
-    block.rows.splice(index, 1);
-    this.bump();
+  removeTableRow(d: QuestionDraft, si: number, bi: number, ri: number): void {
+    const block = d.sections[si].blocks[bi];
+    this.updateBlock(d, si, bi, { rows: block.rows.filter((_, i) => i !== ri) });
   }
 
-  addTableColumn(block: SectionBlockDraft): void {
-    block.headers.push(`Column ${block.headers.length + 1}`);
-    for (const row of block.rows) row.push('');
-    this.bump();
+  addTableColumn(d: QuestionDraft, si: number, bi: number): void {
+    const block = d.sections[si].blocks[bi];
+    this.updateBlock(d, si, bi, {
+      headers: [...block.headers, `Column ${block.headers.length + 1}`],
+      rows: block.rows.map((row) => [...row, '']),
+    });
   }
 
-  removeTableColumn(block: SectionBlockDraft, index: number): void {
+  removeTableColumn(d: QuestionDraft, si: number, bi: number, hi: number): void {
+    const block = d.sections[si].blocks[bi];
     if (block.headers.length <= 1) return;
-    block.headers.splice(index, 1);
-    for (const row of block.rows) row.splice(index, 1);
-    this.bump();
+    this.updateBlock(d, si, bi, {
+      headers: block.headers.filter((_, i) => i !== hi),
+      rows: block.rows.map((row) => row.filter((_, i) => i !== hi)),
+    });
   }
 
-  togglePaste(block: SectionBlockDraft): void {
-    block.pasteOpen = !block.pasteOpen;
-    this.bump();
+  togglePaste(d: QuestionDraft, si: number, bi: number): void {
+    this.updateBlock(d, si, bi, { pasteOpen: !d.sections[si].blocks[bi].pasteOpen });
   }
 
   /** Import a table from pasted spreadsheet data; first line becomes the headers. */
-  applyPastedTable(block: SectionBlockDraft): void {
+  applyPastedTable(d: QuestionDraft, si: number, bi: number): void {
+    const block = d.sections[si].blocks[bi];
     const lines = this.lines(block.pasteText);
     if (!lines.length) return;
     const split = (line: string) => (line.includes('\t') ? line.split('\t') : line.split(','));
     const parsed = lines.map((l) => split(l).map((c) => c.trim()));
     const width = Math.max(...parsed.map((r) => r.length));
     const padded = parsed.map((r) => [...r, ...new Array(width - r.length).fill('')]);
-    block.headers = padded[0];
-    block.rows = padded.slice(1);
-    if (!block.rows.length) block.rows = [new Array(width).fill('')];
-    block.pasteText = '';
-    block.pasteOpen = false;
-    this.bump();
+    let rows = padded.slice(1);
+    if (!rows.length) rows = [new Array(width).fill('')];
+    this.updateBlock(d, si, bi, { headers: padded[0], rows, pasteText: '', pasteOpen: false });
   }
 
   private serialize(d: QuestionDraft): { options: unknown; answer: unknown } | { error: string } {
@@ -439,7 +529,10 @@ export class EditExamPage implements OnInit {
     if (kind === 'SATA') {
       const options = this.lines(d.optionsText);
       if (options.length < 2) return { error: 'SATA needs at least 2 options (one per line).' };
-      const answer = d.answerText.split(',').map((s) => s.trim()).filter(Boolean);
+      const answer = d.answerText
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
       if (!answer.length) return { error: 'Enter the correct answer letters (e.g. A, B, D).' };
       return { options, answer };
     }
@@ -451,13 +544,15 @@ export class EditExamPage implements OnInit {
     if (kind === 'MATRIX') {
       const rows = this.lines(d.matrixRowsText);
       const columns = this.lines(d.matrixColsText);
-      if (!rows.length || !columns.length) return { error: 'MATRIX needs at least one row and one column.' };
+      if (!rows.length || !columns.length)
+        return { error: 'MATRIX needs at least one row and one column.' };
       const answer: Record<string, string[]> = {};
       for (let i = 0; i < rows.length; i++) {
         const sel = (d.matrixAnswer[String(i)] ?? []).filter((c) => columns.includes(c));
         if (sel.length) answer[String(i)] = sel;
       }
-      if (!Object.keys(answer).length) return { error: 'Mark at least one correct cell in the answer grid.' };
+      if (!Object.keys(answer).length)
+        return { error: 'Mark at least one correct cell in the answer grid.' };
       return { options: { rows, columns }, answer };
     }
     if (kind === 'CLOZE') {
@@ -485,7 +580,8 @@ export class EditExamPage implements OnInit {
         if (!name) return { error: 'Every BOWTIE category needs a name.' };
         if (choices.length < 2) return { error: `Category "${name}" needs at least 2 choices.` };
         const selected = c.answer.filter((a) => choices.includes(a));
-        if (!selected.length) return { error: `Select the correct choice(s) for category "${name}".` };
+        if (!selected.length)
+          return { error: `Select the correct choice(s) for category "${name}".` };
         categories.push({ name, count: Math.max(1, Number(c.count) || selected.length), choices });
         answer[name] = selected;
       }
@@ -493,7 +589,8 @@ export class EditExamPage implements OnInit {
     }
     if (kind === 'RANKING') {
       const items = this.lines(d.rankingText);
-      if (items.length < 2) return { error: 'RANKING needs at least 2 items (one per line, in correct order).' };
+      if (items.length < 2)
+        return { error: 'RANKING needs at least 2 items (one per line, in correct order).' };
       // Display order intentionally differs from the correct order.
       const options = [...items.slice(1), items[0]];
       return { options, answer: items };
@@ -512,7 +609,8 @@ export class EditExamPage implements OnInit {
       return { options: { tokens }, answer };
     }
     if (kind === 'HOTSPOT') {
-      if (!d.regions.length) return { error: 'HOTSPOT needs at least one region (draw on the image or add manually).' };
+      if (!d.regions.length)
+        return { error: 'HOTSPOT needs at least one region (draw on the image or add manually).' };
       if (!d.hotspotAnswer || !d.regions.some((r) => r.id === d.hotspotAnswer)) {
         return { error: 'Select which region is the correct answer.' };
       }
@@ -532,21 +630,21 @@ export class EditExamPage implements OnInit {
   // ── Type switching ──────────────────────────────────────────
 
   onTypeChange(d: QuestionDraft, type: string): void {
-    d.type = type;
-    const kind = this.kindOf(d);
+    const patch: Partial<QuestionDraft> = { type };
+    const kind = kindFromType(type);
     if (kind === 'CLOZE' && d.clozeBlanks.length === 0) {
-      d.clozeBlanks = [{ label: 'Blank 1', choicesText: '', answer: '' }];
+      patch.clozeBlanks = [{ label: 'Blank 1', choicesText: '', answer: '' }];
     }
     if (kind === 'BOWTIE' && d.bowtieCategories.length === 0) {
-      d.bowtieCategories = [{ name: 'Category 1', count: 1, choicesText: '', answer: [] }];
+      patch.bowtieCategories = [{ name: 'Category 1', count: 1, choicesText: '', answer: [] }];
     }
     if (kind === 'HIGHLIGHT' && d.highlightTokens.length === 0) {
-      d.highlightTokens = [
+      patch.highlightTokens = [
         { text: '', correct: false },
         { text: '', correct: false },
       ];
     }
-    this.bump();
+    this.updateDraft(d.id, patch);
   }
 
   // ── MATRIX helpers ──────────────────────────────────────────
@@ -565,25 +663,40 @@ export class EditExamPage implements OnInit {
 
   toggleMatrixAnswer(d: QuestionDraft, rowIdx: number, col: string): void {
     const key = String(rowIdx);
-    const sel = [...(d.matrixAnswer[key] ?? [])];
+    const matrixAnswer = { ...d.matrixAnswer };
+    const sel = [...(matrixAnswer[key] ?? [])];
     const i = sel.indexOf(col);
     if (i >= 0) sel.splice(i, 1);
     else sel.push(col);
-    if (sel.length) d.matrixAnswer[key] = sel;
-    else delete d.matrixAnswer[key];
-    this.bump();
+    if (sel.length) matrixAnswer[key] = sel;
+    else delete matrixAnswer[key];
+    this.updateDraft(d.id, { matrixAnswer });
   }
 
   // ── CLOZE helpers ───────────────────────────────────────────
 
+  setClozeField<K extends keyof ClozeBlankDraft>(
+    d: QuestionDraft,
+    bi: number,
+    key: K,
+    value: ClozeBlankDraft[K],
+  ): void {
+    this.updateDraft(d.id, {
+      clozeBlanks: d.clozeBlanks.map((b, i) => (i === bi ? { ...b, [key]: value } : b)),
+    });
+  }
+
   addClozeBlank(d: QuestionDraft): void {
-    d.clozeBlanks.push({ label: `Blank ${d.clozeBlanks.length + 1}`, choicesText: '', answer: '' });
-    this.bump();
+    this.updateDraft(d.id, {
+      clozeBlanks: [
+        ...d.clozeBlanks,
+        { label: `Blank ${d.clozeBlanks.length + 1}`, choicesText: '', answer: '' },
+      ],
+    });
   }
 
   removeClozeBlank(d: QuestionDraft, index: number): void {
-    d.clozeBlanks.splice(index, 1);
-    this.bump();
+    this.updateDraft(d.id, { clozeBlanks: d.clozeBlanks.filter((_, i) => i !== index) });
   }
 
   clozeChoiceLines(b: ClozeBlankDraft): string[] {
@@ -592,14 +705,33 @@ export class EditExamPage implements OnInit {
 
   // ── BOWTIE helpers ──────────────────────────────────────────
 
+  setBowtieField<K extends keyof BowtieCategoryDraft>(
+    d: QuestionDraft,
+    ci: number,
+    key: K,
+    value: BowtieCategoryDraft[K],
+  ): void {
+    this.updateDraft(d.id, {
+      bowtieCategories: d.bowtieCategories.map((c, i) => (i === ci ? { ...c, [key]: value } : c)),
+    });
+  }
+
   addBowtieCategory(d: QuestionDraft): void {
-    d.bowtieCategories.push({ name: `Category ${d.bowtieCategories.length + 1}`, count: 1, choicesText: '', answer: [] });
-    this.bump();
+    this.updateDraft(d.id, {
+      bowtieCategories: [
+        ...d.bowtieCategories,
+        {
+          name: `Category ${d.bowtieCategories.length + 1}`,
+          count: 1,
+          choicesText: '',
+          answer: [],
+        },
+      ],
+    });
   }
 
   removeBowtieCategory(d: QuestionDraft, index: number): void {
-    d.bowtieCategories.splice(index, 1);
-    this.bump();
+    this.updateDraft(d.id, { bowtieCategories: d.bowtieCategories.filter((_, i) => i !== index) });
   }
 
   bowtieChoiceLines(c: BowtieCategoryDraft): string[] {
@@ -610,23 +742,38 @@ export class EditExamPage implements OnInit {
     return c.answer.includes(choice);
   }
 
-  toggleBowtieAnswer(c: BowtieCategoryDraft, choice: string): void {
-    const i = c.answer.indexOf(choice);
-    if (i >= 0) c.answer.splice(i, 1);
-    else c.answer.push(choice);
-    this.bump();
+  toggleBowtieAnswer(d: QuestionDraft, ci: number, choice: string): void {
+    const cat = d.bowtieCategories[ci];
+    const answer = cat.answer.includes(choice)
+      ? cat.answer.filter((a) => a !== choice)
+      : [...cat.answer, choice];
+    this.setBowtieField(d, ci, 'answer', answer);
   }
 
   // ── HIGHLIGHT helpers ───────────────────────────────────────
 
+  setTokenText(d: QuestionDraft, ti: number, text: string): void {
+    this.updateDraft(d.id, {
+      highlightTokens: d.highlightTokens.map((t, i) => (i === ti ? { ...t, text } : t)),
+    });
+  }
+
+  toggleTokenCorrect(d: QuestionDraft, ti: number): void {
+    this.updateDraft(d.id, {
+      highlightTokens: d.highlightTokens.map((t, i) =>
+        i === ti ? { ...t, correct: !t.correct } : t,
+      ),
+    });
+  }
+
   addHighlightToken(d: QuestionDraft): void {
-    d.highlightTokens.push({ text: '', correct: false });
-    this.bump();
+    this.updateDraft(d.id, {
+      highlightTokens: [...d.highlightTokens, { text: '', correct: false }],
+    });
   }
 
   removeHighlightToken(d: QuestionDraft, index: number): void {
-    d.highlightTokens.splice(index, 1);
-    this.bump();
+    this.updateDraft(d.id, { highlightTokens: d.highlightTokens.filter((_, i) => i !== index) });
   }
 
   // ── HOTSPOT region drawing ──────────────────────────────────
@@ -636,6 +783,10 @@ export class EditExamPage implements OnInit {
     const x = Math.min(100, Math.max(0, ((ev.clientX - rect.left) / rect.width) * 100));
     const y = Math.min(100, Math.max(0, ((ev.clientY - rect.top) / rect.height) * 100));
     return { x, y };
+  }
+
+  private currentDraft(id: number): QuestionDraft | undefined {
+    return this.drafts().find((d) => d.id === id);
   }
 
   startRegionDraw(ev: MouseEvent, d: QuestionDraft, wrap: HTMLElement): void {
@@ -650,51 +801,74 @@ export class EditExamPage implements OnInit {
       w: 0,
       h: 0,
     };
-    d.regions.push(region);
-    this.drawing = { draft: d, startX: x, startY: y, region };
-    this.bump();
+    this.updateDraft(d.id, { regions: [...d.regions, region] });
+    this.drawing = { draftId: d.id, regionId: region.id, startX: x, startY: y };
   }
 
   moveRegionDraw(ev: MouseEvent, wrap: HTMLElement): void {
     if (!this.drawing) return;
+    const { draftId, regionId, startX, startY } = this.drawing;
+    const d = this.currentDraft(draftId);
+    if (!d) return;
     const { x, y } = this.relativePercent(ev, wrap);
-    const { startX, startY, region } = this.drawing;
-    region.x = Math.min(startX, x);
-    region.y = Math.min(startY, y);
-    region.w = Math.abs(x - startX);
-    region.h = Math.abs(y - startY);
-    this.bump();
+    this.updateDraft(draftId, {
+      regions: d.regions.map((r) =>
+        r.id === regionId
+          ? {
+              ...r,
+              x: Math.min(startX, x),
+              y: Math.min(startY, y),
+              w: Math.abs(x - startX),
+              h: Math.abs(y - startY),
+            }
+          : r,
+      ),
+    });
   }
 
   endRegionDraw(): void {
     if (!this.drawing) return;
-    const { draft, region } = this.drawing;
+    const { draftId, regionId } = this.drawing;
     this.drawing = null;
+    const d = this.currentDraft(draftId);
+    const region = d?.regions.find((r) => r.id === regionId);
+    if (!d || !region) return;
     // Discard accidental clicks (tiny regions)
     if (region.w < 2 || region.h < 2) {
-      draft.regions = draft.regions.filter((r) => r.id !== region.id);
-    } else if (!draft.hotspotAnswer) {
-      draft.hotspotAnswer = region.id;
+      this.updateDraft(draftId, { regions: d.regions.filter((r) => r.id !== regionId) });
+    } else if (!d.hotspotAnswer) {
+      this.updateDraft(draftId, { hotspotAnswer: regionId });
     }
-    this.bump();
+  }
+
+  setRegionLabel(d: QuestionDraft, ri: number, label: string): void {
+    this.updateDraft(d.id, {
+      regions: d.regions.map((r, i) => (i === ri ? { ...r, label } : r)),
+    });
   }
 
   removeRegion(d: QuestionDraft, index: number): void {
-    const removed = d.regions.splice(index, 1)[0];
-    if (removed && d.hotspotAnswer === removed.id) d.hotspotAnswer = '';
-    this.bump();
+    const removed = d.regions[index];
+    this.updateDraft(d.id, {
+      regions: d.regions.filter((_, i) => i !== index),
+      hotspotAnswer: removed && d.hotspotAnswer === removed.id ? '' : d.hotspotAnswer,
+    });
   }
 
   addManualRegion(d: QuestionDraft): void {
-    d.regions.push({
-      id: `r${Date.now().toString(36)}`,
-      label: `Region ${d.regions.length + 1}`,
-      x: 10,
-      y: 10,
-      w: 30,
-      h: 20,
+    this.updateDraft(d.id, {
+      regions: [
+        ...d.regions,
+        {
+          id: `r${Date.now().toString(36)}`,
+          label: `Region ${d.regions.length + 1}`,
+          x: 10,
+          y: 10,
+          w: 30,
+          h: 20,
+        },
+      ],
     });
-    this.bump();
   }
 
   // ── Image upload ────────────────────────────────────────────
@@ -703,19 +877,16 @@ export class EditExamPage implements OnInit {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-    d.uploading = true;
-    d.error = '';
-    this.bump();
+    this.setFlag(this.uploading, d.id, true);
+    this.setError(d.id, '');
     this.examService.uploadQuestionImage(d.id, file).subscribe({
       next: (res) => {
-        d.image = res.image;
-        d.uploading = false;
-        this.bump();
+        this.updateDraft(d.id, { image: res.image });
+        this.setFlag(this.uploading, d.id, false);
       },
       error: (err) => {
-        d.uploading = false;
-        d.error = err?.error?.detail || 'Image upload failed.';
-        this.bump();
+        this.setFlag(this.uploading, d.id, false);
+        this.setError(d.id, err?.error?.detail || 'Image upload failed.');
       },
     });
     input.value = '';
@@ -723,34 +894,28 @@ export class EditExamPage implements OnInit {
 
   removeImage(d: QuestionDraft): void {
     this.examService.deleteQuestionImage(d.id).subscribe({
-      next: () => {
-        d.image = null;
-        this.bump();
-      },
-      error: () => {
-        d.error = 'Could not remove the image.';
-        this.bump();
-      },
+      next: () => this.updateDraft(d.id, { image: null }),
+      error: () => this.setError(d.id, 'Could not remove the image.'),
     });
   }
 
   // ── Save / delete / add ─────────────────────────────────────
 
-  save(d: QuestionDraft): void {
-    d.error = '';
+  save(clicked: QuestionDraft): void {
+    // Re-read the current draft — the object captured at click time may predate the
+    // latest copy-on-write replacement.
+    const d = this.currentDraft(clicked.id) ?? clicked;
+    this.setError(d.id, '');
     if (!d.question.trim()) {
-      d.error = 'Question text cannot be empty.';
-      this.bump();
+      this.setError(d.id, 'Question text cannot be empty.');
       return;
     }
     const serialized = this.serialize(d);
     if ('error' in serialized) {
-      d.error = serialized.error;
-      this.bump();
+      this.setError(d.id, serialized.error);
       return;
     }
-    d.saving = true;
-    this.bump();
+    this.setFlag(this.saving, d.id, true);
     this.examService
       .updateQuestion(this.examId, d.id, {
         number: d.number,
@@ -764,18 +929,18 @@ export class EditExamPage implements OnInit {
       })
       .subscribe({
         next: () => {
-          d.saving = false;
-          d.saved = true;
-          this.bump();
-          setTimeout(() => {
-            d.saved = false;
-            this.bump();
-          }, 2000);
+          this.setFlag(this.saving, d.id, false);
+          this.setFlag(this.saved, d.id, true);
+          const existing = this.savedTimers.get(d.id);
+          if (existing) clearTimeout(existing);
+          this.savedTimers.set(
+            d.id,
+            setTimeout(() => this.setFlag(this.saved, d.id, false), 2000),
+          );
         },
         error: (err) => {
-          d.saving = false;
-          d.error = err?.error?.detail || 'Save failed.';
-          this.bump();
+          this.setFlag(this.saving, d.id, false);
+          this.setError(d.id, err?.error?.detail || 'Save failed.');
         },
       });
   }
@@ -784,10 +949,7 @@ export class EditExamPage implements OnInit {
     if (!confirm(`Delete question #${d.number}? This cannot be undone.`)) return;
     this.examService.deleteQuestion(this.examId, d.id).subscribe({
       next: () => this.drafts.update((list) => list.filter((x) => x.id !== d.id)),
-      error: () => {
-        d.error = 'Delete failed.';
-        this.bump();
-      },
+      error: (err) => this.setError(d.id, err?.error?.detail || 'Delete failed.'),
     });
   }
 
@@ -807,13 +969,13 @@ export class EditExamPage implements OnInit {
       .subscribe({
         next: (q) => {
           const draft = this.toDraft(q);
-          draft.expanded = true;
           this.drafts.update((list) => [...list, draft]);
+          this.expanded.set({ ...this.expanded(), [draft.id]: true });
           this.addingQuestion.set(false);
         },
-        error: () => {
+        error: (err) => {
           this.addingQuestion.set(false);
-          alert('Could not add a question.');
+          alert(err?.error?.detail || 'Could not add a question.');
         },
       });
   }

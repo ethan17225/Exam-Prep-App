@@ -1,27 +1,35 @@
 from typing import Annotated, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
+from src.attempts.constants import AttemptMode
 from src.constants import MAX_INT, MAX_QUESTIONS_PER_EXAM
+from src.identifiers import ID_LENGTH
+from src.schemas import ISODateTime
 
 
 class AnswerSubmission(BaseModel):
     question_number: int = Field(ge=0, le=MAX_INT)
     answer: Any = None
+    # Honoured only in practice mode — a graded run cannot self-mark.
     fib_correct: bool | None = None
 
 
 class ExamSubmission(BaseModel):
-    exam_id: str = Field(max_length=8)
+    exam_id: str = Field(max_length=ID_LENGTH)
     answers: list[AnswerSubmission] = Field(max_length=MAX_QUESTIONS_PER_EXAM)
+    # Ignored for graded attempts: the server computes elapsed time from the
+    # attempt's started_at, which the client cannot influence.
     time_spent_seconds: int = Field(ge=0, le=MAX_INT)
-    mode: str = Field(default="exam", max_length=10)
+    mode: AttemptMode = AttemptMode.EXAM
+    # Ignored for graded attempts: it let a student grade only the questions they
+    # answered correctly, since `total` was the size of the chosen subset.
     question_numbers: list[int] | None = Field(default=None, max_length=MAX_QUESTIONS_PER_EXAM)
 
 
 class SaveProgressPayload(BaseModel):
-    exam_id: str = Field(max_length=8)
-    mode: str = Field(default="exam", max_length=10)
+    exam_id: str = Field(max_length=ID_LENGTH)
+    mode: AttemptMode = AttemptMode.EXAM
     # Keys are question numbers. Constraining them here stops a non-numeric key
     # from wedging the admin dashboard's int() conversion for every instructor.
     answers: dict[Annotated[int, Field(ge=0, le=MAX_INT)], Any]
@@ -32,6 +40,8 @@ class SaveProgressPayload(BaseModel):
 
 
 class InProgressOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     exam_id: str
     exam_title: str
@@ -43,11 +53,15 @@ class InProgressOut(BaseModel):
     current_page: int
     total_questions: int
     answered_count: int
-    started_at: str | None
-    saved_at: str
+    started_at: ISODateTime | None
+    saved_at: ISODateTime
 
 
 class HistorySummaryOut(BaseModel):
+    """Everything the history list renders, minus the heavy `results` blob."""
+
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     exam_id: str
     exam_title: str
@@ -57,12 +71,13 @@ class HistorySummaryOut(BaseModel):
     passed: bool
     time_spent_seconds: int
     mode: str
-    taken_at: str
+    over_time: bool
+    taken_at: ISODateTime
 
 
 class HistoryOut(HistorySummaryOut):
     """Full record, including the per-question results blob. Returned only for a
-    single record — the list endpoint would be a 100 MB response."""
+    single record — the list endpoint would be a multi-megabyte response."""
 
     results: Any
 
@@ -72,7 +87,3 @@ class TopicStatOut(BaseModel):
     total: int
     correct: int
     score: int
-
-
-class DeletedOut(BaseModel):
-    deleted: bool

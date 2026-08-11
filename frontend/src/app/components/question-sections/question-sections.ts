@@ -34,8 +34,10 @@ export class QuestionSectionsComponent {
   hasSections = computed(() => this.visibleSections().length > 0);
   isTabbed = computed(() => this.visibleSections().length > 1);
 
-  expanded = computed(() => (this.manuallyToggled() ? this.userExpanded() : !this.startCollapsed()));
   private userExpanded = signal(true);
+  expanded = computed(() =>
+    this.manuallyToggled() ? this.userExpanded() : !this.startCollapsed(),
+  );
 
   activeSection = computed(() => {
     const list = this.visibleSections();
@@ -66,10 +68,6 @@ export class QuestionSectionsComponent {
 
   asText(block: SectionBlock): TextBlock {
     return block as TextBlock;
-  }
-
-  asList(block: SectionBlock): ListBlock {
-    return block as ListBlock;
   }
 
   asTable(block: SectionBlock): TableBlock {

@@ -21,6 +21,12 @@ body {
   min-height: 100vh;
 }
 
+// Keyboard focus must stay visible everywhere; mouse clicks stay outline-free.
+:focus-visible {
+  outline: 2px solid #4361ee;
+  outline-offset: 2px;
+}
+
 // ── Shared utility classes ──────────────────────────────────────
 
 .btn {
@@ -34,7 +40,9 @@ body {
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
+  transition:
+    background 0.15s,
+    opacity 0.15s;
 
   &:disabled {
     opacity: 0.45;
@@ -45,25 +53,33 @@ body {
 .btn-primary {
   background: #111;
   color: #fff;
-  &:hover:not(:disabled) { background: #333; }
+  &:hover:not(:disabled) {
+    background: #333;
+  }
 }
 
 .btn-secondary {
   background: #e8e8e8;
   color: #333;
-  &:hover:not(:disabled) { background: #ddd; }
+  &:hover:not(:disabled) {
+    background: #ddd;
+  }
 }
 
 .btn-danger {
   background: #fee;
   color: #c00;
-  &:hover:not(:disabled) { background: #fdd; }
+  &:hover:not(:disabled) {
+    background: #fdd;
+  }
 }
 
 .btn-success {
   background: #e6f9ed;
   color: #0a7;
-  &:hover:not(:disabled) { background: #cef5dc; }
+  &:hover:not(:disabled) {
+    background: #cef5dc;
+  }
 }
 
 .card {
@@ -93,10 +109,22 @@ body {
   color: #c00;
 }
 
-.badge-mcq { background: #eef; color: #44c; }
-.badge-sata { background: #fef4e6; color: #b80; }
-.badge-fib { background: #e8f8f5; color: #088; }
-.badge-other { background: #fff3e0; color: #b45309; }
+.badge-mcq {
+  background: #eef;
+  color: #44c;
+}
+.badge-sata {
+  background: #fef4e6;
+  color: #b80;
+}
+.badge-fib {
+  background: #e8f8f5;
+  color: #088;
+}
+.badge-other {
+  background: #fff3e0;
+  color: #b45309;
+}
 
 .page-title {
   font-size: 1.4rem;
@@ -113,10 +141,10 @@ body {
 }
 
 textarea,
-input[type="text"],
-input[type="number"],
-input[type="email"],
-input[type="password"] {
+input[type='text'],
+input[type='number'],
+input[type='email'],
+input[type='password'] {
   width: 100%;
   padding: 0.6rem 0.8rem;
   border: 1px solid #ddd;
@@ -126,7 +154,6 @@ input[type="password"] {
   transition: border-color 0.15s;
 
   &:focus {
-    outline: none;
     border-color: #111;
   }
 }
@@ -149,7 +176,6 @@ select {
   transition: border-color 0.15s;
 
   &:focus {
-    outline: none;
     border-color: #111;
   }
 }
@@ -214,10 +240,10 @@ select {
   }
 
   textarea,
-  input[type="text"],
-  input[type="number"],
-  input[type="email"],
-  input[type="password"] {
+  input[type='text'],
+  input[type='number'],
+  input[type='email'],
+  input[type='password'] {
     min-height: 44px;
     font-size: 1rem; // prevents iOS zoom on focus
   }

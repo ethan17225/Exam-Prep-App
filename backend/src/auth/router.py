@@ -1,11 +1,18 @@
+import logging
+
 from fastapi import APIRouter, Response, status
 
 from src.auth import service
 from src.auth.constants import AUTH_COOKIE
 from src.auth.dependencies import CurrentUserDep
 from src.auth.exceptions import BadCredentials, EmailTaken, InvalidInviteCode, RegistrationClosed
-from src.auth.schemas import LoginIn, LogoutOut, RegisterIn, TokenOut, UserOut
+from src.auth.schemas import LoginIn, LogoutOut, PasswordChangeIn, RegisterIn, TokenOut, UserOut
+from src.config import settings
 from src.database import SessionDep
+
+# Auth outcomes are the only forensic record this app keeps. Without them a
+# password-spray run or an account takeover leaves nothing behind.
+logger = logging.getLogger("mcq.auth")
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -28,6 +35,7 @@ async def register(payload: RegisterIn, db: SessionDep):
     # FastAPI passes it through untouched — including its 200 status. Declaring
     # status_code=201 here would be a lie, as it was before this refactor.
     user = await service.register(payload, db)
+    logger.info("register ok user=%s", user.id)
     return service.login_response(user)
 
 
@@ -39,7 +47,13 @@ async def register(payload: RegisterIn, db: SessionDep):
     responses={status.HTTP_401_UNAUTHORIZED: {"description": BadCredentials.DETAIL}},
 )
 async def login(payload: LoginIn, db: SessionDep):
-    user = await service.authenticate(payload, db)
+    try:
+        user = await service.authenticate(payload, db)
+    except BadCredentials:
+        # Deliberately logs the attempted address, not the password.
+        logger.warning("login failed email=%s", payload.email)
+        raise
+    logger.info("login ok user=%s", user.id)
     return service.login_response(user)
 
 
@@ -50,8 +64,34 @@ async def login(payload: LoginIn, db: SessionDep):
     description="Clears the auth cookie. The bearer token is discarded client-side.",
 )
 async def logout(response: Response) -> LogoutOut:
-    response.delete_cookie(AUTH_COOKIE, path="/")
+    # Attributes must match the ones used at set time or some browsers keep the
+    # cookie. The bearer token is discarded client-side.
+    response.delete_cookie(
+        AUTH_COOKIE,
+        path="/",
+        httponly=True,
+        secure=settings.environment != "local",
+        samesite="lax",
+    )
     return LogoutOut(ok=True)
+
+
+@router.post(
+    "/password",
+    response_model=TokenOut,
+    summary="Change your password",
+    description=(
+        "Requires the current password. Every existing token for the account is "
+        "revoked, including the caller's — the response carries a fresh one."
+    ),
+    responses={status.HTTP_401_UNAUTHORIZED: {"description": BadCredentials.DETAIL}},
+)
+async def change_password(payload: PasswordChangeIn, user: CurrentUserDep, db: SessionDep):
+    if not await service.verify_password(payload.current_password, user.password_hash):
+        raise BadCredentials()
+    await service.change_password(user, payload.new_password, db)
+    logger.info("password changed user=%s (all tokens revoked)", user.id)
+    return service.login_response(user)
 
 
 @router.get(
@@ -61,4 +101,4 @@ async def logout(response: Response) -> LogoutOut:
     description="Returns the authenticated user's id, email and role.",
 )
 async def read_me(user: CurrentUserDep):
-    return service.user_to_dict(user)
+    return user

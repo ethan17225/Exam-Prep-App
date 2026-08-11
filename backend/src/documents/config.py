@@ -1,12 +1,12 @@
 from pathlib import Path
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
-from src.config import BASE_DIR
+from src.config import BASE_DIR, load_settings, settings_config
 
 
 class DocumentsConfig(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="DOCS_", env_file=BASE_DIR / ".env", extra="ignore")
+    model_config = settings_config("DOCS_")
 
     # Must resolve to /app/Docs in Docker — that is where the `docs` volume is
     # mounted. Deriving it from this module's __file__ would put it inside the
@@ -14,4 +14,4 @@ class DocumentsConfig(BaseSettings):
     root: Path = BASE_DIR / "Docs"
 
 
-documents_settings = DocumentsConfig()
+documents_settings = load_settings(DocumentsConfig)

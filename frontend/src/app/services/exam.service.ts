@@ -97,7 +97,14 @@ export type QuestionKind =
   | 'HIGHLIGHT'
   | 'HOTSPOT';
 
-export const ADVANCED_KINDS: QuestionKind[] = ['MATRIX', 'CLOZE', 'BOWTIE', 'RANKING', 'HIGHLIGHT', 'HOTSPOT'];
+export const ADVANCED_KINDS: QuestionKind[] = [
+  'MATRIX',
+  'CLOZE',
+  'BOWTIE',
+  'RANKING',
+  'HIGHLIGHT',
+  'HOTSPOT',
+];
 
 export interface QuestionTypeCounts {
   mcq: number;
@@ -107,17 +114,27 @@ export interface QuestionTypeCounts {
 }
 
 /** Classify a question the same way as take-exam and server grading. */
-export function classifyQuestionType(q: { type: string; options?: QuestionOptions | null }): QuestionKind {
+export function classifyQuestionType(q: {
+  type: string;
+  options?: QuestionOptions | null;
+}): QuestionKind {
   const t = (q.type ?? '').trim().toUpperCase();
   if ((ADVANCED_KINDS as string[]).includes(t)) return t as QuestionKind;
   if (t === 'SATA') return 'SATA';
-  if (t === 'FIB' || t === 'FILL-IN-THE-BLANK' || !q.options || (Array.isArray(q.options) && q.options.length === 0)) {
+  if (
+    t === 'FIB' ||
+    t === 'FILL-IN-THE-BLANK' ||
+    !q.options ||
+    (Array.isArray(q.options) && q.options.length === 0)
+  ) {
     return 'FIB';
   }
   return 'MCQ';
 }
 
-export function countQuestionTypes<T extends { type: string; options?: QuestionOptions | null }>(questions: T[]): QuestionTypeCounts {
+export function countQuestionTypes<T extends { type: string; options?: QuestionOptions | null }>(
+  questions: T[],
+): QuestionTypeCounts {
   const out: QuestionTypeCounts = { mcq: 0, sata: 0, fib: 0, other: 0 };
   for (const q of questions) {
     const g = classifyQuestionType(q);
@@ -220,6 +237,165 @@ export function formatAnswerForDisplay(
   return String(ans) || '—';
 }
 
+// ── Shared page helpers ─────────────────────────────────────────
+
+/** One date format app-wide: locale date + time. */
+export function formatDate(iso: string): string {
+  return new Date(iso).toLocaleString();
+}
+
+/** Compact human duration: "1h 5m", "5m 3s", "42s". */
+export function formatDuration(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const hrs = Math.floor(s / 3600);
+  const mins = Math.floor((s % 3600) / 60);
+  const secs = s % 60;
+  if (hrs > 0) return `${hrs}h ${mins}m`;
+  if (mins > 0) return `${mins}m ${secs}s`;
+  return `${secs}s`;
+}
+
+/** HH:MM:SS, for countdown timers. */
+export function formatClock(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
+}
+
+/** Fisher–Yates, non-mutating. */
+export function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** Answered-so-far percentage for an in-progress attempt. */
+export function progressPercent(record: {
+  answered_count: number;
+  total_questions: number;
+}): number {
+  if (record.total_questions === 0) return 0;
+  return Math.round((record.answered_count / record.total_questions) * 100);
+}
+
+/** Kind from the type string alone — for editors where the type dropdown, not the options shape, is authoritative. */
+export function kindFromType(type: string): QuestionKind {
+  const t = (type ?? '').trim().toUpperCase();
+  if ((ADVANCED_KINDS as string[]).includes(t)) return t as QuestionKind;
+  if (t === 'SATA') return 'SATA';
+  if (t === 'FIB' || t === 'FILL-IN-THE-BLANK') return 'FIB';
+  return 'MCQ';
+}
+
+// ── Client-side grading ─────────────────────────────────────────
+// Port of backend/src/grading/service.py (grade_question) + utils.py. Practice-mode
+// feedback must agree with the graded score, so any change there changes here.
+
+/** Unordered comparison — SATA, HIGHLIGHT. Accepts a list or a comma-separated string. */
+function normStrSet(values: unknown): Set<string> {
+  if (values === null || values === undefined) return new Set();
+  if (Array.isArray(values)) {
+    return new Set(values.map((v) => String(v).trim()).filter(Boolean));
+  }
+  const s = String(values).trim();
+  return new Set(
+    s
+      ? s
+          .split(',')
+          .map((p) => p.trim())
+          .filter(Boolean)
+      : [],
+  );
+}
+
+/** Ordered comparison — CLOZE, RANKING. */
+function normStrList(values: unknown): string[] {
+  if (values === null || values === undefined) return [];
+  if (Array.isArray(values)) return values.map((v) => String(v).trim());
+  return [String(values).trim()];
+}
+
+/** MATRIX/BOWTIE answers: key -> set of selections. */
+function groupedAnswerMap(value: unknown): Record<string, Set<string>> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const out: Record<string, Set<string>> = {};
+  for (const [k, v] of Object.entries(value)) {
+    const selections = normStrSet(v);
+    if (selections.size) out[String(k).trim()] = selections;
+  }
+  return out;
+}
+
+function setsEqual(a: Set<string>, b: Set<string>): boolean {
+  return a.size === b.size && [...a].every((x) => b.has(x));
+}
+
+/**
+ * True when `userAnswer` grades correct under the backend's rules.
+ * FIB self-marking (practice mode) is the caller's concern — this implements the
+ * server's fallback FIB matching (float equality, then fuzzy substring).
+ */
+export function isAnswerCorrect(q: Question, userAnswer: AnswerValue | null | undefined): boolean {
+  const expected = q.answer;
+  if (expected === undefined || expected === null) return false;
+  const kind = classifyQuestionType(q);
+
+  if (kind === 'MATRIX' || kind === 'BOWTIE') {
+    const user = groupedAnswerMap(userAnswer);
+    const exp = groupedAnswerMap(expected);
+    const keys = Object.keys(exp);
+    if (keys.length !== Object.keys(user).length) return false;
+    return keys.every((k) => user[k] !== undefined && setsEqual(exp[k], user[k]));
+  }
+
+  if (kind === 'CLOZE') {
+    const user = normStrList(Array.isArray(userAnswer) ? userAnswer : null);
+    const exp = normStrList(expected);
+    return (
+      user.length === exp.length && user.every((u, i) => u.toLowerCase() === exp[i].toLowerCase())
+    );
+  }
+
+  if (kind === 'RANKING') {
+    const user = normStrList(Array.isArray(userAnswer) ? userAnswer : null);
+    const exp = normStrList(expected);
+    return user.length === exp.length && user.every((u, i) => u === exp[i]);
+  }
+
+  if (kind === 'HIGHLIGHT') {
+    return setsEqual(normStrSet(userAnswer), normStrSet(expected));
+  }
+
+  if (kind === 'HOTSPOT') {
+    const user = String(userAnswer ?? '').trim();
+    return user !== '' && user === String(expected).trim();
+  }
+
+  if (kind === 'SATA') {
+    return setsEqual(normStrSet(expected), normStrSet(userAnswer));
+  }
+
+  if (kind === 'FIB') {
+    const user = String(userAnswer ?? '')
+      .trim()
+      .toLowerCase();
+    const exp = String(expected).trim().toLowerCase();
+    const uf = Number(user);
+    const ef = Number(exp);
+    if (user !== '' && exp !== '' && Number.isFinite(uf) && Number.isFinite(ef)) return uf === ef;
+    return (
+      user === exp ||
+      (user.length >= 3 && exp.includes(user)) ||
+      (exp.length >= 3 && user.includes(exp))
+    );
+  }
+
+  return String(userAnswer ?? '').trim() === String(expected).trim();
+}
+
 export interface Course {
   id: string;
   name: string;
@@ -247,6 +423,10 @@ export interface ExamSummary {
   course_id: string | null;
   course_name: string | null;
   time_limit_minutes: number | null;
+  /** Practice mode reveals the answer key, so a graded exam has this off. */
+  allow_practice: boolean;
+  /** Only the owner may rename, edit, delete or re-flag an exam. */
+  is_owner: boolean;
   total_questions: number;
   mcq_count: number;
   sata_count: number;
@@ -260,6 +440,14 @@ export interface ExamDetail {
   title: string;
   course_name?: string | null;
   time_limit_minutes?: number | null;
+  /**
+   * Whether `answer`/`rationale` are present on the questions below. The server
+   * withholds them unless you own the exam or practice is allowed, so never
+   * infer it from a field being missing.
+   */
+  answers_included: boolean;
+  allow_practice: boolean;
+  is_owner: boolean;
   questions: Question[];
 }
 
@@ -305,6 +493,8 @@ export interface ExamResultSummary {
   passed: boolean;
   time_spent_seconds: number;
   mode: string;
+  /** Submitted after the time limit; graded against the last pre-deadline save. */
+  over_time: boolean;
   taken_at: string;
 }
 
@@ -372,7 +562,12 @@ export class ExamService {
 
   constructor(private http: HttpClient) {}
 
-  createExam(title: string, questions: Question[], courseId?: string, timeLimitMinutes?: number | null): Observable<{ exam_id: string; total_questions: number }> {
+  createExam(
+    title: string,
+    questions: Question[],
+    courseId?: string,
+    timeLimitMinutes?: number | null,
+  ): Observable<{ exam_id: string; total_questions: number }> {
     const body: Record<string, unknown> = { title, questions };
     if (courseId) body['course_id'] = courseId;
     if (timeLimitMinutes) body['time_limit_minutes'] = timeLimitMinutes;
@@ -404,7 +599,7 @@ export class ExamService {
     return this.http.get<DocumentContent>(`${this.base}/documents/html`, { params });
   }
 
-  getExam(id: string, includeAnswers: boolean = false): Observable<ExamDetail> {
+  getExam(id: string, includeAnswers = false): Observable<ExamDetail> {
     const params = includeAnswers ? '?include_answers=true' : '';
     return this.http.get<ExamDetail>(`${this.base}/exams/${id}${params}`);
   }
@@ -438,7 +633,15 @@ export class ExamService {
   }
 
   updateTimeLimit(id: string, timeLimitMinutes: number | null): Observable<ExamSummary> {
-    return this.http.patch<ExamSummary>(`${this.base}/exams/${id}/time-limit`, { time_limit_minutes: timeLimitMinutes });
+    return this.http.patch<ExamSummary>(`${this.base}/exams/${id}/time-limit`, {
+      time_limit_minutes: timeLimitMinutes,
+    });
+  }
+
+  updateAllowPractice(id: string, allowPractice: boolean): Observable<ExamSummary> {
+    return this.http.patch<ExamSummary>(`${this.base}/exams/${id}/allow-practice`, {
+      allow_practice: allowPractice,
+    });
   }
 
   saveProgress(payload: SaveProgressPayload): Observable<InProgressExam> {
@@ -457,8 +660,10 @@ export class ExamService {
     return this.http.delete<{ deleted: boolean }>(`${this.base}/in-progress/${id}`);
   }
 
-  deleteInProgressByExam(examId: string, mode: string = 'exam'): Observable<{ deleted: boolean }> {
-    return this.http.delete<{ deleted: boolean }>(`${this.base}/in-progress/by-exam/${examId}?mode=${mode}`);
+  deleteInProgressByExam(examId: string, mode = 'exam'): Observable<{ deleted: boolean }> {
+    return this.http.delete<{ deleted: boolean }>(
+      `${this.base}/in-progress/by-exam/${examId}?mode=${mode}`,
+    );
   }
 
   getAdminDashboard(): Observable<AdminDashboardItem[]> {
@@ -471,12 +676,18 @@ export class ExamService {
     return this.http.post<Question>(`${this.base}/exams/${examId}/questions`, question);
   }
 
-  updateQuestion(examId: string, questionId: number, patch: Partial<Question>): Observable<Question> {
+  updateQuestion(
+    examId: string,
+    questionId: number,
+    patch: Partial<Question>,
+  ): Observable<Question> {
     return this.http.patch<Question>(`${this.base}/exams/${examId}/questions/${questionId}`, patch);
   }
 
   deleteQuestion(examId: string, questionId: number): Observable<{ deleted: boolean }> {
-    return this.http.delete<{ deleted: boolean }>(`${this.base}/exams/${examId}/questions/${questionId}`);
+    return this.http.delete<{ deleted: boolean }>(
+      `${this.base}/exams/${examId}/questions/${questionId}`,
+    );
   }
 
   uploadQuestionImage(questionId: number, file: File): Observable<{ image: string }> {

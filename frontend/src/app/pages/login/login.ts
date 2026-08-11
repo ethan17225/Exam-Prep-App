@@ -24,7 +24,11 @@ export class LoginPage implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') || '/overview';
+    const requested = this.route.snapshot.queryParamMap.get('returnUrl') || '/overview';
+    // Only same-origin absolute paths. `//evil.example` is a protocol-relative
+    // URL, so reject a leading `//` — otherwise a phishing link could bounce the
+    // user off-site after login.
+    this.returnUrl = requested.startsWith('/') && !requested.startsWith('//') ? requested : '/overview';
     if (this.auth.isLoggedIn()) {
       this.router.navigateByUrl(this.returnUrl);
     }

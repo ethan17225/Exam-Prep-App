@@ -51,9 +51,13 @@ app = FastAPI(**app_kwargs)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     """Log the traceback and answer with JSON.
 
-    Starlette's default 500 is bare text/plain emitted outside CORSMiddleware,
-    so the frontend's `err.error.detail` read comes back undefined and
-    cross-origin callers see an opaque CORS error instead.
+    Starlette's default 500 is bare text/plain, so the frontend's
+    `err.error.detail` read came back undefined on every unhandled error.
+
+    Note what this does NOT fix: an Exception handler runs inside
+    ServerErrorMiddleware, which Starlette installs *outside* CORSMiddleware, so
+    a 500 still carries no Access-Control-Allow-Origin header. That only matters
+    for a cross-origin caller; the app itself is same-origin behind nginx.
     """
     logger.exception("Unhandled error on %s %s", request.method, request.url.path)
     return JSONResponse({"detail": "Internal server error"}, status_code=500)

@@ -15,6 +15,8 @@ interface AuthResponse {
 
 const TOKEN_KEY = 'exam_token';
 const USER_KEY = 'exam_user';
+/** Prefix of the per-attempt autosave mirror written by take-exam. */
+export const PROGRESS_KEY_PREFIX = 'exam_progress_';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -72,6 +74,13 @@ export class AuthService {
     this.user.set(null);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+
+    // Also drop every autosave mirror. On a shared machine these otherwise
+    // outlive the session, and the next signed-in user resuming the same exam
+    // would restore the previous user's answers into their own attempt.
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith(PROGRESS_KEY_PREFIX)) localStorage.removeItem(key);
+    }
   }
 
   private store(res: AuthResponse): void {
@@ -85,7 +94,11 @@ export class AuthService {
 /** Reads `exp` out of a JWT payload. Treats anything unparseable as expired. */
 function isExpired(token: string): boolean {
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
+    // JWT payloads are base64url, so restore the standard alphabet before atob —
+    // otherwise a '-' or '_' in the payload throws and a valid token is treated
+    // as expired, intermittently bouncing the user to /login.
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(b64));
     return typeof payload.exp !== 'number' || payload.exp * 1000 <= Date.now();
   } catch {
     return true;

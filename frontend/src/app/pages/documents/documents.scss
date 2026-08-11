@@ -4,11 +4,23 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 0.75rem;
-  margin-bottom: 0.25rem;
+  margin-bottom: 1.25rem;
 
   .page-title {
     margin-bottom: 0;
   }
+}
+
+.header-controls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.search-filter {
+  width: 280px;
+  max-width: 100%;
 }
 
 .course-filter {
@@ -23,14 +35,15 @@
   font-size: 0.85rem;
   font-weight: 500;
   color: #333;
-  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E") no-repeat right 0.65rem center;
+  background: #fff
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E")
+    no-repeat right 0.65rem center;
   background-size: 10px 6px;
   appearance: none;
   cursor: pointer;
   transition: border-color 0.15s;
 
   &:focus {
-    outline: none;
     border-color: #111;
   }
 }
@@ -77,7 +90,9 @@
   align-items: center;
   gap: 0.85rem;
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 
   &:hover {
     border-color: #bbb;
@@ -138,8 +153,12 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .viewer-container {
@@ -209,7 +228,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .viewer-error {
@@ -316,20 +337,21 @@
 
 // ── Responsive ───────────────────────────────────────────────────
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .docs-header {
     flex-direction: column;
-    align-items: stretch !important;
+    align-items: stretch;
   }
 
   .header-controls {
     flex-direction: column;
-    align-items: stretch !important;
+    align-items: stretch;
     width: 100%;
   }
 
-  .course-select, .search-filter {
-    width: 100% !important;
+  .course-select,
+  .search-filter {
+    width: 100%;
   }
 
   .doc-card {

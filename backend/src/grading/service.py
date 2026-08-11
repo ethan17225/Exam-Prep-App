@@ -55,15 +55,22 @@ def question_type_counts(questions: list) -> tuple[int, int, int, int]:
             other += 1
         elif qtype == QuestionType.SATA:
             sata += 1
-        elif qtype in FIB_TYPES or not q.options:
+        # Calls the shared predicate rather than restating its rule, which is the
+        # whole reason these two functions live in one file.
+        elif is_fib_question(q):
             fib += 1
         else:
             mcq += 1
     return mcq, sata, fib, other
 
 
-def grade_question(q, user_answer) -> bool:
-    """Shared grading logic for all question types (except FIB self-marking)."""
+def grade_question(q, user_answer, *, fuzzy_fib: bool = True) -> bool:
+    """Shared grading logic for all question types (except FIB self-marking).
+
+    `fuzzy_fib=False` disables the lenient substring match on free-text answers.
+    Graded attempts pass False: self-marking is practice-only, so without this
+    the leniency documented below would decide real marks.
+    """
     expected = q.answer
     qtype = _normalized_type(q)
 
@@ -98,6 +105,13 @@ def grade_question(q, user_answer) -> bool:
         try:
             return float(user_str) == float(expected_str)
         except (ValueError, TypeError):
+            if not fuzzy_fib:
+                return user_str == expected_str
+            # Deliberately lenient on free text: a 3+ character substring match
+            # counts either way, so "tach" is accepted for "tachycardia". Typing
+            # a short common word can therefore score a mark it did not earn —
+            # the trade is that FIB answers are otherwise unmarkable, and the UI
+            # offers self-marking (`fib_correct`) for the cases this gets wrong.
             return (
                 user_str == expected_str
                 or (len(user_str) >= 3 and user_str in expected_str)

@@ -6,8 +6,12 @@
   text-align: center;
   margin-bottom: 1.25rem;
 
-  &.passed { border-color: #a3e4b8; }
-  &.failed { border-color: #f5b5b5; }
+  &.passed {
+    border-color: #a3e4b8;
+  }
+  &.failed {
+    border-color: #f5b5b5;
+  }
 }
 
 .score-main {
@@ -67,15 +71,6 @@
   color: #b45309;
 }
 
-.review-image {
-  display: block;
-  max-width: 100%;
-  max-height: 360px;
-  margin-bottom: 0.75rem;
-  border: 1px solid #e2e2e2;
-  border-radius: 8px;
-}
-
 .section-title {
   font-size: 1.1rem;
   font-weight: 700;
@@ -112,21 +107,35 @@
   font-weight: 600;
   cursor: pointer;
   color: #666;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
   border-right: 1px solid #ddd;
 
-  &:last-child { border-right: none; }
-  &:hover:not(.active) { background: #f5f5f5; }
+  &:last-child {
+    border-right: none;
+  }
+  &:hover:not(.active) {
+    background: #f5f5f5;
+  }
 
   &.active {
     background: #111;
     color: #fff;
   }
 
-  &.pill-mcq.active { background: #44c; }
-  &.pill-sata.active { background: #b80; }
-  &.pill-fib.active { background: #088; }
-  &.pill-other.active { background: #b45309; }
+  &.pill-mcq.active {
+    background: #44c;
+  }
+  &.pill-sata.active {
+    background: #b80;
+  }
+  &.pill-fib.active {
+    background: #088;
+  }
+  &.pill-other.active {
+    background: #b45309;
+  }
 }
 
 .review-count {
@@ -141,112 +150,6 @@
   margin-bottom: 0.75rem;
 }
 
-.review-card {
-  margin-bottom: 0.75rem;
-  border-left: 3px solid #ddd;
-
-  &.correct { border-left-color: #4caf50; }
-  &.wrong { border-left-color: #e53935; }
-}
-
-.review-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.review-num {
-  font-weight: 700;
-  font-size: 0.85rem;
-}
-
-.review-status {
-  margin-left: auto;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.review-question {
-  font-size: 0.9rem;
-  line-height: 1.55;
-  margin-bottom: 0.75rem;
-}
-
-.review-options {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  margin-bottom: 0.75rem;
-}
-
-.review-opt {
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  border: 1px solid #eee;
-  background: #fafafa;
-
-  &.correct-answer {
-    background: #e6f9ed;
-    border-color: #a3e4b8;
-  }
-
-  /* SATA: user chose a correct option — green */
-  &.sata-correct-picked {
-    background: #e6f9ed;
-    border-color: #a3e4b8;
-  }
-
-  /* SATA: correct but user did not select — yellow */
-  &.sata-correct-only {
-    background: #fff7d6;
-    border-color: #e0c34a;
-  }
-
-  &.wrong-pick {
-    background: #fef0f0;
-    border-color: #f5b5b5;
-    text-decoration: line-through;
-  }
-}
-
-.opt-indicator {
-  font-weight: 700;
-  margin-right: 0.35rem;
-
-  &.opt-correct { color: #4caf50; }
-  &.opt-yellow { color: #b8860b; }
-  &.opt-wrong { color: #e53935; }
-}
-
-.review-answer-summary {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.82rem;
-  margin-top: 0.5rem;
-  margin-bottom: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  background: #f7f7f7;
-  border-radius: 6px;
-}
-
-.answer-sep {
-  color: #ddd;
-  margin: 0 0.25rem;
-}
-
-.review-fib {
-  font-size: 0.85rem;
-  line-height: 1.7;
-  margin-bottom: 0.75rem;
-}
-
-.fib-label {
-  color: #888;
-}
-
 .badge-exam {
   background: #eef;
   color: #44c;
@@ -255,16 +158,6 @@
 .badge-practice {
   background: #e6f9ed;
   color: #0a7;
-}
-
-.rationale {
-  font-size: 0.82rem;
-  color: #555;
-  line-height: 1.55;
-  background: #f9f9f3;
-  padding: 0.6rem 0.8rem;
-  border-radius: 6px;
-  border: 1px solid #eee;
 }
 
 @media (max-width: 640px) {
@@ -285,16 +178,6 @@
     flex-direction: column;
     align-items: center;
     gap: 0.35rem;
-  }
-
-  .review-answer-summary {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.3rem;
-  }
-
-  .answer-sep {
-    display: none;
   }
 
   .type-pills {

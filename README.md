@@ -65,10 +65,38 @@ App runs at `http://localhost:4200` and proxies `/api` to port 8000.
   dashboard showing every student's in-progress attempts.
 - Only the owner of an exam can edit or delete it, shared or not.
 
-> **Known limitation:** `GET /api/exams/{id}?include_answers=true` is available
-> to anyone who can see the exam, because practice mode grades client-side. A
-> determined student can read the answer key from devtools. Closing this means
-> moving reveal/check-answer to server calls.
+### Practice vs. graded exams
+
+Every exam is one or the other, set by `allow_practice` (instructor-created
+exams default to graded, student-created to practice; either owner can flip it):
+
+- **Practice** reveals the answer key to the student — that is the point. Never
+  grade an exam that has practice enabled; its key is available to anyone who can
+  see it.
+- **Graded** withholds the key until submission and enforces the whole attempt
+  server-side: one open attempt at a time, the time limit and elapsed clock are
+  the server's, and the score is computed from what the server received (client
+  self-marking and question-subset selection are ignored). Submitting is
+  at-most-once.
+
+### What graded mode does *not* protect against
+
+Written down so nobody mistakes it for lockdown proctoring:
+
+- It is **not** proctoring software — no screen lock, no second-device
+  detection. A student can read the paper on another device or get help.
+- A student **owns any exam they upload**, including a re-upload of the
+  instructor's material, and therefore owns its key.
+- **Attempts are unlimited.** Submitting frees the slot, so a student can retake;
+  every attempt appears in History for the instructor to see, but "best score" is
+  theirs to pick. Blocking retakes needs an instructor reset flow (not built).
+- An exam with **no time limit has no deadline** — set one for anything
+  invigilated.
+- **Graded fill-in-the-blank is exact/numeric match** (no fuzzy matching, no
+  manual regrade). Prefer multiple-choice on assessments.
+- An abandoned graded attempt is cleared by an instructor via
+  `DELETE /api/admin/in-progress/{id}` — students cannot discard their own (that
+  would reset the timer).
 
 ## Database migrations
 
@@ -85,7 +113,10 @@ Databases created before Alembic are stamped automatically on first start.
 ## Backups
 
 The compose stack dumps the database daily to `./backups/` and keeps 14 days.
-To restore:
+The dumps are **plaintext and contain password hashes and answer keys** — the
+`./backups` directory must be treated as a secret (it is gitignored). For an
+untrusted host, pipe the dump through `age`/`gpg` with a public key and store the
+private key elsewhere. To restore:
 
 ```bash
 gunzip -c backups/mcq_app_<timestamp>.sql.gz | docker compose exec -T db psql -U postgres mcq_app

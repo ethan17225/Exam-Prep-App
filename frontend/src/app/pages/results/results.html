@@ -1,4 +1,9 @@
-@if (!result()) {
+@if (loadError()) {
+  <div class="empty-state">
+    <p>{{ loadError() }}</p>
+    <button class="btn btn-primary" (click)="load()">Retry</button>
+  </div>
+} @else if (loading() || !result()) {
   <p class="empty-state">Loading results...</p>
 } @else {
   @let r = result()!;
@@ -26,8 +31,6 @@
     </div>
   </div>
 
-
-
   <div class="result-actions">
     <button class="btn btn-primary" (click)="retake()">Retake Exam</button>
     <button class="btn btn-secondary" (click)="goHome()">Back to Exams</button>
@@ -36,57 +39,6 @@
   <h2 class="section-title">Review</h2>
 
   @for (q of r.results; track q.question_number) {
-    <div class="card review-card" [class.correct]="q.is_correct" [class.wrong]="!q.is_correct">
-      <div class="review-header">
-        <span class="review-num">Q{{ q.question_number }}</span>
-        <span class="badge" [class.badge-mcq]="q.type === 'MCQ'" [class.badge-sata]="q.type === 'SATA'" [class.badge-fib]="q.type === 'FIB' || q.type === 'Fill-in-the-blank'" [class.badge-other]="isAdvanced(q)">{{ q.type }}</span>
-        <span class="review-status">{{ q.is_correct ? '✓ Correct' : '✗ Incorrect' }}</span>
-      </div>
-
-      <app-question-sections [sections]="q.sections" [startCollapsed]="true" />
-
-      <p class="review-question">{{ q.question }}</p>
-
-      @if (q.image) {
-        <img class="review-image" [src]="q.image" alt="Question illustration" />
-      }
-
-      @if (showOptionList(q)) {
-        <div class="review-options">
-          @for (opt of optionList(q); track opt) {
-            <div
-              class="review-opt"
-              [class.user-pick]="isUserPick(q, opt)"
-              [class.correct-answer]="isCorrectOpt(q, opt)"
-              [class.wrong-pick]="isUserPick(q, opt) && !isCorrectOpt(q, opt)"
-            >
-              @if (isCorrectOpt(q, opt)) {
-                <span class="opt-indicator opt-correct">✓</span>
-              } @else if (isUserPick(q, opt)) {
-                <span class="opt-indicator opt-wrong">✗</span>
-              }
-              {{ opt }}
-            </div>
-          }
-        </div>
-        <div class="review-answer-summary">
-          <span class="fib-label">Your answer:</span> <strong>{{ formatAnswer(q, q.user_answer) }}</strong>
-          <span class="answer-sep">|</span>
-          <span class="fib-label">Correct answer:</span> <strong>{{ formatAnswer(q, q.correct_answer) }}</strong>
-        </div>
-      } @else {
-        <div class="review-fib">
-          <span class="fib-label">Your answer:</span> <strong>{{ formatAnswer(q, q.user_answer) }}</strong>
-          <br />
-          <span class="fib-label">Correct answer:</span> <strong>{{ formatAnswer(q, q.correct_answer) }}</strong>
-        </div>
-      }
-
-      @if (q.rationale) {
-        <div class="rationale">
-          <strong>Rationale:</strong> {{ q.rationale }}
-        </div>
-      }
-    </div>
+    <app-answer-review [question]="q" />
   }
 }

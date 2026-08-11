@@ -1,33 +1,17 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Query, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Query, status
 
 from src.admin import service
-from src.auth.dependencies import InstructorDep
+from src.admin.schemas import DashboardItemOut
+from src.attempts import service as attempts_service
+from src.attempts.exceptions import RecordNotFound
+from src.auth.dependencies import require_instructor
 from src.auth.exceptions import InstructorRequired
 from src.database import SessionDep
+from src.schemas import DeletedOut
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
-
-
-class DashboardItemOut(BaseModel):
-    id: str
-    exam_id: str
-    exam_title: str
-    student_email: str | None
-    mode: str
-    total_questions: int
-    answered_count: int
-    remaining_count: int
-    correct_count: int
-    wrong_count: int
-    score_percent: float
-    started_at: str | None
-    saved_at: str
-    seconds_since_last_answer: int
-    seconds_since_start: int | None
-    remaining_seconds: int
 
 
 @router.get(
@@ -38,7 +22,30 @@ class DashboardItemOut(BaseModel):
         "Every student's in-progress attempt with live grading. The only endpoint "
         "that returns other users' data, hence the instructor gate."
     ),
+    # The gate is the whole point here, but the identity is never read — so it is
+    # a route dependency rather than an unused parameter.
+    dependencies=[Depends(require_instructor)],
     responses={status.HTTP_403_FORBIDDEN: {"description": InstructorRequired.DETAIL}},
 )
-async def admin_dashboard(user: InstructorDep, db: SessionDep, limit: Annotated[int, Query(ge=1, le=1000)] = 200):
+async def admin_dashboard(db: SessionDep, limit: Annotated[int, Query(ge=1, le=1000)] = 200):
     return await service.build_dashboard(limit, db)
+
+
+@router.delete(
+    "/in-progress/{record_id}",
+    response_model=DeletedOut,
+    summary="Reset a student's attempt",
+    description=(
+        "Clears any student's in-progress attempt. The companion to students not "
+        "being able to discard a graded attempt themselves — without this, an "
+        "abandoned attempt would lock a student out of that exam permanently."
+    ),
+    dependencies=[Depends(require_instructor)],
+    responses={
+        status.HTTP_403_FORBIDDEN: {"description": InstructorRequired.DETAIL},
+        status.HTTP_404_NOT_FOUND: {"description": RecordNotFound.DETAIL},
+    },
+)
+async def reset_attempt(record_id: str, db: SessionDep):
+    await attempts_service.reset_attempt_unscoped(record_id, db)
+    return {"deleted": True}

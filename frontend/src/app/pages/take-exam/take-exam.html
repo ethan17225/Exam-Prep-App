@@ -1,4 +1,9 @@
-@if (questions().length === 0) {
+@if (loadError()) {
+  <div class="empty-state">
+    <p>{{ loadError() }}</p>
+    <button class="btn btn-primary" (click)="load()">Retry</button>
+  </div>
+} @else if (loading()) {
   <p class="empty-state">Loading exam...</p>
 } @else {
   <!-- Sticky exam header -->
@@ -23,7 +28,11 @@
         </span>
       </div>
       <div class="exam-topbar-right">
-        <span class="timer" [class.timer-warning]="timerWarning()" [class.timer-danger]="timerDanger()">
+        <span
+          class="timer"
+          [class.timer-warning]="timerWarning()"
+          [class.timer-danger]="timerDanger()"
+        >
           {{ formattedTime() }}
         </span>
         @if (autoSaveStatus() === 'saving') {
@@ -31,7 +40,9 @@
         } @else if (autoSaveStatus() === 'saved') {
           <span class="auto-save-indicator saved">Saved</span>
         } @else if (autoSaveStatus() === 'error') {
-          <span class="auto-save-indicator save-error" title="Saved on this device only">Not saved</span>
+          <span class="auto-save-indicator save-error" title="Saved on this device only"
+            >Not saved</span
+          >
         }
         <button class="btn btn-secondary btn-sm" (click)="toggleNav()">
           {{ showNav() ? 'Hide' : 'Questions' }}
@@ -49,15 +60,15 @@
   @if (showNav()) {
     <div class="q-nav-panel card">
       <div class="q-nav-grid">
-        @for (q of questions(); track q.number; let i = $index) {
+        @for (n of navVm(); track n.number) {
           <button
             class="q-nav-btn"
-            [class.answered]="isAnswered(q.number)"
-            [class.flagged]="isFlagged(q.number)"
-            [class.current]="isOnCurrentPage(i)"
-            (click)="goTo(i)"
+            [class.answered]="n.answered"
+            [class.flagged]="n.flagged"
+            [class.current]="n.current"
+            (click)="goTo(n.index)"
           >
-            {{ i + 1 }}
+            {{ n.index + 1 }}
           </button>
         }
       </div>
@@ -71,29 +82,41 @@
 
   <!-- Page info -->
   <div class="page-info">
-    Page {{ currentPage() + 1 }} of {{ totalPages() }}
-    &mdash; Questions {{ pageStartNum() }}–{{ pageEndNum() }}
+    Page {{ currentPage() + 1 }} of {{ totalPages() }} &mdash; Questions {{ pageStartNum() }}–{{
+      pageEndNum()
+    }}
   </div>
 
   <!-- Questions for current page -->
   @for (q of pageQuestions(); track q.number; let i = $index) {
+    @let s = structVm().get(q.number)!;
+    @let st = stateVm().get(q.number)!;
     <div
       class="card question-card"
-      [class.revealed-correct]="isRevealed(q.number) && isQuestionCorrect(q)"
-      [class.revealed-wrong]="isRevealed(q.number) && !isQuestionCorrect(q)"
+      [class.revealed-correct]="st.correct"
+      [class.revealed-wrong]="isRevealed(q.number) && !st.correct"
     >
       <div class="question-header">
         <div class="question-badges">
-          <span class="badge"
-            [class.badge-mcq]="kind(q) === 'MCQ'"
-            [class.badge-sata]="kind(q) === 'SATA'"
-            [class.badge-fib]="kind(q) === 'FIB'"
-            [class.badge-other]="isAdvanced(q)">
+          <span
+            class="badge"
+            [class.badge-mcq]="s.kind === 'MCQ'"
+            [class.badge-sata]="s.kind === 'SATA'"
+            [class.badge-fib]="s.kind === 'FIB'"
+            [class.badge-other]="s.advanced"
+          >
             {{ q.type }}
           </span>
           <span class="topic-label">{{ q.topic }}</span>
         </div>
-        <button class="flag-btn" [class.flagged]="isFlagged(q.number)" (click)="toggleFlag(q.number)" title="Flag for review">
+        <button
+          class="flag-btn"
+          [class.flagged]="isFlagged(q.number)"
+          (click)="toggleFlag(q.number)"
+          title="Flag for review"
+          [attr.aria-label]="isFlagged(q.number) ? 'Unflag question' : 'Flag question for review'"
+          [attr.aria-pressed]="isFlagged(q.number)"
+        >
           {{ isFlagged(q.number) ? '⚑' : '⚐' }}
         </button>
       </div>
@@ -104,41 +127,56 @@
 
       <p class="question-text">{{ q.question }}</p>
 
-      @if (q.image && kind(q) !== 'HOTSPOT') {
+      @if (q.image && s.kind !== 'HOTSPOT') {
         <img class="question-image" [src]="q.image" alt="Question illustration" />
       }
 
-      @if (q.type === 'SATA') {
+      @if (s.kind === 'SATA') {
         <p class="sata-hint">Select all that apply</p>
       }
 
-      @if (kind(q) === 'MATRIX') {
+      @if (s.kind === 'MATRIX') {
         <!-- MATRIX: checkbox grid -->
         <div class="matrix-wrap">
           <table class="matrix-table">
             <thead>
               <tr>
                 <th></th>
-                @for (col of matrixCols(q); track col) {
+                @for (col of s.matrixCols; track col) {
                   <th>{{ col }}</th>
                 }
               </tr>
             </thead>
             <tbody>
-              @for (row of matrixRows(q); track $index; let ri = $index) {
+              @for (row of s.matrixRows; track $index; let ri = $index) {
                 <tr>
                   <td class="matrix-row-label">{{ row }}</td>
-                  @for (col of matrixCols(q); track col) {
+                  @for (col of s.matrixCols; track col) {
                     <td class="matrix-cell">
                       <button
                         class="matrix-check"
                         [class.checked]="isMatrixChecked(q.number, ri, col)"
-                        [class.cell-correct]="isRevealed(q.number) && isMatrixExpected(q, ri, col) && isMatrixChecked(q.number, ri, col)"
-                        [class.cell-missed]="isRevealed(q.number) && isMatrixExpected(q, ri, col) && !isMatrixChecked(q.number, ri, col)"
-                        [class.cell-wrong]="isRevealed(q.number) && !isMatrixExpected(q, ri, col) && isMatrixChecked(q.number, ri, col)"
+                        [class.cell-correct]="
+                          isRevealed(q.number) &&
+                          isMatrixExpected(q, ri, col) &&
+                          isMatrixChecked(q.number, ri, col)
+                        "
+                        [class.cell-missed]="
+                          isRevealed(q.number) &&
+                          isMatrixExpected(q, ri, col) &&
+                          !isMatrixChecked(q.number, ri, col)
+                        "
+                        [class.cell-wrong]="
+                          isRevealed(q.number) &&
+                          !isMatrixExpected(q, ri, col) &&
+                          isMatrixChecked(q.number, ri, col)
+                        "
                         (click)="toggleMatrix(q.number, ri, col)"
                         [disabled]="isRevealed(q.number)"
-                      >{{ isMatrixChecked(q.number, ri, col) ? '☑' : '☐' }}</button>
+                        [attr.aria-label]="row + ' — ' + col"
+                      >
+                        {{ isMatrixChecked(q.number, ri, col) ? '☑' : '☐' }}
+                      </button>
                     </td>
                   }
                 </tr>
@@ -146,18 +184,21 @@
             </tbody>
           </table>
         </div>
-      } @else if (kind(q) === 'CLOZE') {
+      } @else if (s.kind === 'CLOZE') {
         <!-- CLOZE: dropdown blanks -->
         <div class="cloze-blanks">
-          @for (blank of clozeBlanks(q); track $index; let bi = $index) {
+          @for (blank of s.cloze; track $index; let bi = $index) {
             <div
               class="cloze-blank"
               [class.cloze-correct]="isRevealed(q.number) && isClozeBlankCorrect(q, bi)"
               [class.cloze-wrong]="isRevealed(q.number) && !isClozeBlankCorrect(q, bi)"
             >
-              <label class="cloze-label">{{ blank.label }}</label>
+              <label class="cloze-label" [for]="'cloze-' + q.number + '-' + bi">{{
+                blank.label
+              }}</label>
               <select
                 class="cloze-select"
+                [id]="'cloze-' + q.number + '-' + bi"
                 [ngModel]="getClozeAnswer(q.number, bi)"
                 (ngModelChange)="setClozeAnswer(q, bi, $event)"
                 [disabled]="isRevealed(q.number)"
@@ -173,22 +214,30 @@
             </div>
           }
         </div>
-      } @else if (kind(q) === 'BOWTIE') {
+      } @else if (s.kind === 'BOWTIE') {
         <!-- BOWTIE: assign choices to categories -->
         <div class="bowtie-categories">
-          @for (cat of bowtieCategories(q); track cat.name) {
+          @for (cat of s.bowtie; track cat.name) {
             <div class="bowtie-category">
               <div class="bowtie-cat-header">
                 <span class="bowtie-cat-name">{{ cat.name }}</span>
-                <span class="bowtie-count">{{ bowtieSelectedCount(q.number, cat.name) }}/{{ cat.count }} selected</span>
+                <span class="bowtie-count"
+                  >{{ bowtieSelectedCount(q.number, cat.name) }}/{{ cat.count }} selected</span
+                >
               </div>
               <div class="bowtie-choices">
                 @for (choice of cat.choices; track choice) {
                   <button
                     class="bowtie-choice"
                     [class.selected]="isBowtieSelected(q.number, cat.name, choice)"
-                    [class.option-correct]="isRevealed(q.number) && isBowtieExpected(q, cat.name, choice)"
-                    [class.option-wrong]="isRevealed(q.number) && isBowtieSelected(q.number, cat.name, choice) && !isBowtieExpected(q, cat.name, choice)"
+                    [class.option-correct]="
+                      isRevealed(q.number) && isBowtieExpected(q, cat.name, choice)
+                    "
+                    [class.option-wrong]="
+                      isRevealed(q.number) &&
+                      isBowtieSelected(q.number, cat.name, choice) &&
+                      !isBowtieExpected(q, cat.name, choice)
+                    "
                     (click)="toggleBowtie(q.number, cat, choice)"
                     [disabled]="isRevealed(q.number)"
                   >
@@ -199,11 +248,11 @@
             </div>
           }
         </div>
-      } @else if (kind(q) === 'RANKING') {
+      } @else if (s.kind === 'RANKING') {
         <!-- RANKING: reorder items -->
         <p class="rank-hint">Use the arrows to put the items in the correct order, then confirm.</p>
         <div class="rank-list">
-          @for (item of rankOrder(q); track item; let ri = $index) {
+          @for (item of st.rankOrder; track item; let ri = $index) {
             <div
               class="rank-item"
               [class.rank-correct]="isRevealed(q.number) && isRankItemCorrect(q, ri)"
@@ -212,26 +261,48 @@
               <span class="rank-pos">{{ ri + 1 }}</span>
               <span class="rank-text">{{ item }}</span>
               <span class="rank-controls">
-                <button class="rank-btn" (click)="moveRank(q, ri, -1)" [disabled]="isRevealed(q.number) || ri === 0" aria-label="Move up">▲</button>
-                <button class="rank-btn" (click)="moveRank(q, ri, 1)" [disabled]="isRevealed(q.number) || ri === rankOrder(q).length - 1" aria-label="Move down">▼</button>
+                <button
+                  class="rank-btn"
+                  (click)="moveRank(q, ri, -1)"
+                  [disabled]="isRevealed(q.number) || ri === 0"
+                  aria-label="Move up"
+                >
+                  ▲
+                </button>
+                <button
+                  class="rank-btn"
+                  (click)="moveRank(q, ri, 1)"
+                  [disabled]="isRevealed(q.number) || ri === st.rankOrder.length - 1"
+                  aria-label="Move down"
+                >
+                  ▼
+                </button>
               </span>
             </div>
           }
         </div>
         @if (!isRankConfirmed(q.number) && !isRevealed(q.number)) {
-          <button class="btn btn-secondary btn-sm rank-confirm-btn" (click)="confirmRankOrder(q)">Confirm This Order</button>
+          <button class="btn btn-secondary btn-sm rank-confirm-btn" (click)="confirmRankOrder(q)">
+            Confirm This Order
+          </button>
         }
-      } @else if (kind(q) === 'HIGHLIGHT') {
+      } @else if (s.kind === 'HIGHLIGHT') {
         <!-- HIGHLIGHT: click phrases -->
         <p class="highlight-hint">Click to highlight each finding that applies.</p>
         <div class="highlight-tokens">
-          @for (tok of highlightTokens(q); track $index; let ti = $index) {
+          @for (tok of s.tokens; track $index; let ti = $index) {
             <button
               class="highlight-token"
               [class.selected]="isHighlighted(q.number, ti)"
-              [class.option-correct]="isRevealed(q.number) && isHighlightExpected(q, ti) && isHighlighted(q.number, ti)"
-              [class.option-missed]="isRevealed(q.number) && isHighlightExpected(q, ti) && !isHighlighted(q.number, ti)"
-              [class.option-wrong]="isRevealed(q.number) && !isHighlightExpected(q, ti) && isHighlighted(q.number, ti)"
+              [class.option-correct]="
+                isRevealed(q.number) && isHighlightExpected(q, ti) && isHighlighted(q.number, ti)
+              "
+              [class.option-missed]="
+                isRevealed(q.number) && isHighlightExpected(q, ti) && !isHighlighted(q.number, ti)
+              "
+              [class.option-wrong]="
+                isRevealed(q.number) && !isHighlightExpected(q, ti) && isHighlighted(q.number, ti)
+              "
               (click)="toggleHighlight(q.number, ti)"
               [disabled]="isRevealed(q.number)"
             >
@@ -239,12 +310,12 @@
             </button>
           }
         </div>
-      } @else if (kind(q) === 'HOTSPOT') {
+      } @else if (s.kind === 'HOTSPOT') {
         <!-- HOTSPOT: click a region on the image -->
         @if (q.image) {
           <div class="hotspot-wrap">
             <img [src]="q.image" alt="Question image" />
-            @for (region of hotspotRegions(q); track region.id) {
+            @for (region of s.regions; track region.id) {
               <button
                 class="hotspot-region"
                 [style.left.%]="region.x"
@@ -253,51 +324,72 @@
                 [style.height.%]="region.h"
                 [class.selected]="isHotspotSelected(q.number, region.id)"
                 [class.region-correct]="isRevealed(q.number) && isHotspotExpected(q, region.id)"
-                [class.region-wrong]="isRevealed(q.number) && isHotspotSelected(q.number, region.id) && !isHotspotExpected(q, region.id)"
+                [class.region-wrong]="
+                  isRevealed(q.number) &&
+                  isHotspotSelected(q.number, region.id) &&
+                  !isHotspotExpected(q, region.id)
+                "
                 (click)="selectHotspot(q.number, region.id)"
                 [disabled]="isRevealed(q.number)"
                 [title]="region.label"
+                [attr.aria-label]="region.label"
               ></button>
             }
           </div>
-          @if (hotspotSelectedLabel(q)) {
-            <p class="hotspot-selected">Selected: <strong>{{ hotspotSelectedLabel(q) }}</strong></p>
+          @if (st.hotspotLabel) {
+            <p class="hotspot-selected">
+              Selected: <strong>{{ st.hotspotLabel }}</strong>
+            </p>
           }
         } @else {
           <div class="options-list">
-            @for (region of hotspotRegions(q); track region.id) {
+            @for (region of s.regions; track region.id) {
               <button
                 class="option-btn"
                 [class.selected]="isHotspotSelected(q.number, region.id)"
                 [class.option-correct]="isRevealed(q.number) && isHotspotExpected(q, region.id)"
-                [class.option-wrong]="isRevealed(q.number) && isHotspotSelected(q.number, region.id) && !isHotspotExpected(q, region.id)"
+                [class.option-wrong]="
+                  isRevealed(q.number) &&
+                  isHotspotSelected(q.number, region.id) &&
+                  !isHotspotExpected(q, region.id)
+                "
                 (click)="selectHotspot(q.number, region.id)"
                 [disabled]="isRevealed(q.number)"
               >
-                <span class="option-indicator">{{ isHotspotSelected(q.number, region.id) ? '●' : '○' }}</span>
+                <span class="option-indicator">{{
+                  isHotspotSelected(q.number, region.id) ? '●' : '○'
+                }}</span>
                 {{ region.label }}
               </button>
             }
           </div>
         }
-      } @else if (isTextInput(q)) {
+      } @else if (s.kind === 'FIB') {
         <!-- FIB / Text input -->
         <div class="fib-input">
           <input
             type="text"
             placeholder="Type your answer..."
+            [attr.aria-label]="'Answer for question ' + (pageStartNum() + i)"
             [ngModel]="(getAnswer(q.number) ?? '') + ''"
             (ngModelChange)="setTextAnswer(q.number, $event)"
             [disabled]="isFibConfirmed(q.number)"
           />
-          @if (!isFibConfirmed(q.number)) {
-            <button class="btn btn-primary btn-sm fib-confirm-btn" (click)="confirmFib(q.number)" [disabled]="!isAnswered(q.number)">
+          <!-- Reveal + self-grade are PRACTICE ONLY. In a graded run this block
+               showed the student the correct answer and then let them mark
+               themselves — the SATA and MCQ paths were already guarded. -->
+          @if (mode() === 'practice' && !isFibConfirmed(q.number)) {
+            <button
+              class="btn btn-primary btn-sm fib-confirm-btn"
+              (click)="confirmFib(q.number)"
+              [disabled]="!isAnswered(q.number)"
+            >
               Confirm
             </button>
           }
         </div>
 
-        @if (isFibConfirmed(q.number)) {
+        @if (mode() === 'practice' && isFibConfirmed(q.number)) {
           <div class="fib-reveal">
             <div class="fib-correct-answer">
               <span class="fib-label">Correct answer:</span>
@@ -306,30 +398,38 @@
             @if (getFibMark(q.number) === undefined) {
               <div class="fib-self-grade">
                 <span>Was your answer correct?</span>
-                <button class="btn btn-success btn-sm" (click)="markFib(q.number, true)">Correct</button>
-                <button class="btn btn-danger btn-sm" (click)="markFib(q.number, false)">Incorrect</button>
+                <button class="btn btn-success btn-sm" (click)="markFib(q.number, true)">
+                  Correct
+                </button>
+                <button class="btn btn-danger btn-sm" (click)="markFib(q.number, false)">
+                  Incorrect
+                </button>
               </div>
             } @else {
-              <div class="fib-grade-result" [class.fib-grade-correct]="getFibMark(q.number)" [class.fib-grade-wrong]="!getFibMark(q.number)">
+              <div
+                class="fib-grade-result"
+                [class.fib-grade-correct]="getFibMark(q.number)"
+                [class.fib-grade-wrong]="!getFibMark(q.number)"
+              >
                 {{ getFibMark(q.number) ? '✓ Marked as correct' : '✗ Marked as incorrect' }}
               </div>
             }
             @if (q.rationale) {
-              <div class="rationale">
-                <strong>Rationale:</strong> {{ q.rationale }}
-              </div>
+              <div class="rationale"><strong>Rationale:</strong> {{ q.rationale }}</div>
             }
           </div>
         }
-      } @else if (q.type === 'SATA' && mcqOptions(q).length) {
+      } @else if (s.kind === 'SATA' && s.options.length) {
         <!-- SATA options -->
         <div class="options-list">
-          @for (opt of mcqOptions(q); track opt) {
+          @for (opt of s.options; track opt) {
             <button
               class="option-btn"
               [class.selected]="isSataSelected(q.number, opt)"
               [class.option-correct]="isRevealed(q.number) && isCorrectOption(q, opt)"
-              [class.option-wrong]="isRevealed(q.number) && isSataSelected(q.number, opt) && !isCorrectOption(q, opt)"
+              [class.option-wrong]="
+                isRevealed(q.number) && isSataSelected(q.number, opt) && !isCorrectOption(q, opt)
+              "
               (click)="toggleSATA(q.number, opt)"
               [disabled]="isRevealed(q.number)"
             >
@@ -339,24 +439,27 @@
           }
         </div>
         @if (mode() === 'practice' && !isRevealed(q.number) && isAnswered(q.number)) {
-          <button class="btn btn-primary btn-sm check-answer-btn" (click)="checkSATAAnswer(q.number)">
+          <button
+            class="btn btn-primary btn-sm check-answer-btn"
+            (click)="checkSATAAnswer(q.number)"
+          >
             Check Answer
           </button>
         }
         @if (isRevealed(q.number) && q.rationale) {
-          <div class="rationale">
-            <strong>Rationale:</strong> {{ q.rationale }}
-          </div>
+          <div class="rationale"><strong>Rationale:</strong> {{ q.rationale }}</div>
         }
-      } @else if (mcqOptions(q).length) {
+      } @else if (s.options.length) {
         <!-- MCQ options -->
         <div class="options-list">
-          @for (opt of mcqOptions(q); track opt) {
+          @for (opt of s.options; track opt) {
             <button
               class="option-btn"
               [class.selected]="isSelected(q.number, opt)"
               [class.option-correct]="isRevealed(q.number) && isCorrectOption(q, opt)"
-              [class.option-wrong]="isRevealed(q.number) && isSelected(q.number, opt) && !isCorrectOption(q, opt)"
+              [class.option-wrong]="
+                isRevealed(q.number) && isSelected(q.number, opt) && !isCorrectOption(q, opt)
+              "
               (click)="selectMCQ(q.number, opt)"
               [disabled]="isRevealed(q.number)"
             >
@@ -366,16 +469,17 @@
           }
         </div>
         @if (isRevealed(q.number) && q.rationale) {
-          <div class="rationale">
-            <strong>Rationale:</strong> {{ q.rationale }}
-          </div>
+          <div class="rationale"><strong>Rationale:</strong> {{ q.rationale }}</div>
         }
       }
 
       <!-- Shared check/reveal block for advanced question types -->
-      @if (isAdvanced(q)) {
-        @if (mode() === 'practice' && !isRevealed(q.number) && isFullyAnswered(q)) {
-          <button class="btn btn-primary btn-sm check-answer-btn" (click)="revealQuestion(q.number)">
+      @if (s.advanced) {
+        @if (mode() === 'practice' && !isRevealed(q.number) && st.fullyAnswered) {
+          <button
+            class="btn btn-primary btn-sm check-answer-btn"
+            (click)="revealQuestion(q.number)"
+          >
             Check Answer
           </button>
         }
@@ -383,12 +487,10 @@
           <div class="fib-reveal">
             <div class="fib-correct-answer">
               <span class="fib-label">Correct answer:</span>
-              <strong>{{ correctAnswerText(q) }}</strong>
+              <strong>{{ st.correctText }}</strong>
             </div>
             @if (q.rationale) {
-              <div class="rationale">
-                <strong>Rationale:</strong> {{ q.rationale }}
-              </div>
+              <div class="rationale"><strong>Rationale:</strong> {{ q.rationale }}</div>
             }
           </div>
         }
@@ -398,12 +500,20 @@
 
   <!-- Bottom navigation -->
   <div class="bottom-nav">
-    <button class="btn btn-secondary" (click)="prevPage()" [disabled]="currentPage() === 0">← Previous 20</button>
+    <button class="btn btn-secondary" (click)="prevPage()" [disabled]="currentPage() === 0">
+      ← Previous 20
+    </button>
     <div class="bottom-nav-center">
       <button class="btn btn-primary" (click)="submit()" [disabled]="submitting()">
         {{ submitting() ? 'Submitting...' : 'Submit Exam' }}
       </button>
     </div>
-    <button class="btn btn-secondary" (click)="nextPage()" [disabled]="currentPage() === totalPages() - 1">Next 20 →</button>
+    <button
+      class="btn btn-secondary"
+      (click)="nextPage()"
+      [disabled]="currentPage() === totalPages() - 1"
+    >
+      Next 20 →
+    </button>
   </div>
 }

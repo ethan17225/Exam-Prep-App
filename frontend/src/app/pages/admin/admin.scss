@@ -49,8 +49,14 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 
-  &.exam { background: #eef; color: #44c; }
-  &.practice { background: #e6f9ed; color: #0a7; }
+  &.exam {
+    background: #eef;
+    color: #44c;
+  }
+  &.practice {
+    background: #e6f9ed;
+    color: #0a7;
+  }
 }
 
 .progress-section {
@@ -94,16 +100,28 @@
   font-size: 1.4rem;
   font-weight: 700;
 
-  &.done { color: #0a7; }
-  &.remaining { color: #e65100; }
-  &.correct { color: #0a7; }
-  &.wrong { color: #c00; }
+  &.done {
+    color: #0a7;
+  }
+  &.remaining {
+    color: #e65100;
+  }
+  &.correct {
+    color: #0a7;
+  }
+  &.wrong {
+    color: #c00;
+  }
   &.score {
     font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
     color: #888;
   }
-  &.score-pass { color: #0a7; }
-  &.score-fail { color: #c00; }
+  &.score-pass {
+    color: #0a7;
+  }
+  &.score-fail {
+    color: #c00;
+  }
   &.timer {
     font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
     font-size: 1.1rem;
@@ -142,8 +160,12 @@
   font-weight: 600;
   font-family: 'SF Mono', SFMono-Regular, Consolas, monospace;
 
-  &.idle { color: #e65100; }
-  &.elapsed { color: #555; }
+  &.idle {
+    color: #e65100;
+  }
+  &.elapsed {
+    color: #555;
+  }
 }
 
 // ── Mobile ──────────────────────────────────────────────────────

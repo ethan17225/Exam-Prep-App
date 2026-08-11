@@ -188,7 +188,14 @@ export class UploadPage implements OnInit {
   }
 
   loadCourses(): void {
-    this.examService.listCourses().subscribe((data) => this.courses.set(data));
+    this.examService.listCourses().subscribe({
+      next: (data) => this.courses.set(data),
+      // A course is required to submit, so a failed load must not look like "no courses yet".
+      error: (err) =>
+        this.courseError.set(
+          err?.error?.detail || 'Failed to load courses — reload the page to retry.',
+        ),
+    });
   }
 
   onCourseSelectChange(value: string): void {
@@ -279,15 +286,17 @@ export class UploadPage implements OnInit {
     let timeLimit = this.timeLimitMinutes();
     if (timeLimit && timeLimit <= 0) timeLimit = null; // invalid times ignored
 
-    this.examService.createExam(titleVal, questions as never[], this.selectedCourseId(), timeLimit).subscribe({
-      next: () => {
-        this.loading.set(false);
-        this.router.navigate(['/exams']);
-      },
-      error: (err) => {
-        this.loading.set(false);
-        this.error.set(err?.error?.detail || 'Failed to create exam.');
-      },
-    });
+    this.examService
+      .createExam(titleVal, questions as never[], this.selectedCourseId(), timeLimit)
+      .subscribe({
+        next: () => {
+          this.loading.set(false);
+          this.router.navigate(['/exams']);
+        },
+        error: (err) => {
+          this.loading.set(false);
+          this.error.set(err?.error?.detail || 'Failed to create exam.');
+        },
+      });
   }
 }

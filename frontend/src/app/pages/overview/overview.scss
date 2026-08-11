@@ -35,8 +35,13 @@
   padding: 3rem 1rem;
   color: #999;
 
-  p { font-size: 1rem; }
-  .empty-sub { font-size: 0.85rem; margin-top: 0.3rem; }
+  p {
+    font-size: 1rem;
+  }
+  .empty-sub {
+    font-size: 0.85rem;
+    margin-top: 0.3rem;
+  }
 }
 
 // Charts
@@ -111,8 +116,13 @@
   cursor: pointer;
   text-align: left;
 
-  &:hover { background: #f5f5f5; }
-  &.active { background: #eef2ff; font-weight: 600; }
+  &:hover {
+    background: #f5f5f5;
+  }
+  &.active {
+    background: #eef2ff;
+    font-weight: 600;
+  }
 }
 
 .topic-dropdown-name {
@@ -165,8 +175,12 @@
 .topic-score {
   font-weight: 700;
 
-  &.topic-score-pass { color: #0a7; }
-  &.topic-score-fail { color: #c00; }
+  &.topic-score-pass {
+    color: #0a7;
+  }
+  &.topic-score-fail {
+    color: #c00;
+  }
 }
 
 .topic-progress-track {
@@ -206,8 +220,12 @@
   height: 8px;
   border-radius: 50%;
 
-  &.exam { background: #4361ee; }
-  &.practice { background: #0a7; }
+  &.exam {
+    background: #4361ee;
+  }
+  &.practice {
+    background: #0a7;
+  }
 }
 
 // Mode badges
@@ -240,8 +258,16 @@
   cursor: pointer;
   transition: background 0.1s;
 
-  &:last-child { border-bottom: none; }
-  &:hover { background: #fafafa; margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; border-radius: 6px; }
+  &:last-child {
+    border-bottom: none;
+  }
+  &:hover {
+    background: #fafafa;
+    margin: 0 -0.5rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    border-radius: 6px;
+  }
 }
 
 .recent-info {
@@ -270,8 +296,12 @@
   font-weight: 700;
   font-size: 0.95rem;
 
-  &.score-pass { color: #0a7; }
-  &.score-fail { color: #c00; }
+  &.score-pass {
+    color: #0a7;
+  }
+  &.score-fail {
+    color: #c00;
+  }
 }
 
 // Responsive

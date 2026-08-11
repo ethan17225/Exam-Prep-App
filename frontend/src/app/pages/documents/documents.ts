@@ -1,6 +1,5 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, HostListener, OnInit, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ExamService, Course, DocumentItem } from '../../services/exam.service';
 
 @Component({
@@ -15,9 +14,12 @@ export class DocumentsPage implements OnInit {
   selectedCourseId = signal<string>('');
   searchQuery = signal('');
 
+  loading = signal(true);
+  loadError = signal('');
+
   // Viewer state
   viewingDoc = signal<DocumentItem | null>(null);
-  viewingHtml = signal<SafeHtml | null>(null);
+  viewingHtml = signal<string | null>(null);
   viewerLoading = signal(false);
   viewerError = signal('');
 
@@ -26,11 +28,11 @@ export class DocumentsPage implements OnInit {
     const courseId = this.selectedCourseId();
     const query = this.searchQuery().toLowerCase().trim();
     let docs = this.documents();
-    
+
     if (courseId) {
       docs = docs.filter((d) => d.course_id === courseId);
     }
-    
+
     if (query) {
       docs = docs.filter((d) => d.title.toLowerCase().includes(query));
     }
@@ -51,18 +53,26 @@ export class DocumentsPage implements OnInit {
     return groups;
   });
 
-  constructor(
-    private examService: ExamService,
-    private sanitizer: DomSanitizer,
-  ) {}
+  constructor(private examService: ExamService) {}
 
   ngOnInit(): void {
+    // The course filter is a convenience — the document list itself surfaces load failures.
     this.examService.listCourses().subscribe((data) => this.courses.set(data));
     this.loadDocuments();
   }
 
   loadDocuments(): void {
-    this.examService.listDocuments().subscribe((data) => this.documents.set(data));
+    this.loadError.set('');
+    this.examService.listDocuments().subscribe({
+      next: (data) => {
+        this.documents.set(data);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.loadError.set(err?.error?.detail || 'Failed to load documents.');
+      },
+    });
   }
 
   onCourseChange(courseId: string): void {
@@ -83,7 +93,11 @@ export class DocumentsPage implements OnInit {
 
     this.examService.getDocumentContent(doc.html_url).subscribe({
       next: (content) => {
-        this.viewingHtml.set(this.sanitizer.bypassSecurityTrustHtml(content.html));
+        // Bound as a plain string so Angular's sanitizer runs on it. The server
+        // only strips the <body> wrapper — it does not sanitize — and these files
+        // are served from our own origin, so bypassing sanitization here would
+        // make any document a same-origin script injection.
+        this.viewingHtml.set(content.html);
         this.viewerLoading.set(false);
       },
       error: () => {
@@ -91,6 +105,11 @@ export class DocumentsPage implements OnInit {
         this.viewerLoading.set(false);
       },
     });
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.viewingDoc()) this.closeViewer();
   }
 
   closeViewer(): void {

@@ -34,8 +34,17 @@ PY
 
 alembic upgrade head
 
-# gunicorn supervises N uvicorn workers. --proxy-headers keeps client IPs from
-# nginx; --forwarded-allow-ips trusts the compose network in front of us.
+# gunicorn supervises N uvicorn workers. Each worker holds its own pool of
+# (DB_POOL_SIZE + DB_MAX_OVERFLOW) = 15 connections, so keep
+#   WEB_CONCURRENCY * 15 + a few  <  Postgres max_connections (default 100).
+# Raising WEB_CONCURRENCY past ~5 needs max_connections raised to match.
+#
+# --forwarded-allow-ips trusts X-Forwarded-* headers. Uvicorn's proxy middleware
+# only matches exact IPs or '*', not CIDR, and the frontend container's IP is not
+# stable — so '*' is the practical value. It is bounded by the compose network
+# split (see docker-compose.yml): only the frontend and backup containers can
+# reach this service, so no untrusted peer is in a position to forge the header.
+# The app does not use the client IP for authorization in any case.
 exec gunicorn src.main:app \
     --worker-class uvicorn.workers.UvicornWorker \
     --workers "${WEB_CONCURRENCY:-3}" \
@@ -44,4 +53,4 @@ exec gunicorn src.main:app \
     --graceful-timeout 30 \
     --access-logfile - \
     --error-logfile - \
-    --forwarded-allow-ips '*'
+    --forwarded-allow-ips "${FORWARDED_ALLOW_IPS:-*}"
