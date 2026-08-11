@@ -15,6 +15,9 @@
             {{ item.mode === 'practice' ? 'Practice' : 'Exam' }}
           </span>
         </div>
+        @if (item.student_email) {
+          <div class="dash-student">{{ item.student_email }}</div>
+        }
 
         <div class="progress-section">
           <div class="progress-track">

@@ -1,17 +1,10 @@
 import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { ExamService, ExamResult } from '../../services/exam.service';
+import { ExamService, ExamResultSummary, TopicStat } from '../../services/exam.service';
 import { Chart, registerables } from 'chart.js';
 
 Chart.register(...registerables);
-
-interface TopicStat {
-  topic: string;
-  score: number;
-  correct: number;
-  total: number;
-}
 
 @Component({
   selector: 'app-overview',
@@ -20,7 +13,9 @@ interface TopicStat {
   styleUrl: './overview.scss',
 })
 export class OverviewPage implements OnInit, OnDestroy {
-  records = signal<ExamResult[]>([]);
+  records = signal<ExamResultSummary[]>([]);
+  // Aggregated by the API: the history list no longer ships every question.
+  topicStats = signal<TopicStat[]>([]);
   selectedTopic = signal('');
   topicSearch = signal('');
   topicDropdownOpen = signal(false);
@@ -53,26 +48,6 @@ export class OverviewPage implements OnInit, OnDestroy {
   examCount = computed(() => this.records().filter((r) => r.mode !== 'practice').length);
   practiceCount = computed(() => this.records().filter((r) => r.mode === 'practice').length);
 
-  topicStats = computed<TopicStat[]>(() => {
-    const map = new Map<string, { correct: number; total: number }>();
-    for (const record of this.records()) {
-      for (const q of record.results) {
-        const existing = map.get(q.topic) || { correct: 0, total: 0 };
-        existing.total++;
-        if (q.is_correct) existing.correct++;
-        map.set(q.topic, existing);
-      }
-    }
-    return Array.from(map.entries())
-      .map(([topic, stats]) => ({
-        topic,
-        score: Math.round((stats.correct / stats.total) * 100),
-        correct: stats.correct,
-        total: stats.total,
-      }))
-      .sort((a, b) => b.score - a.score);
-  });
-
   filteredTopicStats = computed(() => {
     const query = this.topicSearch().trim().toLowerCase();
     if (!query) return this.topicStats();
@@ -92,12 +67,15 @@ export class OverviewPage implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    this.examService.getTopicStats().subscribe((stats) => {
+      this.topicStats.set(stats);
+      if (stats.length > 0) {
+        this.selectedTopic.set(stats[0].topic);
+      }
+    });
+
     this.examService.getHistory().subscribe((data) => {
       this.records.set(data);
-      const topics = this.topicStats();
-      if (topics.length > 0) {
-        this.selectedTopic.set(topics[0].topic);
-      }
       setTimeout(() => this.renderCharts(), 0);
     });
   }

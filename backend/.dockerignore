@@ -3,3 +3,6 @@ __pycache__
 .env
 .venv
 venv
+test_*.py
+Docs
+uploads

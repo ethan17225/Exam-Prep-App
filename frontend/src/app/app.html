@@ -1,14 +1,22 @@
-<nav class="nav">
-  <span class="nav-brand">MCQ Exam</span>
-  <div class="nav-links">
-    <a routerLink="/overview" routerLinkActive="active">Overview</a>
-    <a routerLink="/exams" routerLinkActive="active">Exams</a>
-    <a routerLink="/in-progress" routerLinkActive="active">In Progress</a>
-    <a routerLink="/history" routerLinkActive="active">History</a>
-    <a routerLink="/documents" routerLinkActive="active">Documents</a>
-    <a routerLink="/upload" routerLinkActive="active">Upload</a>
-  </div>
-</nav>
-<main class="main">
+@if (auth.isLoggedIn()) {
+  <nav class="nav">
+    <span class="nav-brand">MCQ Exam</span>
+    <div class="nav-links">
+      <a routerLink="/overview" routerLinkActive="active">Overview</a>
+      <a routerLink="/exams" routerLinkActive="active">Exams</a>
+      <a routerLink="/in-progress" routerLinkActive="active">In Progress</a>
+      <a routerLink="/history" routerLinkActive="active">History</a>
+      <a routerLink="/documents" routerLinkActive="active">Documents</a>
+      <a routerLink="/upload" routerLinkActive="active">Upload</a>
+      @if (auth.isInstructor()) {
+        <a routerLink="/admin" routerLinkActive="active">Admin</a>
+      }
+      <button type="button" class="nav-logout" (click)="logout()" [title]="auth.user()?.email">
+        Sign out
+      </button>
+    </div>
+  </nav>
+}
+<main class="main" [class.main-plain]="!auth.isLoggedIn()">
   <router-outlet />
 </main>

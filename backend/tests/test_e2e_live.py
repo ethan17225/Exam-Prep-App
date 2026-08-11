@@ -2,10 +2,13 @@
 """End-to-end smoke test for question types (run against a live backend)."""
 
 import json
+import os
 import sys
+import urllib.error
 import urllib.request
 
-BASE = "http://localhost:8001/api"
+# Bare-metal dev runs on 8000; docker compose publishes the same API on 8001.
+BASE = os.environ.get("API_BASE", "http://localhost:8000/api")
 
 TEST_EXAM = {
     "title": "__e2e_smoke_test__",
@@ -84,8 +87,19 @@ TEST_EXAM = {
 }
 
 
+TOKEN = None
+
+
+def _headers(extra=None):
+    headers = dict(extra or {})
+    if TOKEN:
+        headers["Authorization"] = f"Bearer {TOKEN}"
+    return headers
+
+
 def get(path):
-    with urllib.request.urlopen(BASE + path) as r:
+    req = urllib.request.Request(BASE + path, headers=_headers())
+    with urllib.request.urlopen(req) as r:
         return json.load(r)
 
 
@@ -93,7 +107,7 @@ def post(path, payload):
     req = urllib.request.Request(
         BASE + path,
         data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"},
+        headers=_headers({"Content-Type": "application/json"}),
         method="POST",
     )
     with urllib.request.urlopen(req) as r:
@@ -104,7 +118,7 @@ def patch(path, payload):
     req = urllib.request.Request(
         BASE + path,
         data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"},
+        headers=_headers({"Content-Type": "application/json"}),
         method="PATCH",
     )
     with urllib.request.urlopen(req) as r:
@@ -112,7 +126,7 @@ def patch(path, payload):
 
 
 def delete(path):
-    req = urllib.request.Request(BASE + path, method="DELETE")
+    req = urllib.request.Request(BASE + path, headers=_headers(), method="DELETE")
     with urllib.request.urlopen(req) as r:
         return json.load(r)
 
@@ -127,11 +141,23 @@ def upload_image(question_id, filename, content):
     req = urllib.request.Request(
         f"{BASE}/questions/{question_id}/image",
         data=body,
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        headers=_headers({"Content-Type": f"multipart/form-data; boundary={boundary}"}),
         method="POST",
     )
     with urllib.request.urlopen(req) as r:
         return json.load(r)
+
+
+def login():
+    """Authenticate before anything else — every /api route now requires a session."""
+    email = os.environ.get("E2E_EMAIL")
+    password = os.environ.get("E2E_PASSWORD")
+    if not email or not password:
+        raise SystemExit(
+            "Set E2E_EMAIL and E2E_PASSWORD to an existing account before running this script.\n"
+            "The bootstrap instructor created by migration 0002 works."
+        )
+    return post("/auth/login", {"email": email, "password": password})["token"]
 
 
 failures = []
@@ -143,6 +169,20 @@ def check(name, cond, detail=""):
     if not cond:
         failures.append(name)
 
+
+# ── Authenticate ────────────────────────────────────────────────
+TOKEN = login()
+check("login returns a token", bool(TOKEN))
+check("authenticated identity resolves", "email" in get("/auth/me"))
+
+_saved_token, TOKEN = TOKEN, None
+try:
+    get("/exams")
+    check("unauthenticated request is rejected", False, "GET /exams succeeded without a token")
+except urllib.error.HTTPError as exc:
+    check("unauthenticated request is rejected", exc.code == 401, f"got {exc.code}")
+finally:
+    TOKEN = _saved_token
 
 # ── Create a temporary exam for testing ─────────────────────────
 courses = get("/courses")
@@ -220,9 +260,17 @@ png = bytes.fromhex(
 img = upload_image(new_q["id"], "test.png", png)
 check("image upload returns URL", img["image"].startswith("/api/uploads/"), str(img))
 
-with urllib.request.urlopen("http://localhost:8001" + img["image"]) as r:
+# The uploads mount is behind the auth middleware, so this needs the token too.
+_img_req = urllib.request.Request(BASE.removesuffix("/api") + img["image"], headers=_headers())
+with urllib.request.urlopen(_img_req) as r:
     served = r.read()
 check("uploaded image is served", served == png)
+
+try:
+    urllib.request.urlopen(BASE.removesuffix("/api") + img["image"])
+    check("uploads mount rejects anonymous access", False, "image served without a token")
+except urllib.error.HTTPError as exc:
+    check("uploads mount rejects anonymous access", exc.code == 401, f"got {exc.code}")
 
 deleted_img = delete(f"/questions/{new_q['id']}/image")
 check("image delete works", deleted_img["image"] is None)

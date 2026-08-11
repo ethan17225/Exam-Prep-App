@@ -30,6 +30,8 @@
           <span class="auto-save-indicator saving">Saving...</span>
         } @else if (autoSaveStatus() === 'saved') {
           <span class="auto-save-indicator saved">Saved</span>
+        } @else if (autoSaveStatus() === 'error') {
+          <span class="auto-save-indicator save-error" title="Saved on this device only">Not saved</span>
         }
         <button class="btn btn-secondary btn-sm" (click)="toggleNav()">
           {{ showNav() ? 'Hide' : 'Questions' }}

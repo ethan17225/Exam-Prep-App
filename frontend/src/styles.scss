@@ -114,7 +114,9 @@ body {
 
 textarea,
 input[type="text"],
-input[type="number"] {
+input[type="number"],
+input[type="email"],
+input[type="password"] {
   width: 100%;
   padding: 0.6rem 0.8rem;
   border: 1px solid #ddd;
@@ -152,6 +154,57 @@ select {
   }
 }
 
+// ── Auth forms ──────────────────────────────────────────────────
+.auth-page {
+  display: flex;
+  justify-content: center;
+  padding-top: 2rem;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+}
+
+.field {
+  display: block;
+  margin-bottom: 1rem;
+
+  span {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-size: 0.85rem;
+    color: #555;
+  }
+}
+
+.auth-error {
+  margin: 0 0 1rem;
+  color: #c00;
+  font-size: 0.85rem;
+}
+
+.auth-hint {
+  margin: -0.5rem 0 1rem;
+  font-size: 0.78rem;
+  color: #777;
+}
+
+.auth-submit {
+  width: 100%;
+}
+
+.auth-alt {
+  margin: 1rem 0 0;
+  font-size: 0.85rem;
+  color: #555;
+  text-align: center;
+
+  a {
+    color: #111;
+  }
+}
+
 // ── Mobile responsive ───────────────────────────────────────────
 @media (max-width: 640px) {
   .btn {
@@ -162,9 +215,15 @@ select {
 
   textarea,
   input[type="text"],
-  input[type="number"] {
+  input[type="number"],
+  input[type="email"],
+  input[type="password"] {
     min-height: 44px;
     font-size: 1rem; // prevents iOS zoom on focus
+  }
+
+  .auth-page {
+    padding-top: 1rem;
   }
 
   select {

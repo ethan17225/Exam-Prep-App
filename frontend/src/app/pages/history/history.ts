@@ -1,7 +1,7 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { ExamService, ExamResult } from '../../services/exam.service';
+import { ExamService, ExamResultSummary } from '../../services/exam.service';
 
 @Component({
   selector: 'app-history',
@@ -10,7 +10,7 @@ import { ExamService, ExamResult } from '../../services/exam.service';
   styleUrl: './history.scss',
 })
 export class HistoryPage implements OnInit {
-  records = signal<ExamResult[]>([]);
+  records = signal<ExamResultSummary[]>([]);
   searchQuery = signal('');
 
   filteredRecords = computed(() => {

@@ -291,7 +291,11 @@ export interface QuestionResult {
   rationale: string;
 }
 
-export interface ExamResult {
+/**
+ * What `GET /api/history` returns. The heavy `results` blob is deliberately
+ * absent from the list — fetch a single record for that.
+ */
+export interface ExamResultSummary {
   id: string;
   exam_id: string;
   exam_title: string;
@@ -301,8 +305,19 @@ export interface ExamResult {
   passed: boolean;
   time_spent_seconds: number;
   mode: string;
-  results: QuestionResult[];
   taken_at: string;
+}
+
+export interface ExamResult extends ExamResultSummary {
+  results: QuestionResult[];
+}
+
+/** Per-topic performance, aggregated server-side across every attempt. */
+export interface TopicStat {
+  topic: string;
+  score: number;
+  correct: number;
+  total: number;
 }
 
 export interface InProgressExam {
@@ -325,6 +340,8 @@ export interface AdminDashboardItem {
   id: string;
   exam_id: string;
   exam_title: string;
+  /** Which student this attempt belongs to. Instructor-only view. */
+  student_email: string | null;
   mode: string;
   total_questions: number;
   answered_count: number;
@@ -396,8 +413,12 @@ export class ExamService {
     return this.http.post<ExamResult>(`${this.base}/exams/${payload.exam_id}/submit`, payload);
   }
 
-  getHistory(): Observable<ExamResult[]> {
-    return this.http.get<ExamResult[]>(`${this.base}/history`);
+  getHistory(): Observable<ExamResultSummary[]> {
+    return this.http.get<ExamResultSummary[]>(`${this.base}/history`);
+  }
+
+  getTopicStats(): Observable<TopicStat[]> {
+    return this.http.get<TopicStat[]>(`${this.base}/history/topic-stats`);
   }
 
   getHistoryRecord(id: string): Observable<ExamResult> {

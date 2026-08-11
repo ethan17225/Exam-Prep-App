@@ -8,6 +8,7 @@ import {
   AnswerSubmission,
   AnswerValue,
   InProgressExam,
+  SaveProgressPayload,
   QuestionKind,
   BowtieCategory,
   ClozeBlank,
@@ -37,7 +38,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
   flagged = signal<Set<number>>(new Set());
   submitting = signal(false);
   showNav = signal(false);
-  autoSaveStatus = signal<'idle' | 'saving' | 'saved'>('idle');
+  autoSaveStatus = signal<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   mode = signal<'exam' | 'practice'>('exam');
   timeLimitSeconds = signal(180 * 60);
@@ -136,20 +137,24 @@ export class TakeExamPage implements OnInit, OnDestroy {
   }
 
   private restoreProgress(allQuestions: Question[], saved: InProgressExam): void {
+    // If the last autosave never reached the server, the local mirror is newer.
+    const local = this.readLocalProgress(saved.saved_at);
+    const source = local ?? saved;
+
     const questionMap = new Map(allQuestions.map((q) => [q.number, q]));
-    const ordered = saved.question_order
+    const ordered = source.question_order
       .map((num) => questionMap.get(num))
       .filter((q): q is Question => !!q);
     this.questions.set(ordered);
 
     const restoredAnswers = new Map<number, AnswerValue>();
-    for (const [key, val] of Object.entries(saved.answers)) {
+    for (const [key, val] of Object.entries(source.answers)) {
       restoredAnswers.set(Number(key), val);
     }
     this.answers.set(restoredAnswers);
-    this.flagged.set(new Set(saved.flagged));
-    this.remainingSeconds.set(saved.remaining_seconds);
-    this.currentPage.set(saved.current_page);
+    this.flagged.set(new Set(source.flagged));
+    this.remainingSeconds.set(source.remaining_seconds);
+    this.currentPage.set(source.current_page);
   }
 
   ngOnDestroy(): void {
@@ -636,6 +641,11 @@ export class TakeExamPage implements OnInit, OnDestroy {
     this.autoSaveTimeout = setTimeout(() => this.persistProgress(), 500);
   }
 
+  /** Key for the local mirror of this attempt. */
+  private localKey(): string {
+    return `exam_progress_${this.examId}_${this.mode()}`;
+  }
+
   private persistProgress(): void {
     if (this.questions().length === 0) return;
     this.autoSaveStatus.set('saving');
@@ -645,25 +655,56 @@ export class TakeExamPage implements OnInit, OnDestroy {
       answersObj[String(key)] = val;
     }
 
-    this.examService
-      .saveProgress({
-        exam_id: this.examId,
-        mode: this.mode(),
-        answers: answersObj,
-        flagged: [...this.flagged()],
-        question_order: this.questions().map((q) => q.number),
-        remaining_seconds: this.remainingSeconds(),
-        current_page: this.currentPage(),
-      })
-      .subscribe({
-        next: () => {
-          this.autoSaveStatus.set('saved');
-          setTimeout(() => {
-            if (this.autoSaveStatus() === 'saved') this.autoSaveStatus.set('idle');
-          }, 2000);
-        },
-        error: () => this.autoSaveStatus.set('idle'),
-      });
+    const payload = {
+      exam_id: this.examId,
+      mode: this.mode(),
+      answers: answersObj,
+      flagged: [...this.flagged()],
+      question_order: this.questions().map((q) => q.number),
+      remaining_seconds: this.remainingSeconds(),
+      current_page: this.currentPage(),
+    };
+
+    // Mirror locally before the request. An expired token, a network blip, or a
+    // backend restart mid-exam must never cost the student their answers.
+    try {
+      localStorage.setItem(this.localKey(), JSON.stringify({ savedAt: Date.now(), payload }));
+    } catch {
+      // Quota or private-mode failure — the server save below is still attempted.
+    }
+
+    this.examService.saveProgress(payload).subscribe({
+      next: () => {
+        this.autoSaveStatus.set('saved');
+        setTimeout(() => {
+          if (this.autoSaveStatus() === 'saved') this.autoSaveStatus.set('idle');
+        }, 2000);
+      },
+      // 'idle' looked identical to "nothing to save", so a whole exam could fail
+      // to save with no visible hint. Surface it.
+      error: () => this.autoSaveStatus.set('error'),
+    });
+  }
+
+  /** Local mirror for this attempt, if it is newer than what the server returned. */
+  private readLocalProgress(serverSavedAt: string | null): SaveProgressPayload | null {
+    try {
+      const raw = localStorage.getItem(this.localKey());
+      if (!raw) return null;
+      const { savedAt, payload } = JSON.parse(raw) as { savedAt: number; payload: SaveProgressPayload };
+      if (serverSavedAt && new Date(serverSavedAt).getTime() >= savedAt) return null;
+      return payload;
+    } catch {
+      return null;
+    }
+  }
+
+  private clearLocalProgress(): void {
+    try {
+      localStorage.removeItem(this.localKey());
+    } catch {
+      // Nothing to do — a stale mirror is discarded on the next successful save.
+    }
   }
 
   // ── Submit ──────────────────────────────────────────────────
@@ -696,6 +737,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
       .subscribe({
         next: (result) => {
           this.submitting.set(false);
+          this.clearLocalProgress();
           this.examService
             .deleteInProgressByExam(this.examId, this.mode())
             .subscribe({ error: () => {} });
@@ -703,7 +745,9 @@ export class TakeExamPage implements OnInit, OnDestroy {
         },
         error: () => {
           this.submitting.set(false);
-          alert('Submission failed. Please try again.');
+          // The local mirror is deliberately left in place: reopening the exam
+          // restores these answers rather than losing them.
+          alert('Submission failed. Your answers are saved on this device — sign in again and reopen the exam to retry.');
         },
       });
   }

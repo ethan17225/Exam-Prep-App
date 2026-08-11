@@ -42,10 +42,34 @@
   }
 }
 
+// Sits inside .nav-links so the mobile bottom bar treats it as another tab.
+.nav-logout {
+  padding: 0.4rem 0.85rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #555;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+
+  &:hover {
+    background: #f5f5f5;
+    color: #111;
+  }
+}
+
 .main {
   max-width: 860px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
+}
+
+// No nav on the login/register screens — reclaim the bottom padding.
+.main-plain {
+  padding-bottom: 2rem;
 }
 
 // ── Mobile: bottom tab bar ──────────────────────────────────────
@@ -118,9 +142,25 @@
     }
   }
 
+  .nav-logout {
+    flex: 1;
+    min-width: 0;
+    padding: 0.6rem 0.3rem;
+    border-radius: 0;
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+    color: #888;
+    min-height: 48px;
+  }
+
   .main {
     padding: 1.25rem 1rem;
     // bottom padding for fixed nav bar
     padding-bottom: calc(60px + env(safe-area-inset-bottom));
+  }
+
+  .main-plain {
+    padding-bottom: 1.25rem;
   }
 }
