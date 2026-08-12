@@ -1,12 +1,29 @@
 import logging
+from typing import Annotated
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, File, Response, UploadFile, status
 
 from src.auth import service
 from src.auth.constants import AUTH_COOKIE
 from src.auth.dependencies import CurrentUserDep
-from src.auth.exceptions import BadCredentials, EmailTaken, InvalidInviteCode, RegistrationClosed
-from src.auth.schemas import LoginIn, LogoutOut, PasswordChangeIn, RegisterIn, TokenOut, UserOut
+from src.auth.exceptions import (
+    AvatarTooLarge,
+    BadCredentials,
+    EmailTaken,
+    InvalidInviteCode,
+    RegistrationClosed,
+    UnsupportedAvatarType,
+)
+from src.auth.schemas import (
+    AvatarOut,
+    LoginIn,
+    LogoutOut,
+    MeOut,
+    PasswordChangeIn,
+    ProfileUpdate,
+    RegisterIn,
+    TokenOut,
+)
 from src.config import settings
 from src.database import SessionDep
 
@@ -22,8 +39,11 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
     response_model=TokenOut,
     summary="Register an account",
     description=(
-        "Creates a student account. Requires the shared invite code. Returns the "
-        "same token payload as login, and sets the auth cookie used by static files."
+        "Creates a student or instructor account. A student's invite code is their "
+        "instructor's personal code, which enrols them with that instructor; an "
+        "instructor's is the deployment-wide instructor code. Returns the same "
+        "token payload as login, and sets the auth cookie used by static files. "
+        "`display_name` comes back null — the client must then call PATCH /me."
     ),
     responses={
         status.HTTP_403_FORBIDDEN: {"description": f"{RegistrationClosed.DETAIL} / {InvalidInviteCode.DETAIL}"},
@@ -35,7 +55,7 @@ async def register(payload: RegisterIn, db: SessionDep):
     # FastAPI passes it through untouched — including its 200 status. Declaring
     # status_code=201 here would be a lie, as it was before this refactor.
     user = await service.register(payload, db)
-    logger.info("register ok user=%s", user.id)
+    logger.info("register ok user=%s role=%s", user.id, user.role)
     return service.login_response(user)
 
 
@@ -96,9 +116,51 @@ async def change_password(payload: PasswordChangeIn, user: CurrentUserDep, db: S
 
 @router.get(
     "/me",
-    response_model=UserOut,
+    response_model=MeOut,
     summary="Current account",
-    description="Returns the authenticated user's id, email and role.",
+    description=(
+        "The authenticated user's profile. `display_name` is null until onboarding "
+        "completes, `invite_code` is set only for instructors, and "
+        "`instructor_name` only for students."
+    ),
 )
-async def read_me(user: CurrentUserDep):
-    return user
+async def read_me(user: CurrentUserDep, db: SessionDep):
+    return await service.build_me(user, db)
+
+
+@router.patch(
+    "/me",
+    response_model=MeOut,
+    summary="Update your profile",
+    description="Sets the preferred name. This is what completes onboarding.",
+)
+async def update_me(payload: ProfileUpdate, user: CurrentUserDep, db: SessionDep):
+    await service.set_display_name(user, payload.display_name, db)
+    return await service.build_me(user, db)
+
+
+@router.post(
+    "/me/avatar",
+    response_model=AvatarOut,
+    summary="Upload your profile image",
+    description=(
+        "Replaces the caller's avatar. Multipart field name is `file`. SVG is "
+        "rejected: it is served same-origin, so a script inside one is stored XSS."
+    ),
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"description": UnsupportedAvatarType.DETAIL},
+        status.HTTP_413_CONTENT_TOO_LARGE: {"description": AvatarTooLarge.DETAIL},
+    },
+)
+async def upload_avatar(user: CurrentUserDep, db: SessionDep, file: Annotated[UploadFile, File()]):
+    return await service.replace_avatar(user, file, db)
+
+
+@router.delete(
+    "/me/avatar",
+    response_model=AvatarOut,
+    summary="Remove your profile image",
+    description="Clears the avatar and deletes the stored file. Idempotent.",
+)
+async def delete_avatar(user: CurrentUserDep, db: SessionDep):
+    return await service.clear_avatar(user, db)

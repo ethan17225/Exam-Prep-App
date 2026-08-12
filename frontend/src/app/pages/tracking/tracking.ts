@@ -8,12 +8,12 @@ import {
 } from '../../services/exam.service';
 
 @Component({
-  selector: 'app-admin',
+  selector: 'app-tracking',
   imports: [],
-  templateUrl: './admin.html',
-  styleUrl: './admin.scss',
+  templateUrl: './tracking.html',
+  styleUrl: './tracking.scss',
 })
-export class AdminPage implements OnInit, OnDestroy {
+export class TrackingPage implements OnInit, OnDestroy {
   items = signal<AdminDashboardItem[]>([]);
   loading = signal(true);
   loadError = signal('');

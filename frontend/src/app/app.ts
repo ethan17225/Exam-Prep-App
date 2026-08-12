@@ -1,22 +1,17 @@
 import { Component } from '@angular/core';
-import { Router, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 
+import { UserMenuComponent } from './components/user-menu/user-menu';
 import { AuthService } from './services/auth.service';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, UserMenuComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
 export class App {
-  constructor(
-    public auth: AuthService,
-    private router: Router,
-  ) {}
-
-  logout(): void {
-    this.auth.logout();
-    this.router.navigate(['/login']);
-  }
+  // Signing out moved into the user menu, which is why this class has no logic
+  // left beyond exposing auth to the template.
+  constructor(public auth: AuthService) {}
 }

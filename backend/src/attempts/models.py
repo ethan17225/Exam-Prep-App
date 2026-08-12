@@ -81,6 +81,10 @@ class History(Base):
     correct = Column(Integer, nullable=False)
     total = Column(Integer, nullable=False)
     passed = Column(Boolean, nullable=False)
+    # The threshold this attempt was graded against, copied from the exam. History
+    # is denormalized and outlives the exam, so without its own copy an instructor
+    # editing the pass grade would retroactively relabel past attempts.
+    pass_grade = Column(Integer, nullable=False)
     time_spent_seconds = Column(Integer, nullable=False)
     results = Column(JSONB, nullable=False)
     # NOT NULL: a nullable mode forced a defensive `record.mode or "exam"` in one

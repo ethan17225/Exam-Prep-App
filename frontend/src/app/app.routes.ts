@@ -1,6 +1,12 @@
 import { Routes } from '@angular/router';
 
-import { authGuard, instructorGuard } from './services/auth.guard';
+import {
+  authGuard,
+  instructorGuard,
+  instructorMatch,
+  onboardingGuard,
+  studentMatch,
+} from './services/auth.guard';
 
 export const routes: Routes = [
   { path: 'login', loadComponent: () => import('./pages/login/login').then((m) => m.LoginPage) },
@@ -9,16 +15,43 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/register/register').then((m) => m.RegisterPage),
   },
 
-  // Everything below requires a session. canActivateChild runs the guard on every
-  // child navigation, so a new page cannot be reached with a cleared token.
+  // Everything below requires a session. canActivateChild runs the guards on every
+  // child navigation, so a new page cannot be reached with a cleared token — or
+  // before the account has a preferred name.
   {
     path: '',
-    canActivateChild: [authGuard],
+    canActivateChild: [authGuard, onboardingGuard],
     children: [
       { path: '', redirectTo: 'overview', pathMatch: 'full' },
       {
+        path: 'onboarding',
+        loadComponent: () => import('./pages/onboarding/onboarding').then((m) => m.OnboardingPage),
+      },
+      {
+        path: 'account',
+        loadComponent: () => import('./pages/account/account').then((m) => m.AccountPage),
+      },
+      // Two entirely different landing pages behind one URL. canMatch falls
+      // through to the next candidate instead of redirecting, so each role loads
+      // only its own bundle. The student route is last and unguarded, which makes
+      // it the fallback if neither matcher runs.
+      {
         path: 'overview',
+        canMatch: [instructorMatch],
+        loadComponent: () =>
+          import('./pages/instructor-overview/instructor-overview').then(
+            (m) => m.InstructorOverviewPage,
+          ),
+      },
+      {
+        path: 'overview',
+        canMatch: [studentMatch],
         loadComponent: () => import('./pages/overview/overview').then((m) => m.OverviewPage),
+      },
+      {
+        path: 'students',
+        canActivate: [instructorGuard],
+        loadComponent: () => import('./pages/students/students').then((m) => m.StudentsPage),
       },
       {
         path: 'upload',
@@ -63,10 +96,13 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/documents/documents').then((m) => m.DocumentsPage),
       },
       {
-        path: 'admin',
+        path: 'tracking',
         canActivate: [instructorGuard],
-        loadComponent: () => import('./pages/admin/admin').then((m) => m.AdminPage),
+        loadComponent: () => import('./pages/tracking/tracking').then((m) => m.TrackingPage),
       },
+      // The page was called Admin until the instructor nav was reorganized.
+      // Kept so bookmarks and anything already linking to it still resolve.
+      { path: 'admin', redirectTo: 'tracking', pathMatch: 'full' },
     ],
   },
 

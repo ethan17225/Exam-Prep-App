@@ -19,7 +19,7 @@
     <div class="score-details">
       <span>{{ r.correct }} / {{ r.total }} correct</span>
       <span>Time: {{ formattedTime() }}</span>
-      <span>Need 72% to pass</span>
+      <span>Need {{ r.pass_grade }}% to pass</span>
     </div>
     <div class="score-type-breakdown">
       <span class="type-chip type-chip-mcq">MCQ {{ typeCounts().mcq }}</span>

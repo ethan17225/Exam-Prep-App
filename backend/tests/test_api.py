@@ -13,11 +13,17 @@ import pytest
 from httpx2 import AsyncClient
 
 from src.attempts.router import history_router, progress_router
+from src.attempts.schemas import HistorySummaryOut
+from src.auth import service as auth_service
+from src.auth.config import auth_settings
+from src.auth.constants import UserRole
+from src.auth.exceptions import InvalidInviteCode
+from src.auth.schemas import RegisterIn
 from src.constants import MAX_QUESTIONS_PER_EXAM
-from src.exams.constants import ALLOWED_IMAGE_EXTENSIONS
 from src.exams.exceptions import EmptyTitle, ExamNotFound, QuestionNotFound
 from src.grading.service import grade_question
 from src.identifiers import ID_LENGTH, new_id
+from src.storage import ALLOWED_IMAGE_EXTENSIONS
 
 SRC = Path(__file__).resolve().parent.parent / "src"
 
@@ -28,6 +34,9 @@ ANONYMOUS_GET_PATHS = [
     "/api/history/topic-stats",
     "/api/in-progress",
     "/api/admin/dashboard",
+    "/api/admin/overview",
+    "/api/admin/students",
+    "/api/admin/students/u1",
     "/api/documents",
     "/api/auth/me",
     # StaticFiles mounts: dependencies do not apply to them, so these prove the
@@ -53,8 +62,19 @@ async def test_garbage_token_is_rejected(anon: AsyncClient):
     assert resp.status_code == 401
 
 
-async def test_student_is_blocked_from_the_dashboard(as_student: AsyncClient):
-    assert (await as_student.get("/api/admin/dashboard")).status_code == 403
+@pytest.mark.parametrize(
+    "path",
+    ["/api/admin/dashboard", "/api/admin/overview", "/api/admin/students", "/api/admin/students/u9"],
+)
+async def test_student_is_blocked_from_instructor_routes(as_student: AsyncClient, path: str):
+    assert (await as_student.get(path)).status_code == 403
+
+
+async def test_anonymous_profile_mutations_are_rejected(anon: AsyncClient):
+    # These write the caller's own row, so an unauthenticated one has nothing to
+    # write — and the avatar delete unlinks a file.
+    assert (await anon.patch("/api/auth/me", json={"display_name": "x"})).status_code == 401
+    assert (await anon.delete("/api/auth/me/avatar")).status_code == 401
 
 
 # ── Input bounds: 422, never 500 ───────────────────────────────────
@@ -68,6 +88,10 @@ ONE_QUESTION = {"number": 1, "topic": "t", "type": "MCQ", "question": "q", "answ
         ("/api/exams", {"title": "x" * 300, "questions": []}),
         ("/api/exams", {"title": "ok", "questions": [], "time_limit_minutes": 9_999_999_999}),
         ("/api/exams", {"title": "ok", "questions": [ONE_QUESTION] * (MAX_QUESTIONS_PER_EXAM + 1)}),
+        # 0 is not a pass mark and >100 is unreachable: either would be an exam
+        # that every attempt passes, or one that none can.
+        ("/api/exams", {"title": "ok", "questions": [], "pass_grade": 0}),
+        ("/api/exams", {"title": "ok", "questions": [], "pass_grade": 101}),
         ("/api/courses", {"name": "x" * 300}),
         (
             "/api/exams/abc/submit",
@@ -117,6 +141,124 @@ async def test_question_number_may_be_omitted(as_student: AsyncClient):
     body = {k: v for k, v in ONE_QUESTION.items() if k != "number"}
     resp = await as_student.post("/api/exams", json={"title": "ok", "questions": [body]})
     assert resp.status_code != 422
+
+
+@pytest.mark.parametrize("pass_grade", [0, 101, -5])
+async def test_out_of_range_pass_grade_update_is_422(as_student: AsyncClient, pass_grade: int):
+    resp = await as_student.patch("/api/exams/abc/pass-grade", json={"pass_grade": pass_grade})
+    assert resp.status_code == 422
+
+
+@pytest.mark.parametrize("pass_grade", [1, 72, 100])
+async def test_in_range_pass_grade_update_passes_validation(as_student: AsyncClient, pass_grade: int):
+    # Reaches the dead DB and 500s, which is proof that validation let it through.
+    resp = await as_student.patch("/api/exams/abc/pass-grade", json={"pass_grade": pass_grade})
+    assert resp.status_code != 422
+
+
+async def test_pass_grade_defaults_rather_than_being_required(as_student: AsyncClient):
+    # Existing API callers predate the field, so omitting it must not 422 — the
+    # upload form is what makes it a required input.
+    resp = await as_student.post("/api/exams", json={"title": "ok", "questions": []})
+    assert resp.status_code != 422
+
+
+async def test_history_carries_the_threshold_it_was_graded_against():
+    # Editing an exam's pass grade must not relabel attempts that are already
+    # graded, which is only possible because History has its own copy.
+    assert "pass_grade" in HistorySummaryOut.model_fields
+
+
+# ── Registration roles ─────────────────────────────────────────────
+#
+# `register` does two SELECTs then an add and a commit, so a stub session covers
+# it without Postgres — the same reason the rest of this file needs no database.
+
+
+class _FakeResult:
+    def __init__(self, value):
+        self._value = value
+
+    def scalar_one_or_none(self):
+        return self._value
+
+
+class _FakeSession:
+    """Returns the queued values, in order, from successive execute() calls."""
+
+    def __init__(self, results):
+        self._results = list(results)
+        self.added = []
+
+    async def execute(self, *_args, **_kwargs):
+        return _FakeResult(self._results.pop(0))
+
+    def add(self, obj):
+        self.added.append(obj)
+
+    async def commit(self):
+        pass
+
+
+def _register_payload(**overrides) -> RegisterIn:
+    return RegisterIn(**{"email": "new@example.com", "password": "password1", **overrides})
+
+
+def test_registration_defaults_to_student():
+    # A payload with no role must never mint an instructor.
+    assert _register_payload(invite_code="x").role is UserRole.STUDENT
+
+
+@pytest.mark.parametrize("role", ["admin", "Instructor", "superuser", ""])
+async def test_unknown_registration_role_is_422(anon: AsyncClient, role: str):
+    body = {"email": "a@b.co", "password": "password1", "invite_code": "x", "role": role}
+    assert (await anon.post("/api/auth/register", json=body)).status_code == 422
+
+
+async def test_wrong_instructor_code_cannot_mint_an_instructor(anon: AsyncClient):
+    # The only gate on instructor sign-up is AUTH_INSTRUCTOR_INVITE_CODE, so a
+    # wrong value must fail before any database work.
+    body = {
+        "email": "a@b.co",
+        "password": "password1",
+        "invite_code": "definitely-not-the-code",
+        "role": "instructor",
+    }
+    resp = await anon.post("/api/auth/register", json=body)
+    assert resp.status_code == InvalidInviteCode.STATUS_CODE == 403
+    assert resp.json()["detail"] == InvalidInviteCode.DETAIL
+
+
+async def test_student_registration_links_the_instructor_and_mints_no_code(instructor):
+    # The invite-code lookup finds the instructor; the email lookup finds nobody.
+    db = _FakeSession([instructor, None])
+    user = await auth_service.register(_register_payload(invite_code=instructor.invite_code), db)
+
+    assert user.role is UserRole.STUDENT
+    assert user.instructor_id == instructor.id
+    # A student holding an invite code could enrol other students under themselves.
+    assert user.invite_code is None
+    # NULL display_name is what sends the new account through onboarding.
+    assert user.display_name is None
+
+
+async def test_unknown_student_invite_code_is_rejected():
+    # No instructor owns that code, and there is no shared student code any more,
+    # so there is no way to create a student who belongs to nobody.
+    db = _FakeSession([None])
+    with pytest.raises(InvalidInviteCode):
+        await auth_service.register(_register_payload(invite_code="nobodys-code"), db)
+
+
+async def test_instructor_registration_mints_a_personal_code():
+    db = _FakeSession([None])
+    payload = _register_payload(invite_code=auth_settings.instructor_invite_code, role=UserRole.INSTRUCTOR)
+    user = await auth_service.register(payload, db)
+
+    assert user.role is UserRole.INSTRUCTOR
+    # Without a code of their own an instructor cannot enrol anybody.
+    assert user.invite_code
+    assert user.instructor_id is None
 
 
 def test_svg_is_not_an_allowed_image_type():

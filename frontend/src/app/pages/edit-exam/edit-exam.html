@@ -649,5 +649,12 @@
         </div>
       }
     </div>
+  } @empty {
+    <!-- Reachable straight from Upload's manual mode, which creates the exam with
+         no questions at all. Without this the page is a header over blank space. -->
+    <p class="empty-state">
+      This exam has no questions yet. Use <strong>+ Add Question</strong> above to create the first
+      one.
+    </p>
   }
 }

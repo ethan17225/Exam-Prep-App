@@ -1,6 +1,27 @@
 <h1 class="page-title">Upload Exam</h1>
 
 <div class="card upload-card">
+  <div class="mode-tabs" role="tablist" aria-label="How to add questions">
+    <button
+      type="button"
+      role="tab"
+      [attr.aria-selected]="mode() === 'manual'"
+      [class.active]="mode() === 'manual'"
+      (click)="setMode('manual')"
+    >
+      Add questions manually
+    </button>
+    <button
+      type="button"
+      role="tab"
+      [attr.aria-selected]="mode() === 'json'"
+      [class.active]="mode() === 'json'"
+      (click)="setMode('json')"
+    >
+      Add questions by JSON
+    </button>
+  </div>
+
   <label class="field-label" for="upload-course-select">Course</label>
   <div class="course-selector">
     <select
@@ -60,22 +81,48 @@
     min="1"
   />
 
-  <label class="field-label" for="upload-json">Questions JSON</label>
-  <textarea
-    id="upload-json"
-    rows="16"
-    [ngModel]="jsonText()"
-    (ngModelChange)="jsonText.set($event)"
-    placeholder="Paste your JSON array here, or use the file picker below..."
-  ></textarea>
+  <label class="field-label" for="upload-pass-grade"
+    >Pass Grade (%) <span class="field-hint">(Required, 1–100)</span></label
+  >
+  <input
+    id="upload-pass-grade"
+    type="number"
+    [ngModel]="passGrade()"
+    (ngModelChange)="passGrade.set($event)"
+    placeholder="e.g. 72"
+    min="1"
+    max="100"
+  />
+
+  @if (mode() === 'json') {
+    <label class="field-label" for="upload-json">Questions JSON</label>
+    <textarea
+      id="upload-json"
+      rows="16"
+      [ngModel]="jsonText()"
+      (ngModelChange)="jsonText.set($event)"
+      placeholder="Paste your JSON array here, or use the file picker below..."
+    ></textarea>
+  } @else {
+    <p class="mode-note">
+      The exam will be created empty and you will land in the question editor, where you can add
+      questions one at a time.
+    </p>
+  }
 
   <div class="upload-actions">
-    <label class="btn btn-secondary file-btn">
-      Choose File
-      <input type="file" accept=".json" (change)="onFileSelected($event)" hidden />
-    </label>
+    @if (mode() === 'json') {
+      <label class="btn btn-secondary file-btn">
+        Choose File
+        <input type="file" accept=".json" (change)="onFileSelected($event)" hidden />
+      </label>
+    }
     <button class="btn btn-primary" (click)="submit()" [disabled]="loading()">
-      {{ loading() ? 'Creating...' : 'Create Exam' }}
+      @if (loading()) {
+        Creating...
+      } @else {
+        {{ mode() === 'manual' ? 'Create & Add Questions' : 'Create Exam' }}
+      }
     </button>
   </div>
 
@@ -84,82 +131,111 @@
   }
 </div>
 
-<div class="format-hint card">
-  <strong>Supported question types:</strong>
-  <ul>
-    <li><code>MCQ</code> — single correct answer (answer is a letter, e.g. "C")</li>
-    <li><code>SATA</code> — select all that apply (answer is an array, e.g. ["A","C"])</li>
-    <li><code>FIB</code> — fill in the blank (answer is a text or numeric string)</li>
-    <li>
-      <code>MATRIX</code> — grid of rows × columns with checkboxes (answer maps row index to correct
-      column names)
-    </li>
-    <li>
-      <code>CLOZE</code> — statement with dropdown blanks (answer is one choice per blank, in order)
-    </li>
-    <li>
-      <code>BOWTIE</code> — assign choices to categories, e.g. condition / findings / interventions
-      (answer maps category name to correct choices)
-    </li>
-    <li>
-      <code>RANKING</code> — put items in the correct order (options is the display order, answer is
-      the correct order)
-    </li>
-    <li>
-      <code>HIGHLIGHT</code> — click phrases in a passage (answer is the list of correct token
-      indices, 0-based)
-    </li>
-    <li>
-      <code>HOTSPOT</code> — click a region on an image (regions use percent coordinates; upload the
-      image afterwards via <em>Edit Questions</em>)
-    </li>
-  </ul>
-  <p class="format-note">
-    Any question type can also carry an image (e.g. an ECG strip) — attach it after upload via the
-    exam's <em>Edit Questions</em> menu.
-  </p>
+<!-- Both cards below document the JSON format, so they are noise in manual mode
+     where the question editor's own form is the interface. -->
+@if (mode() === 'json') {
+  <div class="format-hint card">
+    <strong>Supported question types:</strong>
+    <ul>
+      <li><code>MCQ</code> — single correct answer (answer is a letter, e.g. "C")</li>
+      <li><code>SATA</code> — select all that apply (answer is an array, e.g. ["A","C"])</li>
+      <li><code>FIB</code> — fill in the blank (answer is a text or numeric string)</li>
+      <li>
+        <code>MATRIX</code> — grid of rows × columns with checkboxes (answer maps row index to
+        correct column names)
+      </li>
+      <li>
+        <code>CLOZE</code> — statement with dropdown blanks (answer is one choice per blank, in
+        order)
+      </li>
+      <li>
+        <code>BOWTIE</code> — assign choices to categories, e.g. condition / findings /
+        interventions (answer maps category name to correct choices)
+      </li>
+      <li>
+        <code>RANKING</code> — put items in the correct order (options is the display order, answer
+        is the correct order)
+      </li>
+      <li>
+        <code>HIGHLIGHT</code> — click phrases in a passage (answer is the list of correct token
+        indices, 0-based)
+      </li>
+      <li>
+        <code>HOTSPOT</code> — click a region on an image (regions use percent coordinates; upload
+        the image afterwards via <em>Edit Questions</em>)
+      </li>
+    </ul>
+    <p class="format-note">
+      Any question type can also carry an image (e.g. an ECG strip) — attach it after upload via the
+      exam's <em>Edit Questions</em> menu.
+    </p>
 
-  <strong>Patient data sections (optional):</strong>
-  <p class="format-note">
-    Add a <code>sections</code> array to any question to attach supporting case-study data such as
-    nurses' notes, vital signs, labs, orders or medication records. Each section is one tab: two or
-    more sections render as a tabbed chart above the question.
-  </p>
-  <ul>
-    <li><code>title</code> — the tab label, e.g. "Laboratory Results"</li>
-    <li><code>blocks</code> — the tab content, in order. Each block is one of:</li>
-    <li class="sub">
-      <code>{{ '{' }} "type": "text", "text": "..." {{ '}' }}</code> — a paragraph (line breaks are
-      preserved)
-    </li>
-    <li class="sub">
-      <code>{{ '{' }} "type": "list", "items": ["...", "..."] {{ '}' }}</code> — a bulleted list
-    </li>
-    <li class="sub">
-      <code
-        >{{ '{' }} "type": "table", "caption": "...", "headers": [...], "rows": [[...]]
-        {{ '}' }}</code
-      >
-      — a data table; <code>caption</code> is optional
-    </li>
-  </ul>
-</div>
-
-<div class="example-section card">
-  <div
-    class="example-header"
-    role="button"
-    tabindex="0"
-    (click)="showExample.set(!showExample())"
-    (keydown.enter)="showExample.set(!showExample())"
-  >
-    <strong>JSON Example</strong>
-    <span class="example-toggle">{{ showExample() ? '▾ Hide' : '▸ Show' }}</span>
+    <strong>Patient data sections (optional):</strong>
+    <p class="format-note">
+      Add a <code>sections</code> array to any question to attach supporting case-study data such as
+      nurses' notes, vital signs, labs, orders or medication records. Each section is one tab: two
+      or more sections render as a tabbed chart above the question.
+    </p>
+    <ul>
+      <li><code>title</code> — the tab label, e.g. "Laboratory Results"</li>
+      <li><code>blocks</code> — the tab content, in order. Each block is one of:</li>
+      <li class="sub">
+        <code>{{ '{' }} "type": "text", "text": "..." {{ '}' }}</code> — a paragraph (line breaks
+        are preserved)
+      </li>
+      <li class="sub">
+        <code>{{ '{' }} "type": "list", "items": ["...", "..."] {{ '}' }}</code> — a bulleted list
+      </li>
+      <li class="sub">
+        <code
+          >{{ '{' }} "type": "table", "caption": "...", "headers": [...], "rows": [[...]]
+          {{ '}' }}</code
+        >
+        — a data table; <code>caption</code> is optional
+      </li>
+    </ul>
   </div>
-  @if (showExample()) {
-    <pre class="example-json">{{ exampleJson }}</pre>
-    <button class="btn btn-secondary btn-sm copy-btn" (click)="copyExample()">
-      {{ copied() ? 'Copied!' : 'Copy to clipboard' }}
-    </button>
-  }
-</div>
+
+  <div class="example-section card">
+    <div
+      class="example-header"
+      role="button"
+      tabindex="0"
+      (click)="showExample.set(!showExample())"
+      (keydown.enter)="showExample.set(!showExample())"
+    >
+      <strong>JSON Example</strong>
+      <span class="example-toggle">{{ showExample() ? '▾ Hide' : '▸ Show' }}</span>
+    </div>
+    @if (showExample()) {
+      <!-- Multi-select, not one-of: the point is to build the exact subset you
+           are about to write. "All" is the no-selection state. -->
+      <div class="type-tabs" role="group" aria-label="Filter example by question type">
+        <button
+          type="button"
+          class="type-tab"
+          [class.active]="allTypesActive"
+          [attr.aria-pressed]="allTypesActive"
+          (click)="selectAllTypes()"
+        >
+          All
+        </button>
+        @for (type of exampleTypes; track type) {
+          <button
+            type="button"
+            class="type-tab"
+            [class.active]="isTypeSelected(type)"
+            [attr.aria-pressed]="isTypeSelected(type)"
+            (click)="toggleType(type)"
+          >
+            {{ type }}
+          </button>
+        }
+      </div>
+      <pre class="example-json">{{ exampleJson() }}</pre>
+      <button class="btn btn-secondary btn-sm copy-btn" (click)="copyExample()">
+        {{ copied() ? 'Copied!' : 'Copy to clipboard' }}
+      </button>
+    }
+  </div>
+}

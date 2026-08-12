@@ -1,4 +1,4 @@
-<h1 class="page-title">Admin Dashboard</h1>
+<h1 class="page-title">Tracking</h1>
 <p class="subtitle">Live exam monitoring &mdash; auto-refreshes every 3 seconds</p>
 
 @if (loadError()) {
@@ -26,8 +26,13 @@
             {{ item.mode === 'practice' ? 'Practice' : 'Exam' }}
           </span>
         </div>
-        @if (item.student_email) {
-          <div class="dash-student">{{ item.student_email }}</div>
+        @if (item.student_name || item.student_email) {
+          <div class="dash-student">
+            <strong>{{ item.student_name || 'Unnamed' }}</strong>
+            @if (item.student_email) {
+              <span>{{ item.student_email }}</span>
+            }
+          </div>
         }
 
         <div class="progress-section">
@@ -61,12 +66,12 @@
           <div class="stat">
             <span
               class="stat-value score"
-              [class.score-pass]="item.score_percent >= 72"
-              [class.score-fail]="item.score_percent < 72 && item.answered_count > 0"
+              [class.score-pass]="item.score_percent >= item.pass_grade"
+              [class.score-fail]="item.score_percent < item.pass_grade && item.answered_count > 0"
             >
               {{ item.score_percent }}%
             </span>
-            <span class="stat-label">Score</span>
+            <span class="stat-label">Score / {{ item.pass_grade }}%</span>
           </div>
           <div class="stat">
             <span class="stat-value timer">{{ formatClock(item.remaining_seconds) }}</span>

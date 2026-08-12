@@ -36,3 +36,13 @@ class InvalidInviteCode(DetailedHTTPException):
 class EmailTaken(DetailedHTTPException):
     STATUS_CODE = 409
     DETAIL = "An account with that email already exists"
+
+
+class UnsupportedAvatarType(DetailedHTTPException):
+    STATUS_CODE = 400
+    DETAIL = "Unsupported image type"
+
+
+class AvatarTooLarge(DetailedHTTPException):
+    STATUS_CODE = 413
+    DETAIL = "Image is too large"

@@ -1,0 +1,58 @@
+<div class="auth-page">
+  <div class="card auth-card onboarding-card">
+    <h1 class="page-title">Finish setting up</h1>
+    <p class="auth-hint onboarding-intro">
+      Your account is ready. Tell us what to call you, and add a photo if you like.
+    </p>
+
+    <div class="avatar-row">
+      <div class="avatar-preview">
+        @if (previewUrl()) {
+          <img [src]="previewUrl()" alt="Profile image preview" />
+        } @else {
+          <span class="avatar-initials">{{ initials() }}</span>
+        }
+      </div>
+      <div class="avatar-actions">
+        <label class="btn btn-secondary btn-sm">
+          {{ previewUrl() ? 'Change photo' : 'Choose photo' }}
+          <input type="file" accept="image/*" (change)="onFileSelected($event)" hidden />
+        </label>
+        @if (previewUrl()) {
+          <button type="button" class="btn btn-secondary btn-sm" (click)="clearImage()">
+            Remove
+          </button>
+        }
+        <span class="avatar-note">Optional. PNG, JPG, GIF or WebP, up to 5 MB.</span>
+      </div>
+    </div>
+
+    @if (avatarError()) {
+      <p class="auth-error">{{ avatarError() }}</p>
+    }
+
+    <form (ngSubmit)="submit()">
+      <label class="field">
+        <span>Preferred name</span>
+        <input
+          type="text"
+          name="displayName"
+          autocomplete="nickname"
+          maxlength="80"
+          placeholder="e.g. Alex"
+          [ngModel]="displayName()"
+          (ngModelChange)="displayName.set($event)"
+        />
+      </label>
+      <p class="auth-hint">This is how you will appear to your instructor.</p>
+
+      @if (error()) {
+        <p class="auth-error">{{ error() }}</p>
+      }
+
+      <button type="submit" class="btn btn-primary auth-submit" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : 'Continue' }}
+      </button>
+    </form>
+  </div>
+</div>

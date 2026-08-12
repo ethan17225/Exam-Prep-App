@@ -1,0 +1,119 @@
+:host {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+// ── Trigger ──
+.user-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+
+  &:hover .user-avatar,
+  &.open .user-avatar {
+    border-color: #111;
+  }
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border: 1px solid #ddd;
+  border-radius: 50%;
+  transition: border-color 0.15s;
+}
+
+.user-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f0f0;
+  color: #555;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+// ── Popover ──
+.user-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 300;
+  min-width: 200px;
+  padding: 0.35rem;
+  background: #fff;
+  border: 1px solid #e2e2e2;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 10%);
+}
+
+.user-menu-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.5rem 0.6rem 0.6rem;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 0.3rem;
+
+  strong {
+    font-size: 0.88rem;
+  }
+
+  span {
+    font-size: 0.75rem;
+    color: #888;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.user-menu-item {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #333;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover {
+    background: #f5f5f5;
+    color: #111;
+  }
+}
+
+// ── Mobile: first item in the bottom tab bar ──
+@media (max-width: 640px) {
+  :host {
+    justify-content: center;
+    padding: 0.3rem 0.6rem;
+  }
+
+  .user-trigger {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  // Opens upward: the bar is pinned to the bottom of the viewport.
+  .user-menu {
+    top: auto;
+    bottom: calc(100% + 0.4rem);
+    left: 0.4rem;
+  }
+}

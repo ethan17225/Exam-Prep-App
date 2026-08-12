@@ -32,6 +32,8 @@ ADVANCED_TYPES = {
 
 FIB_TYPES = {QuestionType.FIB, "FILL-IN-THE-BLANK"}
 
-# Mirrored by the frontend's overview chart line (overview.ts) and the README.
-# Deliberately not an env var — all three must change together or none.
-PASS_THRESHOLD = 0.72
+# The passing score, as a percentage, for an exam whose creator did not choose
+# one. Every exam carries its own `pass_grade` and every graded attempt copies the
+# threshold it was scored against onto its History row, so this is only ever a
+# default for new exams — never the value a comparison is made against.
+DEFAULT_PASS_GRADE = 72

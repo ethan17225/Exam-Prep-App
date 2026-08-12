@@ -1,0 +1,160 @@
+<h1 class="page-title">Account</h1>
+
+@if (loadError()) {
+  <div class="empty-state">
+    <p>{{ loadError() }}</p>
+    <button class="btn btn-primary" (click)="load()">Retry</button>
+  </div>
+} @else if (loading()) {
+  <p class="empty-state">Loading...</p>
+} @else if (me(); as user) {
+  <div class="account-stack">
+    <!-- ── Profile ── -->
+    <section class="card account-card">
+      <div class="profile-row">
+        <div class="profile-avatar">
+          @if (user.avatar) {
+            <img [src]="user.avatar" [alt]="user.display_name || 'Profile image'" />
+          } @else {
+            <span class="profile-initials">{{ initials() }}</span>
+          }
+        </div>
+        <div class="profile-info">
+          <strong class="profile-name">{{ user.display_name || 'Unnamed' }}</strong>
+          <span class="profile-email">{{ user.email }}</span>
+          <span class="badge badge-other profile-role">
+            {{ user.role === 'instructor' ? 'Instructor' : 'Student' }}
+          </span>
+        </div>
+      </div>
+
+      <div class="avatar-actions">
+        <label class="btn btn-secondary btn-sm" [class.disabled]="savingAvatar()">
+          {{ user.avatar ? 'Change photo' : 'Upload photo' }}
+          <input
+            type="file"
+            accept="image/*"
+            hidden
+            [disabled]="savingAvatar()"
+            (change)="onFileSelected($event)"
+          />
+        </label>
+        @if (user.avatar) {
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            [disabled]="savingAvatar()"
+            (click)="removeAvatar()"
+          >
+            Remove photo
+          </button>
+        }
+        @if (savingAvatar()) {
+          <span class="account-note">Working…</span>
+        }
+      </div>
+      @if (avatarError()) {
+        <p class="auth-error account-inline-error">{{ avatarError() }}</p>
+      }
+    </section>
+
+    <!-- ── Preferred name ── -->
+    <section class="card account-card">
+      <h2 class="account-heading">Preferred name</h2>
+      <form class="account-form" (ngSubmit)="saveName()">
+        <label class="field">
+          <span>How you appear across the app</span>
+          <input
+            type="text"
+            name="displayName"
+            maxlength="80"
+            [ngModel]="nameDraft()"
+            (ngModelChange)="nameDraft.set($event); nameSaved.set(false)"
+          />
+        </label>
+        @if (nameError()) {
+          <p class="auth-error account-inline-error">{{ nameError() }}</p>
+        }
+        @if (nameSaved()) {
+          <p class="account-success">Saved.</p>
+        }
+        <button type="submit" class="btn btn-primary btn-sm" [disabled]="savingName()">
+          {{ savingName() ? 'Saving…' : 'Save name' }}
+        </button>
+      </form>
+    </section>
+
+    <!-- ── Role-specific: enrolment ── -->
+    @if (user.role === 'instructor') {
+      <section class="card account-card">
+        <h2 class="account-heading">Your invite code</h2>
+        <p class="account-note">
+          Share this with your students. Registering with it enrols them under you, and everything
+          on Students and Tracking is scoped to that.
+        </p>
+        <div class="invite-row">
+          <code class="invite-code">{{ user.invite_code }}</code>
+          <button type="button" class="btn btn-secondary btn-sm" (click)="copyInviteCode()">
+            {{ codeCopied() ? 'Copied' : 'Copy' }}
+          </button>
+        </div>
+      </section>
+    } @else {
+      <section class="card account-card">
+        <h2 class="account-heading">Your instructor</h2>
+        <p class="account-value">{{ user.instructor_name || 'Not linked to an instructor' }}</p>
+      </section>
+    }
+
+    <!-- ── Password ── -->
+    <section class="card account-card">
+      <h2 class="account-heading">Change password</h2>
+      <p class="account-note">
+        Changing it signs you out everywhere else. You will stay signed in here.
+      </p>
+      <form class="account-form" (ngSubmit)="changePassword()">
+        <label class="field">
+          <span>Current password</span>
+          <input
+            type="password"
+            name="currentPassword"
+            autocomplete="current-password"
+            [ngModel]="currentPassword()"
+            (ngModelChange)="currentPassword.set($event)"
+          />
+        </label>
+        <label class="field">
+          <span>New password</span>
+          <input
+            type="password"
+            name="newPassword"
+            autocomplete="new-password"
+            [ngModel]="newPassword()"
+            (ngModelChange)="newPassword.set($event)"
+          />
+        </label>
+        <label class="field">
+          <span>Confirm new password</span>
+          <input
+            type="password"
+            name="confirmPassword"
+            autocomplete="new-password"
+            [ngModel]="confirmPassword()"
+            (ngModelChange)="confirmPassword.set($event)"
+          />
+        </label>
+        <p class="auth-hint">At least 8 characters.</p>
+
+        @if (passwordError()) {
+          <p class="auth-error account-inline-error">{{ passwordError() }}</p>
+        }
+        @if (passwordSaved()) {
+          <p class="account-success">Password changed.</p>
+        }
+        <button type="submit" class="btn btn-primary btn-sm" [disabled]="savingPassword()">
+          {{ savingPassword() ? 'Saving…' : 'Change password' }}
+        </button>
+      </form>
+    </section>
+  </div>
+}

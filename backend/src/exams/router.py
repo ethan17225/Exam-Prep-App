@@ -13,6 +13,7 @@ from src.exams.schemas import (
     ExamCreate,
     ExamCreatedOut,
     ExamDetailOut,
+    ExamPassGradeUpdate,
     ExamSummaryOut,
     ExamTimeLimitUpdate,
     ExamTitleUpdate,
@@ -123,6 +124,22 @@ async def update_exam_time_limit(exam_id: str, payload: ExamTimeLimitUpdate, use
 )
 async def update_allow_practice(exam_id: str, payload: ExamAllowPracticeUpdate, user: CurrentUserDep, db: SessionDep):
     exam = await service.set_allow_practice(exam_id, payload.allow_practice, user, db)
+    return await service.exam_summary(exam, user, db)
+
+
+@router.patch(
+    "/{exam_id}/pass-grade",
+    response_model=ExamSummaryOut,
+    summary="Set the pass grade",
+    description=(
+        "Sets the passing score as a percentage, 1-100. Applies to attempts "
+        "submitted from now on: every past attempt keeps the threshold it was "
+        "actually graded against."
+    ),
+    responses=NO_EXAM,
+)
+async def update_exam_pass_grade(exam_id: str, payload: ExamPassGradeUpdate, user: CurrentUserDep, db: SessionDep):
+    exam = await service.set_pass_grade(exam_id, payload.pass_grade, user, db)
     return await service.exam_summary(exam, user, db)
 
 

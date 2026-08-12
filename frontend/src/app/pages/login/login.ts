@@ -28,7 +28,8 @@ export class LoginPage implements OnInit {
     // Only same-origin absolute paths. `//evil.example` is a protocol-relative
     // URL, so reject a leading `//` — otherwise a phishing link could bounce the
     // user off-site after login.
-    this.returnUrl = requested.startsWith('/') && !requested.startsWith('//') ? requested : '/overview';
+    this.returnUrl =
+      requested.startsWith('/') && !requested.startsWith('//') ? requested : '/overview';
     if (this.auth.isLoggedIn()) {
       this.router.navigateByUrl(this.returnUrl);
     }

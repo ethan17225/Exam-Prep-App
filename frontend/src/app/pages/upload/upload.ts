@@ -1,7 +1,15 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, computed, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { ExamService, Course } from '../../services/exam.service';
+
+import { Course, ExamService } from '../../services/exam.service';
+import { EXAMPLE_TYPES, buildExampleJson } from './upload.examples';
+
+/** Whether questions come from a pasted array or get added one at a time. */
+type UploadMode = 'json' | 'manual';
+
+/** The default pass mark, mirroring the backend's DEFAULT_PASS_GRADE. */
+const DEFAULT_PASS_GRADE = 72;
 
 @Component({
   selector: 'app-upload',
@@ -10,6 +18,8 @@ import { ExamService, Course } from '../../services/exam.service';
   styleUrl: './upload.scss',
 })
 export class UploadPage implements OnInit {
+  mode = signal<UploadMode>('json');
+
   title = signal('');
   jsonText = signal('');
   error = signal('');
@@ -24,159 +34,12 @@ export class UploadPage implements OnInit {
   courseLoading = signal(false);
   courseError = signal('');
   timeLimitMinutes = signal<number | null>(null);
+  passGrade = signal<number | null>(DEFAULT_PASS_GRADE);
 
-  readonly exampleJson = `[
-  {
-    "number": 1,
-    "topic": "Pharmacology",
-    "type": "MCQ",
-    "question": "Which medication is a beta-blocker?",
-    "options": [
-      "A. Metoprolol",
-      "B. Lisinopril",
-      "C. Amlodipine",
-      "D. Losartan"
-    ],
-    "answer": "A",
-    "rationale": "Metoprolol is a selective beta-1 blocker."
-  },
-  {
-    "number": 2,
-    "topic": "Infection Control",
-    "type": "SATA",
-    "question": "Which are standard precautions? Select all that apply.",
-    "options": [
-      "A. Hand hygiene",
-      "B. Use of PPE",
-      "C. Reverse isolation",
-      "D. Safe injection practices"
-    ],
-    "answer": ["A", "B", "D"],
-    "rationale": "Standard precautions include hand hygiene, PPE, and safe injection practices."
-  },
-  {
-    "number": 3,
-    "topic": "Anatomy",
-    "type": "FIB",
-    "question": "The largest organ of the human body is the ____.",
-    "answer": "skin",
-    "rationale": "The skin is the largest organ by surface area."
-  },
-  {
-    "number": 4,
-    "topic": "Endocrine",
-    "type": "MATRIX",
-    "question": "For each finding, check the matching diabetes type.",
-    "options": {
-      "rows": ["HgA1C 6.8%", "BMI 35.9"],
-      "columns": ["Type 1 Diabetes", "Type 2 Diabetes"]
-    },
-    "answer": { "0": ["Type 1 Diabetes", "Type 2 Diabetes"], "1": ["Type 2 Diabetes"] },
-    "rationale": "Answer keys map row index to the correct column(s)."
-  },
-  {
-    "number": 5,
-    "topic": "Diabetes",
-    "type": "CLOZE",
-    "question": "The client should be instructed to [1] and [2] if the blood sugar is 60 mg/dL.",
-    "options": {
-      "blanks": [
-        { "label": "Dropdown 1", "choices": ["fast", "drink orange juice", "call 911"] },
-        { "label": "Dropdown 2", "choices": ["continue to monitor symptoms", "drink four glasses of water"] }
-      ]
-    },
-    "answer": ["drink orange juice", "continue to monitor symptoms"],
-    "rationale": "One answer per blank, in order."
-  },
-  {
-    "number": 6,
-    "topic": "Newborn",
-    "type": "BOWTIE",
-    "question": "Drag one condition and two interventions.",
-    "options": {
-      "categories": [
-        { "name": "Potential Condition", "count": 1, "choices": ["Acrocyanosis", "Meconium aspiration syndrome"] },
-        { "name": "Potential Interventions", "count": 2, "choices": ["Suctioning", "Oxygen therapy", "Phototherapy"] }
-      ]
-    },
-    "answer": {
-      "Potential Condition": ["Meconium aspiration syndrome"],
-      "Potential Interventions": ["Suctioning", "Oxygen therapy"]
-    },
-    "rationale": "Answer keys map category name to the correct choice(s)."
-  },
-  {
-    "number": 7,
-    "topic": "Urinary",
-    "type": "RANKING",
-    "question": "Rank from highest risk to lowest risk for UTI.",
-    "options": ["Older males", "School-age female", "Older females", "Adolescent males"],
-    "answer": ["Older females", "Older males", "School-age female", "Adolescent males"],
-    "rationale": "Options is the display order; answer is the correct order."
-  },
-  {
-    "number": 8,
-    "topic": "Assessment",
-    "type": "HIGHLIGHT",
-    "question": "Click to highlight the findings that require follow-up.",
-    "options": {
-      "tokens": ["Blood pressure 160/100 mm Hg", "Heart rate 88 beats/min", "BMI 35.9 kg/m2"]
-    },
-    "answer": [0, 2],
-    "rationale": "Answer is the list of correct token indices (0-based)."
-  },
-  {
-    "number": 9,
-    "topic": "Pediatrics",
-    "type": "HOTSPOT",
-    "question": "Click the location where the nurse should pull the pinna.",
-    "options": {
-      "regions": [
-        { "id": "r1", "label": "Up and back", "x": 55, "y": 5, "w": 40, "h": 30 },
-        { "id": "r2", "label": "Down and back", "x": 55, "y": 60, "w": 40, "h": 30 }
-      ]
-    },
-    "answer": "r2",
-    "rationale": "Region coordinates are percentages of the image. Upload the image afterwards via Edit Questions."
-  },
-  {
-    "number": 10,
-    "topic": "Hypoglycemia Management",
-    "type": "MCQ",
-    "question": "The client is alert and able to swallow. Which action should the nurse take first?",
-    "sections": [
-      {
-        "title": "Nurses' Notes",
-        "blocks": [
-          { "type": "text", "text": "1030: Client reports feeling shaky and sweaty. Skin cool and diaphoretic. Last meal at 0700." },
-          { "type": "list", "items": ["Alert and oriented x3", "Able to swallow without difficulty", "Fine tremor of both hands"] }
-        ]
-      },
-      {
-        "title": "Laboratory Results",
-        "blocks": [
-          {
-            "type": "table",
-            "caption": "Point-of-care glucose",
-            "headers": ["Lab Test", "0800", "1030", "Reference Range"],
-            "rows": [
-              ["Blood glucose", "101 mg/dL", "58 mg/dL", "74-140 mg/dL"],
-              ["Hemoglobin A1C", "7.2%", "-", "Less than 5.7%"]
-            ]
-          }
-        ]
-      }
-    ],
-    "options": [
-      "A. Give 15 g of a fast-acting carbohydrate and recheck in 15 minutes.",
-      "B. Administer 1 mg of glucagon intramuscularly.",
-      "C. Hold the next dose of insulin and notify the provider.",
-      "D. Provide a peanut butter sandwich and whole milk."
-    ],
-    "answer": "A",
-    "rationale": "Sections are optional on any question type. Two or more sections render as tabs above the question."
-  }
-]`;
+  readonly exampleTypes = EXAMPLE_TYPES;
+  /** Empty means the "All" tab: every type is shown. */
+  selectedTypes = signal<ReadonlySet<string>>(new Set());
+  exampleJson = computed(() => buildExampleJson(this.selectedTypes()));
 
   constructor(
     private examService: ExamService,
@@ -196,6 +59,12 @@ export class UploadPage implements OnInit {
           err?.error?.detail || 'Failed to load courses — reload the page to retry.',
         ),
     });
+  }
+
+  setMode(mode: UploadMode): void {
+    this.mode.set(mode);
+    // The message almost certainly referred to the other mode's fields.
+    this.error.set('');
   }
 
   onCourseSelectChange(value: string): void {
@@ -233,8 +102,32 @@ export class UploadPage implements OnInit {
     });
   }
 
+  // ── JSON example filter ──
+
+  isTypeSelected(type: string): boolean {
+    return this.selectedTypes().has(type);
+  }
+
+  /** No type selected is the "All" state, so this is also "is All active". */
+  get allTypesActive(): boolean {
+    return this.selectedTypes().size === 0;
+  }
+
+  selectAllTypes(): void {
+    this.selectedTypes.set(new Set());
+  }
+
+  toggleType(type: string): void {
+    // Copy-on-write: mutating the Set in place would not change the signal's
+    // reference, so the computed example would never recompute.
+    const next = new Set(this.selectedTypes());
+    if (next.has(type)) next.delete(type);
+    else next.add(type);
+    this.selectedTypes.set(next);
+  }
+
   copyExample(): void {
-    navigator.clipboard.writeText(this.exampleJson).then(() => {
+    navigator.clipboard.writeText(this.exampleJson()).then(() => {
       this.copied.set(true);
       setTimeout(() => this.copied.set(false), 2000);
     });
@@ -258,7 +151,6 @@ export class UploadPage implements OnInit {
   submit(): void {
     this.error.set('');
     const titleVal = this.title().trim();
-    const jsonVal = this.jsonText().trim();
 
     if (!this.selectedCourseId()) {
       this.error.set('Please select a course.');
@@ -268,30 +160,50 @@ export class UploadPage implements OnInit {
       this.error.set('Please enter an exam title.');
       return;
     }
-    if (!jsonVal) {
-      this.error.set('Please paste or upload a JSON file.');
+
+    const grade = this.passGrade();
+    if (grade == null || !Number.isFinite(grade) || grade < 1 || grade > 100) {
+      this.error.set('Pass grade is required and must be between 1 and 100.');
       return;
     }
 
-    let questions: unknown[];
-    try {
-      questions = JSON.parse(jsonVal);
-      if (!Array.isArray(questions) || questions.length === 0) throw new Error();
-    } catch {
-      this.error.set('Invalid JSON. Must be a non-empty array of question objects.');
-      return;
+    let questions: unknown[] = [];
+    if (this.mode() === 'json') {
+      const jsonVal = this.jsonText().trim();
+      if (!jsonVal) {
+        this.error.set('Please paste or upload a JSON file.');
+        return;
+      }
+      try {
+        questions = JSON.parse(jsonVal);
+        if (!Array.isArray(questions) || questions.length === 0) throw new Error();
+      } catch {
+        this.error.set('Invalid JSON. Must be a non-empty array of question objects.');
+        return;
+      }
     }
 
     this.loading.set(true);
     let timeLimit = this.timeLimitMinutes();
     if (timeLimit && timeLimit <= 0) timeLimit = null; // invalid times ignored
 
+    const manual = this.mode() === 'manual';
     this.examService
-      .createExam(titleVal, questions as never[], this.selectedCourseId(), timeLimit)
+      .createExam(
+        titleVal,
+        questions as never[],
+        Math.round(grade),
+        this.selectedCourseId(),
+        timeLimit,
+      )
       .subscribe({
-        next: () => {
+        next: (res) => {
           this.loading.set(false);
-          this.router.navigate(['/exams']);
+          // Manual mode creates the exam empty and hands off to the question
+          // editor, which is already the full-featured per-question form — there
+          // is no second inline editor to keep in sync with it.
+          if (manual) this.router.navigate(['/exams', res.exam_id, 'edit']);
+          else this.router.navigate(['/exams']);
         },
         error: (err) => {
           this.loading.set(false);

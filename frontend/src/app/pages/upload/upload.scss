@@ -2,6 +2,52 @@
   margin-bottom: 1rem;
 }
 
+// ── Mode tabs ──
+.mode-tabs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.25rem;
+  margin-bottom: 1.25rem;
+  background: #f4f4f4;
+  border-radius: 8px;
+
+  button {
+    flex: 1;
+    padding: 0.5rem;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #666;
+    cursor: pointer;
+    transition:
+      background 0.15s,
+      color 0.15s;
+
+    &:hover:not(.active) {
+      color: #111;
+    }
+
+    &.active {
+      background: #fff;
+      color: #111;
+      box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+    }
+  }
+}
+
+.mode-note {
+  margin: 1rem 0 0;
+  padding: 0.7rem 0.85rem;
+  background: #f7f7f7;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: #666;
+  line-height: 1.55;
+}
+
 .field-label {
   display: block;
   font-size: 0.8rem;
@@ -10,6 +56,12 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-bottom: 0.4rem;
+
+  // :first-child no longer matches now that the mode tabs lead the card, so the
+  // spacing rule is stated on the sibling instead.
+  .mode-tabs + & {
+    margin-top: 0;
+  }
 
   &:not(:first-child) {
     margin-top: 1rem;
@@ -129,6 +181,17 @@
   }
 }
 
+@media (max-width: 640px) {
+  .mode-tabs button {
+    min-height: 44px;
+    font-size: 0.76rem;
+  }
+
+  .type-tab {
+    min-height: 32px;
+  }
+}
+
 .example-section {
   margin-top: 0.75rem;
 }
@@ -145,6 +208,42 @@
 .example-toggle {
   font-size: 0.8rem;
   color: #888;
+}
+
+// ── Example type filter ──
+.type-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.9rem;
+}
+
+.type-tab {
+  padding: 0.28rem 0.6rem;
+  border: 1px solid #e2e2e2;
+  border-radius: 999px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #666;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+
+  &:hover:not(.active) {
+    border-color: #999;
+    color: #111;
+  }
+
+  &.active {
+    background: #111;
+    border-color: #111;
+    color: #fff;
+  }
 }
 
 .example-json {

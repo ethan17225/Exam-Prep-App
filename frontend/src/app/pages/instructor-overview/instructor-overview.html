@@ -1,0 +1,142 @@
+<h1 class="page-title">Class Overview</h1>
+
+@if (loadError()) {
+  <div class="empty-state">
+    <p>{{ loadError() }}</p>
+    <button class="btn btn-primary" (click)="load()">Retry</button>
+  </div>
+} @else if (loading()) {
+  <p class="empty-state">Loading...</p>
+} @else if (data(); as d) {
+  @if (isEmptyClass()) {
+    <!-- Zeroed KPI cards read like a broken page, so show the one thing that
+         actually unblocks the instructor: the code students register with. -->
+    <div class="card onboard-card">
+      <h2 class="onboard-title">No students yet</h2>
+      <p class="onboard-text">
+        Share your invite code. Anyone who registers with it as a student is enrolled with you, and
+        their attempts show up here.
+      </p>
+      <div class="invite-row">
+        <code class="invite-code">{{ d.invite_code }}</code>
+        <button type="button" class="btn btn-secondary btn-sm" (click)="copyInviteCode()">
+          {{ codeCopied() ? 'Copied' : 'Copy' }}
+        </button>
+      </div>
+    </div>
+  } @else {
+    <!-- ── KPI cards ── -->
+    <div class="kpi-grid">
+      <button type="button" class="card kpi kpi-action" (click)="openStudents()">
+        <span class="kpi-value">{{ d.student_count }}</span>
+        <span class="kpi-label">Students</span>
+      </button>
+      <div class="card kpi">
+        <span class="kpi-value">{{ d.attempts }}</span>
+        <span class="kpi-label">Attempts</span>
+        <span class="kpi-sub">{{ d.recent_attempts }} in the last 30 days</span>
+      </div>
+      <div class="card kpi">
+        <span class="kpi-value">{{ d.average_score }}%</span>
+        <span class="kpi-label">Average score</span>
+      </div>
+      <div class="card kpi">
+        <span
+          class="kpi-value"
+          [class.kpi-good]="d.pass_rate >= 70"
+          [class.kpi-warn]="d.pass_rate < 70"
+          >{{ d.pass_rate }}%</span
+        >
+        <span class="kpi-label">Pass rate</span>
+      </div>
+      <button type="button" class="card kpi kpi-action" (click)="openTracking()">
+        <span class="kpi-value" [class.kpi-live]="d.live_now > 0">{{ d.live_now }}</span>
+        <span class="kpi-label">In progress now</span>
+      </button>
+      <div class="card kpi">
+        <span class="kpi-value">{{ d.exam_count }}</span>
+        <span class="kpi-label">Exams published</span>
+        <span class="kpi-sub">{{ studyTime() }} of class time</span>
+      </div>
+    </div>
+
+    @if (hasNoAttempts()) {
+      <div class="card">
+        <p class="empty-state">
+          {{ d.student_count }} student(s) enrolled, but nobody has submitted an attempt yet.
+        </p>
+      </div>
+    } @else {
+      <!-- ── Charts ── -->
+      <div class="chart-grid">
+        <div class="card chart-card chart-wide">
+          <h2 class="chart-title">Activity — last 14 days</h2>
+          <div class="chart-box chart-box-tall"><canvas id="activityChart"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <h2 class="chart-title">Pass / fail</h2>
+          <div class="chart-box"><canvas id="outcomeChart"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <h2 class="chart-title">Score distribution</h2>
+          <div class="chart-box"><canvas id="bucketChart"></canvas></div>
+        </div>
+        <div class="card chart-card chart-wide">
+          <h2 class="chart-title">Weakest topics</h2>
+          @if (weakestTopics().length === 0) {
+            <p class="empty-state">No topic data yet.</p>
+          } @else {
+            <div class="chart-box chart-box-tall"><canvas id="topicChart"></canvas></div>
+          }
+        </div>
+      </div>
+
+      <!-- ── Per-exam rollup ── -->
+      <section class="card rollup-card">
+        <h2 class="chart-title">By exam</h2>
+        @if (d.exam_rollups.length === 0) {
+          <p class="empty-state">No attempts against any of your exams yet.</p>
+        } @else {
+          <div class="table-scroll">
+            <table class="rollup-table">
+              <thead>
+                <tr>
+                  <th>Exam</th>
+                  <th>Students</th>
+                  <th>Attempts</th>
+                  <th>Average</th>
+                  <th>Pass rate</th>
+                  <th>Last attempt</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of d.exam_rollups; track row.exam_id) {
+                  <tr>
+                    <td class="rollup-name">
+                      <span>{{ row.exam_title }}</span>
+                      <span class="rollup-sub">Pass mark {{ row.pass_grade }}%</span>
+                    </td>
+                    <td>{{ row.students }}</td>
+                    <td>{{ row.attempts }}</td>
+                    <td>{{ row.average_score }}%</td>
+                    <td>
+                      <span
+                        class="badge"
+                        [class.badge-pass]="row.pass_rate >= 70"
+                        [class.badge-fail]="row.pass_rate < 70"
+                        >{{ row.pass_rate }}%</span
+                      >
+                    </td>
+                    <td class="rollup-date">
+                      {{ row.last_attempt_at ? formatDate(row.last_attempt_at) : '—' }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    }
+  }
+}

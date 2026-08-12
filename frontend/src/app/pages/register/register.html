@@ -2,6 +2,27 @@
   <div class="card auth-card">
     <h1 class="page-title">Create account</h1>
 
+    <div class="role-toggle" role="radiogroup" aria-label="Account type">
+      <button
+        type="button"
+        role="radio"
+        [attr.aria-checked]="role() === 'student'"
+        [class.active]="role() === 'student'"
+        (click)="setRole('student')"
+      >
+        Student
+      </button>
+      <button
+        type="button"
+        role="radio"
+        [attr.aria-checked]="role() === 'instructor'"
+        [class.active]="role() === 'instructor'"
+        (click)="setRole('instructor')"
+      >
+        Instructor
+      </button>
+    </div>
+
     <form (ngSubmit)="submit()">
       <label class="field">
         <span>Email</span>
@@ -35,6 +56,7 @@
           (ngModelChange)="inviteCode.set($event)"
         />
       </label>
+      <p class="auth-hint">{{ inviteHint() }}</p>
 
       @if (error()) {
         <p class="auth-error">{{ error() }}</p>

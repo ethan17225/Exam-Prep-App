@@ -12,7 +12,7 @@ from datetime import datetime
 # Must be set before src.config is imported: settings are read at import time.
 os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://u:p@unreachable-host:5432/unused")
 os.environ.setdefault("AUTH_SECRET", "unit-test-secret-at-least-32-characters-long")
-os.environ.setdefault("AUTH_INVITE_CODE", "unit-test-invite")
+os.environ.setdefault("AUTH_INSTRUCTOR_INVITE_CODE", "unit-test-instructor-invite")
 
 import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
@@ -38,6 +38,8 @@ def student() -> User:
         email="student@example.com",
         password_hash="",
         role=UserRole.STUDENT,
+        display_name="Student One",
+        instructor_id="u2",
         created_at=datetime.now(),
     )
 
@@ -49,6 +51,8 @@ def instructor() -> User:
         email="instructor@example.com",
         password_hash="",
         role=UserRole.INSTRUCTOR,
+        display_name="Instructor Two",
+        invite_code="instructorcode",
         created_at=datetime.now(),
     )
 

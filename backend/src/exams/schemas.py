@@ -3,6 +3,7 @@ from typing import Annotated, Any
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 from src.constants import MAX_INT, MAX_QUESTIONS_PER_EXAM
+from src.grading.constants import DEFAULT_PASS_GRADE
 from src.identifiers import ID_LENGTH
 from src.schemas import ISODateTime
 
@@ -54,12 +55,18 @@ class QuestionUpdate(BaseModel):
 
 class ExamCreate(BaseModel):
     title: str = Field(max_length=255)
+    # No min_length: creating an exam with no questions is how the manual editor
+    # flow starts, and the client then adds them one at a time.
     questions: list[QuestionIn] = Field(max_length=MAX_QUESTIONS_PER_EXAM)
     course_id: str | None = Field(default=None, max_length=ID_LENGTH)
     time_limit_minutes: int | None = Field(default=None, ge=0, le=MAX_INT)
     # None means "derive from my role": instructors create assessments, students
     # create study material.
     allow_practice: bool | None = None
+    # Defaulted rather than required so existing API callers keep working; the
+    # upload form makes it a required field. 0 is not a pass mark and >100 is
+    # unreachable, so both are 422 rather than an exam nobody can pass.
+    pass_grade: int = Field(default=DEFAULT_PASS_GRADE, ge=1, le=100)
 
 
 class ExamTitleUpdate(BaseModel):
@@ -72,6 +79,10 @@ class ExamTimeLimitUpdate(BaseModel):
 
 class ExamAllowPracticeUpdate(BaseModel):
     allow_practice: bool
+
+
+class ExamPassGradeUpdate(BaseModel):
+    pass_grade: int = Field(ge=1, le=100)
 
 
 class ExamCreatedOut(BaseModel):
@@ -88,6 +99,7 @@ class ExamSummaryOut(BaseModel):
     course_id: str | None
     course_name: str | None
     time_limit_minutes: int | None
+    pass_grade: int
     allow_practice: bool
     is_owner: bool
     total_questions: int
@@ -144,6 +156,7 @@ class ExamDetailOut(BaseModel):
     course_id: str | None
     course_name: str | None
     time_limit_minutes: int | None
+    pass_grade: int
     # Whether `answer`/`rationale` are present on the questions below. Explicit
     # so the client never infers the answer gate from a missing field.
     answers_included: bool

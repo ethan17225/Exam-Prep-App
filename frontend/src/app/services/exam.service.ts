@@ -272,6 +272,13 @@ export function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+/**
+ * Where a per-topic score stops reading as weak. Presentation only, and
+ * deliberately not a pass grade: a topic spans many exams, each with its own
+ * threshold, so there is no single exam rule to apply to it.
+ */
+export const TOPIC_MASTERY_THRESHOLD = 72;
+
 /** Answered-so-far percentage for an in-progress attempt. */
 export function progressPercent(record: {
   answered_count: number;
@@ -423,6 +430,8 @@ export interface ExamSummary {
   course_id: string | null;
   course_name: string | null;
   time_limit_minutes: number | null;
+  /** The passing score as a percentage, 1-100. Chosen per exam at upload. */
+  pass_grade: number;
   /** Practice mode reveals the answer key, so a graded exam has this off. */
   allow_practice: boolean;
   /** Only the owner may rename, edit, delete or re-flag an exam. */
@@ -440,6 +449,7 @@ export interface ExamDetail {
   title: string;
   course_name?: string | null;
   time_limit_minutes?: number | null;
+  pass_grade: number;
   /**
    * Whether `answer`/`rationale` are present on the questions below. The server
    * withholds them unless you own the exam or practice is allowed, so never
@@ -491,6 +501,12 @@ export interface ExamResultSummary {
   correct: number;
   total: number;
   passed: boolean;
+  /**
+   * The threshold this attempt was graded against, copied onto the record at
+   * submit. Use it rather than a constant — an instructor changing the exam's
+   * pass grade must not relabel attempts that are already graded.
+   */
+  pass_grade: number;
   time_spent_seconds: number;
   mode: string;
   /** Submitted after the time limit; graded against the last pre-deadline save. */
@@ -530,7 +546,10 @@ export interface AdminDashboardItem {
   id: string;
   exam_id: string;
   exam_title: string;
+  /** The live exam's current pass mark, for colouring the partial score. */
+  pass_grade: number;
   /** Which student this attempt belongs to. Instructor-only view. */
+  student_name: string | null;
   student_email: string | null;
   mode: string;
   total_questions: number;
@@ -544,6 +563,84 @@ export interface AdminDashboardItem {
   seconds_since_last_answer: number;
   seconds_since_start: number | null;
   remaining_seconds: number;
+}
+
+// ── Instructor analytics ────────────────────────────────────────
+
+/** One student plus their aggregates, as the Students page lists them. */
+export interface StudentItem {
+  id: string;
+  display_name: string | null;
+  email: string;
+  avatar: string | null;
+  attempts: number;
+  exam_attempts: number;
+  practice_attempts: number;
+  average_score: number;
+  best_score: number;
+  pass_rate: number;
+  total_seconds: number;
+  in_progress_count: number;
+  last_attempt_at: string | null;
+  joined_at: string;
+}
+
+/** An attempt in the instructor's drill-down; no `results` blob by design. */
+export interface StudentAttempt {
+  id: string;
+  exam_id: string;
+  exam_title: string;
+  score: number;
+  correct: number;
+  total: number;
+  passed: boolean;
+  pass_grade: number;
+  mode: string;
+  over_time: boolean;
+  time_spent_seconds: number;
+  taken_at: string;
+}
+
+export interface StudentDetail {
+  student: StudentItem;
+  recent_attempts: StudentAttempt[];
+  topic_stats: TopicStat[];
+}
+
+export interface ExamRollup {
+  exam_id: string;
+  exam_title: string;
+  pass_grade: number;
+  attempts: number;
+  students: number;
+  average_score: number;
+  pass_rate: number;
+  last_attempt_at: string | null;
+}
+
+export interface DailyPoint {
+  day: string;
+  attempts: number;
+  average_score: number;
+}
+
+export interface InstructorOverview {
+  student_count: number;
+  exam_count: number;
+  attempts: number;
+  recent_attempts: number;
+  live_now: number;
+  average_score: number;
+  pass_rate: number;
+  total_seconds: number;
+  invite_code: string | null;
+  attempts_per_day: DailyPoint[];
+  /** Ten 10-point score bands, low to high. Always exactly ten entries. */
+  score_buckets: number[];
+  passed_count: number;
+  failed_count: number;
+  exam_rollups: ExamRollup[];
+  topic_stats: TopicStat[];
 }
 
 export interface SaveProgressPayload {
@@ -565,10 +662,11 @@ export class ExamService {
   createExam(
     title: string,
     questions: Question[],
+    passGrade: number,
     courseId?: string,
     timeLimitMinutes?: number | null,
   ): Observable<{ exam_id: string; total_questions: number }> {
-    const body: Record<string, unknown> = { title, questions };
+    const body: Record<string, unknown> = { title, questions, pass_grade: passGrade };
     if (courseId) body['course_id'] = courseId;
     if (timeLimitMinutes) body['time_limit_minutes'] = timeLimitMinutes;
     return this.http.post<{ exam_id: string; total_questions: number }>(`${this.base}/exams`, body);
@@ -644,6 +742,12 @@ export class ExamService {
     });
   }
 
+  updatePassGrade(id: string, passGrade: number): Observable<ExamSummary> {
+    return this.http.patch<ExamSummary>(`${this.base}/exams/${id}/pass-grade`, {
+      pass_grade: passGrade,
+    });
+  }
+
   saveProgress(payload: SaveProgressPayload): Observable<InProgressExam> {
     return this.http.post<InProgressExam>(`${this.base}/in-progress`, payload);
   }
@@ -668,6 +772,23 @@ export class ExamService {
 
   getAdminDashboard(): Observable<AdminDashboardItem[]> {
     return this.http.get<AdminDashboardItem[]>(`${this.base}/admin/dashboard`);
+  }
+
+  // ── Instructor analytics ─────────────────────────────────────
+  //
+  // All three are instructor-only and scoped server-side to the caller's own
+  // students, so nothing here takes an instructor id.
+
+  getInstructorOverview(): Observable<InstructorOverview> {
+    return this.http.get<InstructorOverview>(`${this.base}/admin/overview`);
+  }
+
+  getStudents(): Observable<StudentItem[]> {
+    return this.http.get<StudentItem[]>(`${this.base}/admin/students`);
+  }
+
+  getStudentDetail(studentId: string): Observable<StudentDetail> {
+    return this.http.get<StudentDetail>(`${this.base}/admin/students/${studentId}`);
   }
 
   // ── Question editing ─────────────────────────────────────────

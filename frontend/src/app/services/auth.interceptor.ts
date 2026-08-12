@@ -22,7 +22,8 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   // ping, a CDN fetch) can never ship the bearer token to a third party.
   const token = auth.getToken();
   const sameApi = req.url.startsWith('/api/');
-  const authed = token && sameApi ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req;
+  const authed =
+    token && sameApi ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req;
 
   return next(authed).pipe(
     catchError((err: HttpErrorResponse) => {

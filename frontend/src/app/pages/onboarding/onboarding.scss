@@ -1,0 +1,60 @@
+.onboarding-card {
+  max-width: 420px;
+}
+
+.onboarding-intro {
+  margin: -0.4rem 0 1.25rem;
+}
+
+// ── Avatar picker ──
+.avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 1.25rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #eee;
+}
+
+.avatar-preview {
+  flex: 0 0 auto;
+  width: 68px;
+  height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #f0f0f0;
+  border: 1px solid #e8e8e8;
+  border-radius: 50%;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.avatar-initials {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: #666;
+  letter-spacing: 0.02em;
+}
+
+.avatar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+
+  label {
+    cursor: pointer;
+  }
+}
+
+.avatar-note {
+  flex: 1 0 100%;
+  font-size: 0.75rem;
+  color: #888;
+}

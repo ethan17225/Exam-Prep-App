@@ -12,9 +12,15 @@ class AuthConfig(BaseSettings):
     # includes input_value in its error text, and the container crash-loops.
     secret: SecretStr = Field(min_length=32)
 
-    # AUTH_INVITE_CODE. Registration is gated by a shared code: it keeps the open
-    # internet out without building email verification. Empty closes registration.
-    invite_code: str = ""
+    # AUTH_INSTRUCTOR_INVITE_CODE. Gates instructor sign-ups only. Students
+    # register with their instructor's personal code instead, which is both the
+    # gate and the enrolment link — so there is no shared student code any more,
+    # and no way to create a student who belongs to nobody.
+    #
+    # Empty closes instructor registration. It does NOT close student
+    # registration: an instructor's code is minted at their sign-up and revoking
+    # enrolment is done by rotating that, not by blanking this.
+    instructor_invite_code: str = ""
 
     # Long-lived on purpose: exams run 90-180 minutes and there is no refresh
     # token, so a token expiring mid-exam is the one failure that costs a student

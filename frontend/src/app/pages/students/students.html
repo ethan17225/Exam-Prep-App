@@ -1,0 +1,187 @@
+<div class="students-header">
+  <h1 class="page-title">Students</h1>
+  <div class="search-filter">
+    <input
+      type="text"
+      placeholder="Search by name or email..."
+      aria-label="Search students"
+      [ngModel]="search()"
+      (ngModelChange)="search.set($event)"
+    />
+  </div>
+</div>
+
+@if (loadError()) {
+  <div class="empty-state">
+    <p>{{ loadError() }}</p>
+    <button class="btn btn-primary" (click)="load()">Retry</button>
+  </div>
+} @else if (loading()) {
+  <p class="empty-state">Loading...</p>
+} @else if (students().length === 0) {
+  <p class="empty-state">
+    Nobody has enrolled with your invite code yet. You can find it on your account page.
+  </p>
+} @else if (visible().length === 0) {
+  <p class="empty-state">No students match your search.</p>
+} @else {
+  <div class="sort-bar">
+    <span class="sort-label">Sort</span>
+    <button type="button" class="sort-chip" (click)="sortBy('name')">
+      Name {{ sortIndicator('name') }}
+    </button>
+    <button type="button" class="sort-chip" (click)="sortBy('attempts')">
+      Attempts {{ sortIndicator('attempts') }}
+    </button>
+    <button type="button" class="sort-chip" (click)="sortBy('average_score')">
+      Average {{ sortIndicator('average_score') }}
+    </button>
+    <button type="button" class="sort-chip" (click)="sortBy('pass_rate')">
+      Pass rate {{ sortIndicator('pass_rate') }}
+    </button>
+    <button type="button" class="sort-chip" (click)="sortBy('last_attempt_at')">
+      Last active {{ sortIndicator('last_attempt_at') }}
+    </button>
+  </div>
+
+  <div class="student-list">
+    @for (s of visible(); track s.id) {
+      <div class="card student-card" [class.expanded]="expandedId() === s.id">
+        <button
+          type="button"
+          class="student-row"
+          [attr.aria-expanded]="expandedId() === s.id"
+          (click)="toggle(s)"
+        >
+          <span class="student-avatar">
+            @if (s.avatar) {
+              <img [src]="s.avatar" alt="" />
+            } @else {
+              {{ initialsOf(s) }}
+            }
+          </span>
+
+          <span class="student-identity">
+            <span class="student-name">{{ s.display_name || 'Unnamed' }}</span>
+            <span class="student-email">{{ s.email }}</span>
+          </span>
+
+          <span class="student-metrics">
+            <span class="metric">
+              <span class="metric-value">{{ s.attempts }}</span>
+              <span class="metric-label">Attempts</span>
+            </span>
+            <span class="metric">
+              <span class="metric-value">{{ s.average_score }}%</span>
+              <span class="metric-label">Average</span>
+            </span>
+            <span class="metric">
+              <span
+                class="metric-value"
+                [class.metric-good]="s.pass_rate >= 70"
+                [class.metric-warn]="s.attempts > 0 && s.pass_rate < 70"
+                >{{ s.pass_rate }}%</span
+              >
+              <span class="metric-label">Pass rate</span>
+            </span>
+            <span class="metric">
+              <span class="metric-value" [class.metric-live]="s.in_progress_count > 0">{{
+                s.in_progress_count
+              }}</span>
+              <span class="metric-label">Open</span>
+            </span>
+          </span>
+
+          <span class="student-chevron">{{ expandedId() === s.id ? '▲' : '▼' }}</span>
+        </button>
+
+        @if (expandedId() === s.id) {
+          <div class="student-detail">
+            @if (detailError()) {
+              <p class="empty-state">{{ detailError() }}</p>
+            } @else if (detailLoading()) {
+              <p class="empty-state">Loading...</p>
+            } @else if (detail(); as d) {
+              <div class="detail-facts">
+                <span
+                  ><strong>{{ d.student.exam_attempts }}</strong> exams ·
+                  <strong>{{ d.student.practice_attempts }}</strong> practice</span
+                >
+                <span
+                  >Best <strong>{{ d.student.best_score }}%</strong></span
+                >
+                <span
+                  >Time <strong>{{ formatDuration(d.student.total_seconds) }}</strong></span
+                >
+                <span>Joined {{ formatDate(d.student.joined_at) }}</span>
+              </div>
+
+              <div class="detail-cols">
+                <section class="detail-col">
+                  <h3 class="detail-title">Recent attempts</h3>
+                  @if (d.recent_attempts.length === 0) {
+                    <p class="detail-empty">No attempts yet.</p>
+                  } @else {
+                    <ul class="attempt-list">
+                      @for (a of d.recent_attempts; track a.id) {
+                        <li class="attempt-row">
+                          <span class="attempt-title">{{ a.exam_title }}</span>
+                          <span class="attempt-meta">
+                            <span
+                              class="badge"
+                              [class.badge-exam]="a.mode !== 'practice'"
+                              [class.badge-practice]="a.mode === 'practice'"
+                            >
+                              {{ a.mode === 'practice' ? 'Practice' : 'Exam' }}
+                            </span>
+                            <span class="attempt-score">{{ a.score }}%</span>
+                            <span
+                              class="badge"
+                              [class.badge-pass]="a.passed"
+                              [class.badge-fail]="!a.passed"
+                              >{{ a.passed ? 'PASS' : 'FAIL' }}</span
+                            >
+                          </span>
+                          <span class="attempt-date">{{ formatDate(a.taken_at) }}</span>
+                        </li>
+                      }
+                    </ul>
+                  }
+                </section>
+
+                <section class="detail-col">
+                  <h3 class="detail-title">Weakest topics</h3>
+                  @if (weakestTopics().length === 0) {
+                    <p class="detail-empty">No topic data yet.</p>
+                  } @else {
+                    <ul class="topic-list">
+                      @for (t of weakestTopics(); track t.topic) {
+                        <li class="topic-row">
+                          <span class="topic-row-top">
+                            <span class="topic-row-name">{{ t.topic || 'Untitled' }}</span>
+                            <span
+                              class="topic-row-score"
+                              [class.metric-good]="t.score >= masteryThreshold"
+                              [class.metric-warn]="t.score < masteryThreshold"
+                              >{{ t.score }}%</span
+                            >
+                          </span>
+                          <span class="topic-track">
+                            <span class="topic-fill" [style.width.%]="t.score"></span>
+                          </span>
+                          <span class="topic-row-meta"
+                            >{{ t.correct }} of {{ t.total }} correct</span
+                          >
+                        </li>
+                      }
+                    </ul>
+                  }
+                </section>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+}

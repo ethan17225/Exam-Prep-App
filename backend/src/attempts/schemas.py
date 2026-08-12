@@ -69,6 +69,9 @@ class HistorySummaryOut(BaseModel):
     correct: int
     total: int
     passed: bool
+    # The threshold this attempt was graded against, so the client draws the line
+    # the mark was actually judged by rather than a hardcoded one.
+    pass_grade: int
     time_spent_seconds: int
     mode: str
     over_time: bool

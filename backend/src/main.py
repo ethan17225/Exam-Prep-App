@@ -20,10 +20,9 @@ from src.database import SessionDep
 from src.documents.config import documents_settings
 from src.documents.constants import DOCS_URL_PREFIX
 from src.documents.router import router as documents_router
-from src.exams.config import exams_settings
-from src.exams.constants import UPLOADS_URL_PREFIX
 from src.exams.router import questions_router
 from src.exams.router import router as exams_router
+from src.storage import UPLOADS_URL_PREFIX, storage_settings
 
 logging.basicConfig(
     level=settings.log_level,
@@ -40,7 +39,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app_kwargs = {"title": "MCQ Exam API", "lifespan": lifespan}
+app_kwargs = {"title": "Exam Prep API", "lifespan": lifespan}
 if settings.environment not in SHOW_DOCS_IN:
     app_kwargs["openapi_url"] = None  # also disables /docs and /redoc
 
@@ -78,11 +77,11 @@ app.add_middleware(
 # to exist before the mounts — and they must not be created at config-import
 # time, which would be a filesystem side effect on every import.
 documents_settings.root.mkdir(parents=True, exist_ok=True)
-exams_settings.uploads_dir.mkdir(parents=True, exist_ok=True)
+storage_settings.dir.mkdir(parents=True, exist_ok=True)
 
 app.mount(DOCS_URL_PREFIX, StaticFiles(directory=str(documents_settings.root)), name="docs-files")
-# Question images sit under /api/... so the dev proxy and nginx forward them.
-app.mount(UPLOADS_URL_PREFIX, StaticFiles(directory=str(exams_settings.uploads_dir)), name="uploads")
+# Uploads sit under /api/... so the dev proxy and nginx forward them.
+app.mount(UPLOADS_URL_PREFIX, StaticFiles(directory=str(storage_settings.dir)), name="uploads")
 
 # Dependencies do not apply to mounts, but middleware runs before routing.
 app.middleware("http")(make_static_mount_guard([DOCS_URL_PREFIX, UPLOADS_URL_PREFIX]))

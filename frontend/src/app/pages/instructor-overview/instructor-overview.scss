@@ -1,0 +1,214 @@
+// ── Empty class ──
+.onboard-card {
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.onboard-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.onboard-text {
+  margin: 0 auto 1.25rem;
+  max-width: 420px;
+  font-size: 0.85rem;
+  color: #777;
+  line-height: 1.55;
+}
+
+.invite-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.invite-code {
+  padding: 0.55rem 0.8rem;
+  background: #f7f7f7;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+}
+
+// ── KPI cards ──
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 1rem;
+  text-align: left;
+}
+
+// Cards that navigate. Styled as a card, not a button, so the grid stays even.
+.kpi-action {
+  border: 1px solid #e2e2e2;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    transform 0.1s;
+
+  &:hover {
+    border-color: #111;
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+}
+
+.kpi-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.kpi-good {
+  color: #0a7;
+}
+
+.kpi-warn {
+  color: #b45309;
+}
+
+.kpi-live {
+  color: #4361ee;
+}
+
+.kpi-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.kpi-sub {
+  font-size: 0.72rem;
+  color: #999;
+}
+
+// ── Charts ──
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.chart-card {
+  padding: 1rem 1.1rem 1.1rem;
+  // min-width: 0 keeps a canvas from forcing its grid column wider than the row.
+  min-width: 0;
+}
+
+.chart-wide {
+  grid-column: 1 / -1;
+}
+
+.chart-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.chart-box {
+  position: relative;
+  height: 210px;
+}
+
+.chart-box-tall {
+  height: 260px;
+}
+
+// ── Per-exam rollup ──
+.rollup-card {
+  padding: 1rem 1.1rem 1.1rem;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.rollup-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.83rem;
+
+  th,
+  td {
+    padding: 0.55rem 0.6rem;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 1px solid #f2f2f2;
+  }
+
+  th {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #999;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+}
+
+.rollup-name {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  max-width: 240px;
+
+  > span:first-child {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.rollup-sub {
+  font-size: 0.72rem;
+  color: #999;
+}
+
+.rollup-date {
+  color: #888;
+}
+
+@media (max-width: 640px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpi-value {
+    font-size: 1.35rem;
+  }
+
+  // One column: two charts side by side on a phone are unreadable.
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-box {
+    height: 190px;
+  }
+
+  .chart-box-tall {
+    height: 230px;
+  }
+}

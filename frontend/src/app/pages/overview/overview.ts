@@ -5,6 +5,7 @@ import { forkJoin } from 'rxjs';
 import {
   ExamService,
   ExamResultSummary,
+  TOPIC_MASTERY_THRESHOLD,
   TopicStat,
   formatDate,
   formatDuration,
@@ -143,6 +144,7 @@ export class OverviewPage implements OnInit, OnDestroy {
 
   readonly formatDate = formatDate;
   readonly formatDuration = formatDuration;
+  readonly masteryThreshold = TOPIC_MASTERY_THRESHOLD;
 
   onTopicSearchInput(value: string): void {
     this.topicSearch.set(value);
@@ -213,8 +215,11 @@ export class OverviewPage implements OnInit, OnDestroy {
               borderWidth: 2,
             },
             {
+              // Stepped rather than a flat line: the pass mark is per-exam, and a
+              // single average line would put an attempt on the wrong side of it.
               label: 'Pass Threshold',
-              data: sorted.map(() => 72),
+              data: sorted.map((r) => r.pass_grade),
+              stepped: 'middle',
               borderColor: '#e0e0e0',
               borderDash: [6, 4],
               borderWidth: 1.5,

@@ -25,6 +25,10 @@ class Exam(Base):
     course_id = Column(String(ID_LENGTH), ForeignKey("course.id", ondelete="SET NULL"), nullable=True)
     title = Column(String(255), nullable=False)
     time_limit_minutes = Column(Integer, nullable=True)
+    # The passing score as a percentage, 1-100. No server_default: the create
+    # service always supplies it (the schema defaults it), so a missing value
+    # should be a loud error rather than a silent 72.
+    pass_grade = Column(Integer, nullable=False)
     created_at = Column(DateTime, nullable=False)
 
     course = relationship("Course", back_populates="exams")

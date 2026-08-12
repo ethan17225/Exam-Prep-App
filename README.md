@@ -1,4 +1,4 @@
-# MCQ Exam App
+# Exam Prep
 
 A minimalist web app for taking MCQ, Select All That Apply (SATA), and Fill in the Blank (FIB) exams.
 
@@ -13,7 +13,7 @@ A minimalist web app for taking MCQ, Select All That Apply (SATA), and Fill in t
 
 ```bash
 cp .env.example .env
-# Fill in POSTGRES_PASSWORD, AUTH_SECRET, AUTH_INVITE_CODE, BOOTSTRAP_ADMIN_*
+# Fill in POSTGRES_PASSWORD, AUTH_SECRET, AUTH_INSTRUCTOR_INVITE_CODE, BOOTSTRAP_ADMIN_*
 # Generate secrets: python -c "import secrets; print(secrets.token_urlsafe(48))"
 docker compose up --build
 ```
@@ -24,8 +24,9 @@ Caddy on ports 80/443. Compose refuses to start if a required secret is unset.
 
 The first instructor account is created by the database migration from
 `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` — sign in with it and
-change the password. Everyone else registers with the `AUTH_INVITE_CODE`.
-Nothing else can mint an instructor, so that migration is not optional.
+change the password. Further instructors register with
+`AUTH_INSTRUCTOR_INVITE_CODE`; students register with an instructor's personal
+code (see below).
 
 ### Or run the pieces yourself
 
@@ -59,10 +60,32 @@ App runs at `http://localhost:4200` and proxies `/api` to port 8000.
 
 ## Accounts and access
 
-- **Students** register with the invite code. They see the shared question bank
-  plus anything they create themselves; their attempts and history are private.
-- **Instructors** create content that is visible to everyone, and get the Admin
-  dashboard showing every student's in-progress attempts.
+Registration asks which role you want, and the invite code decides whether you
+get it:
+
+- **Instructors** register with `AUTH_INSTRUCTOR_INVITE_CODE`. Leave that unset
+  to close instructor sign-ups; it does not affect students. Each instructor is
+  minted a **personal enrolment code** at sign-up, shown on their Account page.
+- **Students** register with their instructor's personal code, which is both the
+  gate and the enrolment link — there is no shared student code, so a student
+  always belongs to exactly one instructor. Rotating enrolment means rotating
+  that instructor's code, not blanking the instructor one.
+
+Either way, registration only creates the account: onboarding then collects a
+**preferred name** (required) and an avatar (optional) before the app is usable.
+An account with no preferred name is sent back to onboarding on every sign-in.
+
+What each role sees:
+
+- **Students** see the shared question bank plus anything they create
+  themselves; their attempts and history are private, and their Account page
+  names their instructor.
+- **Instructors** create content visible to everyone, and swap the student
+  Overview for a class dashboard (activity, pass rate, score distribution,
+  weakest topics, per-exam rollups). They also get **Students** — per-student
+  completion, averages and pass rates with search and a drill-down — and
+  **Tracking**, the live in-progress view. History and In progress are hidden
+  for them, since they are personal views.
 - Only the owner of an exam can edit or delete it, shared or not.
 
 ### Practice vs. graded exams
@@ -138,6 +161,11 @@ API_BASE=http://localhost:8000/api E2E_EMAIL=... E2E_PASSWORD=... python tests/e
 `tests/e2e_live.py` creates and then deletes an exam titled `__e2e_smoke_test__`.
 Use `http://localhost:8001/api` for the Docker mapping.
 
+```bash
+cd frontend
+npm test               # grading parity with the backend, JSON example assembly
+```
+
 ## Backend layout
 
 Organised by domain, one package per bounded context:
@@ -149,8 +177,9 @@ backend/src/
 ├── exams/       Exam + Question, exam CRUD, the question editor, image uploads
 ├── attempts/    in-progress autosave, submit, history
 ├── documents/   filesystem-backed course PDFs (no table)
-├── admin/       the instructor dashboard (a cross-domain read view)
+├── admin/       instructor dashboards and analytics (cross-domain read views)
 ├── grading/     answer grading — a pure leaf, imported by three domains
+├── storage.py   image uploads — a pure leaf, shared by avatars and questions
 └── main.py      app assembly, static mounts, /healthz
 ```
 
@@ -159,7 +188,8 @@ in `.claude/skills/exam-api-practices/SKILL.md`.
 
 ## Features
 
-- **Upload** — Paste or upload a JSON file with exam questions
+- **Upload** — Paste or upload a JSON file with exam questions, or start an empty
+  exam and add questions in the editor. The JSON examples filter by question type
 - **Exams** — Browse and start available exams
 - **Timer** — Elapsed time clock during exam-taking
 - **Question types** — MCQ (single choice), SATA (multi-select), FIB (text input),
@@ -167,7 +197,10 @@ in `.claude/skills/exam-api-practices/SKILL.md`.
 - **Question navigator** — Jump to any question, flag questions for review
 - **Results** — Detailed review with correct/incorrect highlighting and rationales
 - **History** — View all past test attempts with scores
-- **Pass threshold** — 72% required to pass (`PASS_THRESHOLD` in `backend/main.py`)
+- **Pass grade** — Set per exam at upload (defaults to `DEFAULT_PASS_GRADE`, 72%,
+  in `backend/src/grading/constants.py`). Each graded attempt stores the
+  threshold it was scored against, so editing an exam's pass grade never
+  relabels past attempts
 
 ## JSON Format
 

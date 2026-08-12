@@ -88,8 +88,8 @@
                   <span class="topic-dropdown-name">{{ t.topic }}</span>
                   <span
                     class="topic-dropdown-score"
-                    [class.topic-score-pass]="t.score >= 72"
-                    [class.topic-score-fail]="t.score < 72"
+                    [class.topic-score-pass]="t.score >= masteryThreshold"
+                    [class.topic-score-fail]="t.score < masteryThreshold"
                     >{{ t.score }}%</span
                   >
                 </button>
@@ -106,8 +106,8 @@
             <span class="topic-name">{{ stat.topic }}</span>
             <span
               class="topic-score"
-              [class.topic-score-pass]="stat.score >= 72"
-              [class.topic-score-fail]="stat.score < 72"
+              [class.topic-score-pass]="stat.score >= masteryThreshold"
+              [class.topic-score-fail]="stat.score < masteryThreshold"
             >
               {{ stat.score }}%
             </span>

@@ -1,0 +1,28 @@
+<button
+  type="button"
+  class="user-trigger"
+  [class.open]="open()"
+  [attr.aria-expanded]="open()"
+  aria-haspopup="menu"
+  [attr.aria-label]="'Account menu for ' + (auth.user()?.display_name || auth.user()?.email)"
+  (click)="toggle()"
+>
+  @if (auth.user()?.avatar) {
+    <img class="user-avatar" [src]="auth.user()?.avatar" alt="" />
+  } @else {
+    <span class="user-avatar user-avatar-fallback">{{ auth.initials() }}</span>
+  }
+</button>
+
+@if (open()) {
+  <div class="user-menu" role="menu">
+    <div class="user-menu-head">
+      <strong>{{ auth.user()?.display_name || 'Your account' }}</strong>
+      <span>{{ auth.user()?.email }}</span>
+    </div>
+    <a class="user-menu-item" role="menuitem" routerLink="/account" (click)="close()">Account</a>
+    <button type="button" class="user-menu-item" role="menuitem" (click)="logout()">
+      Sign out
+    </button>
+  </div>
+}

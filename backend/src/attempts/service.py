@@ -20,7 +20,6 @@ from src.attempts.schemas import ExamSubmission, SaveProgressPayload
 from src.auth.models import User
 from src.constants import MAX_INT
 from src.exams.models import Exam
-from src.grading.constants import PASS_THRESHOLD
 from src.grading.service import grade_question, is_fib_question
 from src.identifiers import new_id
 
@@ -282,16 +281,21 @@ async def submit(exam: Exam, submission: ExamSubmission, user: User, db: AsyncSe
         )
 
     total = len(selected_questions)
-    score = correct_count / total if total else 0
+    percent = round((correct_count / total) * 100, 1) if total else 0
     record = History(
         id=new_id(),
         user_id=user.id,
         exam_id=exam.id,
         exam_title=exam.title,
-        score=round(score * 100, 1),
+        score=percent,
         correct=correct_count,
         total=total,
-        passed=score >= PASS_THRESHOLD,
+        # Compared against the stored percentage, not the raw ratio, so the mark a
+        # student is shown and the mark they are judged by cannot disagree at the
+        # boundary. The threshold is copied onto the row: editing the exam's pass
+        # grade later must not relabel an attempt that is already graded.
+        passed=percent >= exam.pass_grade,
+        pass_grade=exam.pass_grade,
         time_spent_seconds=elapsed,
         over_time=over_time,
         results=results,
@@ -314,6 +318,25 @@ async def list_history(user: User, limit: int, offset: int, db: AsyncSession) ->
         select(History).where(History.user_id == user.id).order_by(History.taken_at.desc()).limit(limit).offset(offset)
     )
     return list((await db.execute(stmt)).scalars().all())
+
+
+def _topic_rows_to_stats(rows) -> list[dict]:
+    """Shared shaping for every per-topic aggregate, so the student's chart and the
+    instructor's cannot drift apart."""
+    stats = [
+        {
+            "topic": topic,
+            "total": total,
+            "correct": correct,
+            "score": round((correct / total) * 100) if total else 0,
+        }
+        for topic, total, correct in rows
+    ]
+    # Sorted here rather than in SQL: `score` is derived, so ordering by it in
+    # the query means repeating the ratio expression. The list is one row per
+    # topic — tens of items, not thousands.
+    stats.sort(key=lambda s: s["score"], reverse=True)
+    return stats
 
 
 async def topic_stats(user: User, db: AsyncSession, attempt_limit: int = 500) -> list[dict]:
@@ -344,20 +367,7 @@ async def topic_stats(user: User, db: AsyncSession, attempt_limit: int = 500) ->
         )
     ).all()
 
-    stats = [
-        {
-            "topic": topic,
-            "total": total,
-            "correct": correct,
-            "score": round((correct / total) * 100) if total else 0,
-        }
-        for topic, total, correct in rows
-    ]
-    # Sorted here rather than in SQL: `score` is derived, so ordering by it in
-    # the query means repeating the ratio expression. The list is one row per
-    # topic — tens of items, not thousands.
-    stats.sort(key=lambda s: s["score"], reverse=True)
-    return stats
+    return _topic_rows_to_stats(rows)
 
 
 async def get_history_or_404(record_id: str, user: User, db: AsyncSession) -> History:
@@ -366,3 +376,291 @@ async def get_history_or_404(record_id: str, user: User, db: AsyncSession) -> Hi
 
 async def delete_history(record_id: str, user: User, db: AsyncSession) -> None:
     await _delete_owned(History, record_id, user, db)
+
+
+# ── Instructor analytics ──────────────────────────────────────────
+#
+# Every query below crosses users, so every one of them is scoped by
+# `"user".instructor_id = :instructor_id` — that predicate is the authorization
+# boundary, not the route gate above it. Their only caller is `admin.service`.
+#
+# All of them aggregate in Postgres and return one row per student, exam, day or
+# topic. Shipping the underlying rows to Python instead is what made the history
+# list a multi-megabyte response, and there are more attempts here than any one
+# student has.
+#
+# Written as raw `text()` rather than `select()`: they are FILTER aggregates,
+# lateral JSONB expansions and a generate_series gap-fill, none of which the ORM
+# expresses more clearly. Note that none of them join `exam` — `history.exam_id`
+# has no foreign key, so an inner join silently drops attempts whose exam is gone.
+
+# Joined subquery of one instructor's students' attempts, reused below.
+_MY_STUDENTS_HISTORY = """
+    SELECT h.*
+    FROM history h
+    JOIN "user" u ON u.id = h.user_id
+    WHERE u.instructor_id = :instructor_id
+"""
+
+
+async def class_totals(instructor_id: str, recent_days: int, db: AsyncSession) -> dict:
+    """Headline numbers for the instructor overview."""
+    row = (
+        await db.execute(
+            text(
+                f"""
+                SELECT COUNT(*) AS attempts,
+                       COUNT(*) FILTER (WHERE h.passed) AS passed_count,
+                       COALESCE(AVG(h.score), 0) AS average_score,
+                       COALESCE(SUM(h.time_spent_seconds), 0) AS total_seconds,
+                       COUNT(*) FILTER (
+                           WHERE h.taken_at >= now() - make_interval(days => :recent_days)
+                       ) AS recent_attempts
+                FROM ({_MY_STUDENTS_HISTORY}) h
+                """
+            ),
+            {"instructor_id": instructor_id, "recent_days": recent_days},
+        )
+    ).one()
+
+    attempts, passed_count, average_score, total_seconds, recent_attempts = row
+    return {
+        "attempts": attempts,
+        "passed_count": passed_count,
+        "average_score": round(float(average_score), 1),
+        "pass_rate": round((passed_count / attempts) * 100) if attempts else 0,
+        "total_seconds": int(total_seconds),
+        "recent_attempts": recent_attempts,
+    }
+
+
+async def student_rollups(instructor_id: str, db: AsyncSession) -> dict[str, dict]:
+    """Per-student aggregates, keyed by user id.
+
+    A dict rather than a list because the caller merges it with the student roster
+    — a student with no attempts yet has no row here but must still be listed.
+    """
+    rows = (
+        await db.execute(
+            text(
+                f"""
+                SELECT h.user_id,
+                       COUNT(*) AS attempts,
+                       COUNT(*) FILTER (WHERE h.mode <> 'practice') AS exam_attempts,
+                       COUNT(*) FILTER (WHERE h.mode = 'practice') AS practice_attempts,
+                       COUNT(*) FILTER (WHERE h.passed) AS passed_count,
+                       AVG(h.score) AS average_score,
+                       MAX(h.score) AS best_score,
+                       SUM(h.time_spent_seconds) AS total_seconds,
+                       MAX(h.taken_at) AS last_attempt_at
+                FROM ({_MY_STUDENTS_HISTORY}) h
+                GROUP BY h.user_id
+                """
+            ),
+            {"instructor_id": instructor_id},
+        )
+    ).all()
+
+    return {
+        row.user_id: {
+            "attempts": row.attempts,
+            "exam_attempts": row.exam_attempts,
+            "practice_attempts": row.practice_attempts,
+            "average_score": round(float(row.average_score), 1),
+            "best_score": round(float(row.best_score), 1),
+            "pass_rate": round((row.passed_count / row.attempts) * 100) if row.attempts else 0,
+            "total_seconds": int(row.total_seconds or 0),
+            "last_attempt_at": row.last_attempt_at,
+        }
+        for row in rows
+    }
+
+
+async def in_progress_counts(instructor_id: str, db: AsyncSession) -> dict[str, int]:
+    """Open attempts per student, keyed by user id."""
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT p.user_id, COUNT(*) AS open_count
+                FROM in_progress_exam p
+                JOIN "user" u ON u.id = p.user_id
+                WHERE u.instructor_id = :instructor_id
+                GROUP BY p.user_id
+                """
+            ),
+            {"instructor_id": instructor_id},
+        )
+    ).all()
+    return dict(rows)
+
+
+async def exam_rollups(instructor_id: str, db: AsyncSession, limit: int = 50) -> list[dict]:
+    """Per-exam aggregates across the instructor's students.
+
+    Title and pass grade are taken from the most recent attempt rather than with
+    MAX(): both are denormalized copies that can legitimately differ between rows
+    after a rename or a threshold change, and the newest is the current one.
+    """
+    rows = (
+        await db.execute(
+            text(
+                f"""
+                SELECT h.exam_id,
+                       (array_agg(h.exam_title ORDER BY h.taken_at DESC))[1] AS exam_title,
+                       (array_agg(h.pass_grade ORDER BY h.taken_at DESC))[1] AS pass_grade,
+                       COUNT(*) AS attempts,
+                       COUNT(DISTINCT h.user_id) AS students,
+                       COUNT(*) FILTER (WHERE h.passed) AS passed_count,
+                       AVG(h.score) AS average_score,
+                       MAX(h.taken_at) AS last_attempt_at
+                FROM ({_MY_STUDENTS_HISTORY}) h
+                GROUP BY h.exam_id
+                ORDER BY attempts DESC
+                LIMIT :limit
+                """
+            ),
+            {"instructor_id": instructor_id, "limit": limit},
+        )
+    ).all()
+
+    return [
+        {
+            "exam_id": row.exam_id,
+            "exam_title": row.exam_title,
+            "pass_grade": row.pass_grade,
+            "attempts": row.attempts,
+            "students": row.students,
+            "average_score": round(float(row.average_score), 1),
+            "pass_rate": round((row.passed_count / row.attempts) * 100) if row.attempts else 0,
+            "last_attempt_at": row.last_attempt_at,
+        }
+        for row in rows
+    ]
+
+
+async def attempts_per_day(instructor_id: str, days: int, db: AsyncSession) -> list[dict]:
+    """One row per calendar day, including days with no attempts.
+
+    generate_series fills the gaps: without it the chart's x-axis compresses idle
+    days away and a quiet week looks like a busy one.
+    """
+    rows = (
+        await db.execute(
+            text(
+                f"""
+                SELECT to_char(d, 'YYYY-MM-DD') AS day,
+                       COUNT(h.id) AS attempts,
+                       COALESCE(AVG(h.score), 0) AS average_score
+                FROM generate_series(
+                    current_date - make_interval(days => :days - 1), current_date, interval '1 day'
+                ) AS d
+                LEFT JOIN ({_MY_STUDENTS_HISTORY}) h ON h.taken_at::date = d::date
+                GROUP BY 1
+                ORDER BY 1
+                """
+            ),
+            {"instructor_id": instructor_id, "days": days},
+        )
+    ).all()
+
+    return [
+        {"day": day, "attempts": attempts, "average_score": round(float(average_score), 1)}
+        for day, attempts, average_score in rows
+    ]
+
+
+async def score_buckets(instructor_id: str, db: AsyncSession) -> list[int]:
+    """Attempt counts in ten 10-point score bands, always exactly ten entries.
+
+    100% falls in the top band rather than an eleventh one of its own.
+    """
+    rows = (
+        await db.execute(
+            text(
+                f"""
+                SELECT LEAST(FLOOR(h.score / 10)::int, 9) AS bucket, COUNT(*) AS attempts
+                FROM ({_MY_STUDENTS_HISTORY}) h
+                GROUP BY 1
+                """
+            ),
+            {"instructor_id": instructor_id},
+        )
+    ).all()
+
+    buckets = [0] * 10
+    for bucket, attempts in rows:
+        buckets[bucket] = attempts
+    return buckets
+
+
+async def topic_stats_for_instructor(instructor_id: str, db: AsyncSession, attempt_limit: int = 1000) -> list[dict]:
+    """Per-topic performance across every one of the instructor's students.
+
+    Bounded the same way `topic_stats` is, and for the same reason: unbounded,
+    this expands every JSONB results blob the class has ever produced.
+    """
+    rows = (
+        await db.execute(
+            text(
+                f"""
+                SELECT COALESCE(elem->>'topic', '') AS topic,
+                       COUNT(*) AS total,
+                       COUNT(*) FILTER (WHERE (elem->>'is_correct')::boolean) AS correct
+                FROM (
+                    SELECT h.results FROM ({_MY_STUDENTS_HISTORY}) h
+                    ORDER BY h.taken_at DESC
+                    LIMIT :attempt_limit
+                ) recent, LATERAL jsonb_array_elements(recent.results) AS elem
+                GROUP BY 1
+                """
+            ),
+            {"instructor_id": instructor_id, "attempt_limit": attempt_limit},
+        )
+    ).all()
+    return _topic_rows_to_stats(rows)
+
+
+# The two functions below take instructor_id as well as student_id and filter on
+# both, so a mistyped call cannot read a student belonging to someone else. The
+# caller's 404 check is defence in depth, not the only barrier.
+
+
+async def list_history_for_student(
+    student_id: str, instructor_id: str, db: AsyncSession, limit: int = 20
+) -> list[History]:
+    stmt = (
+        select(History)
+        .join(User, User.id == History.user_id)
+        .where(History.user_id == student_id, User.instructor_id == instructor_id)
+        .order_by(History.taken_at.desc())
+        .limit(limit)
+    )
+    return list((await db.execute(stmt)).scalars().all())
+
+
+async def topic_stats_for_student(
+    student_id: str, instructor_id: str, db: AsyncSession, attempt_limit: int = 200
+) -> list[dict]:
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT COALESCE(elem->>'topic', '') AS topic,
+                       COUNT(*) AS total,
+                       COUNT(*) FILTER (WHERE (elem->>'is_correct')::boolean) AS correct
+                FROM (
+                    SELECT h.results
+                    FROM history h
+                    JOIN "user" u ON u.id = h.user_id
+                    WHERE h.user_id = :student_id AND u.instructor_id = :instructor_id
+                    ORDER BY h.taken_at DESC
+                    LIMIT :attempt_limit
+                ) recent, LATERAL jsonb_array_elements(recent.results) AS elem
+                GROUP BY 1
+                """
+            ),
+            {"student_id": student_id, "instructor_id": instructor_id, "attempt_limit": attempt_limit},
+        )
+    ).all()
+    return _topic_rows_to_stats(rows)

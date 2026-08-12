@@ -1,4 +1,3 @@
-import pathlib
 from datetime import datetime
 
 from fastapi import UploadFile
@@ -11,14 +10,21 @@ from src.auth.constants import UserRole
 from src.auth.models import User
 from src.authz import visible
 from src.courses import service as courses_service
-from src.exams import utils
-from src.exams.config import exams_settings
-from src.exams.constants import ALLOWED_IMAGE_EXTENSIONS
 from src.exams.exceptions import EmptyTitle, ExamNotFound, ImageTooLarge, QuestionNotFound, UnsupportedImageType
 from src.exams.models import Exam, Question
 from src.exams.schemas import ExamCreate, ExamQuestionOut, QuestionIn, QuestionUpdate
 from src.grading.service import TypeCountRow, question_type_counts
 from src.identifiers import new_id
+from src.storage import (
+    ALLOWED_IMAGE_EXTENSIONS,
+    remove_upload_file,
+    remove_upload_files,
+    save_upload,
+    storage_settings,
+    upload_filename,
+    upload_url,
+    validated_extension,
+)
 
 
 def _clean_title(title: str) -> str:
@@ -99,11 +105,20 @@ async def questions_by_exam_ids(exam_ids, db: AsyncSession):
     return (await db.execute(stmt)).all()
 
 
-async def time_limits_by_exam_ids(exam_ids, db: AsyncSession) -> dict[str, int | None]:
-    """Time limits for many exams at once, so the admin dashboard can derive a
-    countdown instead of trusting the one the student's browser reported."""
-    stmt = select(Exam.id, Exam.time_limit_minutes).where(Exam.id.in_(exam_ids))
-    return dict((await db.execute(stmt)).all())
+async def settings_by_exam_ids(exam_ids, db: AsyncSession) -> dict[str, tuple[int | None, int]]:
+    """`(time_limit_minutes, pass_grade)` for many exams at once, keyed by exam id.
+
+    The tracking dashboard needs both: the countdown must be derived from the
+    server's clock rather than echoing back the one the student's browser
+    reported, and the pass mark is per-exam.
+    """
+    stmt = select(Exam.id, Exam.time_limit_minutes, Exam.pass_grade).where(Exam.id.in_(exam_ids))
+    return {row.id: (row.time_limit_minutes, row.pass_grade) for row in (await db.execute(stmt)).all()}
+
+
+async def count_owned(user: User, db: AsyncSession) -> int:
+    """How many exams this user has published. Read by the instructor overview."""
+    return await db.scalar(select(func.count(Exam.id)).where(Exam.owner_id == user.id)) or 0
 
 
 async def _type_count_rows(exam_ids, db: AsyncSession):
@@ -122,6 +137,7 @@ def _summary(exam: Exam, course_name: str | None, counts: list[TypeCountRow], us
         "course_id": exam.course_id,
         "course_name": course_name,
         "time_limit_minutes": exam.time_limit_minutes,
+        "pass_grade": exam.pass_grade,
         "allow_practice": exam.allow_practice,
         "is_owner": exam.owner_id == user.id,
         "total_questions": len(counts),
@@ -179,6 +195,7 @@ async def create(payload: ExamCreate, user: User, db: AsyncSession) -> dict:
             title=title,
             course_id=payload.course_id,
             time_limit_minutes=payload.time_limit_minutes,
+            pass_grade=payload.pass_grade,
             created_at=datetime.now(),
         )
     )
@@ -214,6 +231,7 @@ async def detail(exam_id: str, user: User, include_answers: bool, db: AsyncSessi
         "course_id": exam.course_id,
         "course_name": exam.course.name if exam.course else None,
         "time_limit_minutes": exam.time_limit_minutes,
+        "pass_grade": exam.pass_grade,
         # Explicit, so the client never has to infer the gate's outcome from
         # whether a field happens to be missing.
         "answers_included": include_answers,
@@ -242,6 +260,15 @@ async def set_allow_practice(exam_id: str, allow: bool, user: User, db: AsyncSes
     return exam
 
 
+async def set_pass_grade(exam_id: str, pass_grade: int, user: User, db: AsyncSession) -> Exam:
+    """Applies to attempts submitted from now on. Past attempts keep the threshold
+    they were graded against — History carries its own copy."""
+    exam = await get_owned_exam_or_404(exam_id, user, db)
+    exam.pass_grade = pass_grade
+    await db.commit()
+    return exam
+
+
 async def set_time_limit(exam_id: str, minutes: int | None, user: User, db: AsyncSession) -> Exam:
     exam = await get_owned_exam_or_404(exam_id, user, db)
     # Zero or negative clears the limit rather than storing a nonsensical one.
@@ -258,7 +285,7 @@ async def delete_exam(exam_id: str, user: User, db: AsyncSession) -> None:
     images = await _image_urls_for_exam(exam_id, db)
     await db.delete(exam)
     await db.commit()
-    await run_in_threadpool(utils.remove_image_files, images)
+    await run_in_threadpool(remove_upload_files, images)
 
 
 async def _image_urls_for_exam(exam_id: str, db: AsyncSession) -> list[str]:
@@ -321,31 +348,29 @@ async def delete_question(exam_id: str, question_id: int, user: User, db: AsyncS
     image = question.image
     await db.delete(question)
     await db.commit()
-    await run_in_threadpool(utils.remove_image_file, image)
+    await run_in_threadpool(remove_upload_file, image)
 
 
 async def replace_question_image(question_id: int, file: UploadFile, user: User, db: AsyncSession) -> Question:
     question = await get_owned_question_or_404(question_id, user, db)
 
-    ext = pathlib.Path(file.filename or "").suffix.lower()
-    if ext not in ALLOWED_IMAGE_EXTENSIONS:
-        raise UnsupportedImageType(
-            f"Unsupported image type '{ext}'. Allowed: {', '.join(sorted(ALLOWED_IMAGE_EXTENSIONS))}"
-        )
+    ext = validated_extension(file.filename)
+    if not ext:
+        raise UnsupportedImageType(f"Unsupported image type. Allowed: {', '.join(sorted(ALLOWED_IMAGE_EXTENSIONS))}")
 
-    filename = utils.image_filename(question_id, ext)
-    dest = exams_settings.uploads_dir / filename
+    filename = upload_filename(f"q{question_id}", ext)
+    dest = storage_settings.dir / filename
     try:
         # One threadpool hop for the whole streamed write, not one per chunk.
-        await run_in_threadpool(utils.save_upload, file.file, dest, exams_settings.max_image_bytes)
+        await run_in_threadpool(save_upload, file.file, dest, storage_settings.max_image_bytes)
     except ValueError as exc:
-        raise ImageTooLarge(f"Image exceeds the {exams_settings.max_image_bytes // (1024 * 1024)} MB limit") from exc
+        raise ImageTooLarge(f"Image exceeds the {storage_settings.max_image_bytes // (1024 * 1024)} MB limit") from exc
 
     previous = question.image
-    question.image = utils.image_url(filename)
+    question.image = upload_url(filename)
     await db.commit()
     # Only discard the old file once the new one is safely committed.
-    await run_in_threadpool(utils.remove_image_file, previous)
+    await run_in_threadpool(remove_upload_file, previous)
     return question
 
 
@@ -354,5 +379,5 @@ async def clear_question_image(question_id: int, user: User, db: AsyncSession) -
     image = question.image
     question.image = None
     await db.commit()
-    await run_in_threadpool(utils.remove_image_file, image)
+    await run_in_threadpool(remove_upload_file, image)
     return question
