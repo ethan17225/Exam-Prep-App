@@ -11,7 +11,18 @@ imports and autogenerate silently starts dropping tables.
 
 from src.attempts.models import History, InProgressExam
 from src.auth.models import User
+from src.banks.models import BankSection, QuestionBank
 from src.courses.models import Course
-from src.exams.models import Exam, Question
+from src.exams.models import Exam, ExamSectionShare, Question
 
-__all__ = ["Course", "Exam", "History", "InProgressExam", "Question", "User"]
+__all__ = [
+    "BankSection",
+    "Course",
+    "Exam",
+    "ExamSectionShare",
+    "History",
+    "InProgressExam",
+    "Question",
+    "QuestionBank",
+    "User",
+]

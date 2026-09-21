@@ -71,7 +71,7 @@ initialized import error. This is the highest-value rule in the file.
 
 ```
 L0  config · database · exceptions · authz · constants · grading/*
-L1  auth      L2  courses      L3  exams, documents
+L1  auth      L2  courses      L3  banks · exams, documents
 L4  attempts  L5  admin        L6  main
 ```
 
@@ -294,9 +294,11 @@ that affects the score:
   `started_at` (set once on insert, never rewritten by the upsert). Past the limit
   plus `SUBMIT_GRACE_SECONDS`, the attempt is graded against the last autosave the
   server accepted before the deadline — never destroyed by a 4xx.
-- **`question_numbers` and `fib_correct` are ignored for graded runs** — both let
+- **`question_ids` and `fib_correct` are ignored for graded runs** — both let
   a student inflate their own score. They stay in the schema (wire contract) but
-  the service drops them unless `mode="practice"`.
+  the service drops them unless `mode="practice"`. Answers, `flagged` and
+  `question_order` are keyed by `Question.id`; the label a student sees is the
+  1-based position in that attempt, stored on history as `question_number`.
 - **The answer key is gated by `Exam.allow_practice`.** `include_answers` is
   honoured only for the owner or when `allow_practice` is true, so an
   assessment-only exam never yields its key before submission. `detail` returns

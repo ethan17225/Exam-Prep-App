@@ -14,6 +14,7 @@ from src.admin.router import router as admin_router
 from src.attempts.router import history_router, progress_router, submit_router
 from src.auth.dependencies import make_static_mount_guard
 from src.auth.router import router as auth_router
+from src.banks.router import router as banks_router
 from src.config import SHOW_DOCS_IN, settings
 from src.courses.router import router as courses_router
 from src.database import SessionDep
@@ -116,6 +117,7 @@ app.include_router(courses_router)
 app.include_router(documents_router)
 app.include_router(exams_router)
 app.include_router(questions_router)
+app.include_router(banks_router)
 app.include_router(submit_router)
 app.include_router(progress_router)
 app.include_router(history_router)

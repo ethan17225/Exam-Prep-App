@@ -3,17 +3,28 @@ from typing import Annotated
 from fastapi import APIRouter, File, Query, UploadFile, status
 
 from src.attempts import service as attempts_service
-from src.auth.dependencies import CurrentUserDep
+from src.attempts.constants import AttemptMode
+from src.auth.dependencies import CurrentUserDep, InstructorDep
+from src.banks.exceptions import DuplicateSectionShare, EmptyBankDraw
 from src.courses.exceptions import CourseNotFound
 from src.database import SessionDep
 from src.exams import service
-from src.exams.exceptions import EmptyTitle, ExamNotFound, ImageTooLarge, QuestionNotFound, UnsupportedImageType
+from src.exams.exceptions import (
+    AttemptLargerThanBank,
+    EmptyTitle,
+    ExamNotFound,
+    ImageTooLarge,
+    QuestionNotFound,
+    UnsupportedImageType,
+)
 from src.exams.schemas import (
     ExamAllowPracticeUpdate,
     ExamCreate,
     ExamCreatedOut,
     ExamDetailOut,
+    ExamFromBank,
     ExamPassGradeUpdate,
+    ExamSettingsUpdate,
     ExamSummaryOut,
     ExamTimeLimitUpdate,
     ExamTitleUpdate,
@@ -65,6 +76,26 @@ async def list_exams(
     return await service.list_summaries(user, course_id, db, limit)
 
 
+@router.post(
+    "/from-bank",
+    response_model=ExamCreatedOut,
+    summary="Create an exam from a question bank",
+    description=(
+        "Creates a shared exam linked to a bank. Each attempt draws a fresh "
+        "paper of questions_per_attempt items using the per-section mix. "
+        "Instructors create assessment-only exams."
+    ),
+    responses={
+        **BAD_TITLE,
+        status.HTTP_404_NOT_FOUND: {"description": CourseNotFound.DETAIL},
+        status.HTTP_400_BAD_REQUEST: {"description": f"{DuplicateSectionShare.DETAIL}; {AttemptLargerThanBank.DETAIL}"},
+        status.HTTP_409_CONFLICT: {"description": EmptyBankDraw.DETAIL},
+    },
+)
+async def create_exam_from_bank(payload: ExamFromBank, user: InstructorDep, db: SessionDep):
+    return await service.create_from_bank(payload, user, db)
+
+
 @router.get(
     "/{exam_id}",
     response_model=ExamDetailOut,
@@ -74,12 +105,24 @@ async def list_exams(
     summary="Get an exam",
     description=(
         "Returns the exam and its questions. `include_answers` adds the answer "
-        "key and rationale, which the practice-mode client needs to grade locally."
+        "key and rationale, which the practice-mode client needs to grade locally. "
+        "For a bank-backed exam, pass `mode` so an open attempt returns its frozen paper."
     ),
     responses=NO_EXAM,
 )
-async def get_exam(exam_id: str, user: CurrentUserDep, db: SessionDep, include_answers: bool = False):
-    return await service.detail(exam_id, user, include_answers, db)
+async def get_exam(
+    exam_id: str,
+    user: CurrentUserDep,
+    db: SessionDep,
+    include_answers: bool = False,
+    mode: Annotated[AttemptMode | None, Query()] = None,
+):
+    question_order = None
+    if mode is not None:
+        attempt = await attempts_service.get_open_attempt(exam_id, mode, user, db)
+        if attempt:
+            question_order = attempt.question_order
+    return await service.detail(exam_id, user, include_answers, db, question_order=question_order)
 
 
 @router.patch(
@@ -143,6 +186,32 @@ async def update_exam_pass_grade(exam_id: str, payload: ExamPassGradeUpdate, use
     return await service.exam_summary(exam, user, db)
 
 
+@router.patch(
+    "/{exam_id}/settings",
+    response_model=ExamSummaryOut,
+    summary="Update exam attempt settings",
+    description=(
+        "Sets time limit, shuffle, and how many questions a student sits per "
+        "attempt. Used by the edit portal; list-page inline editors for these "
+        "were removed."
+    ),
+    responses=NO_EXAM,
+)
+async def update_exam_settings(exam_id: str, payload: ExamSettingsUpdate, user: CurrentUserDep, db: SessionDep):
+    exam = await service.set_settings(
+        exam_id,
+        time_limit_minutes=payload.time_limit_minutes,
+        set_time_limit="time_limit_minutes" in payload.model_fields_set,
+        shuffle=payload.shuffle,
+        questions_per_attempt=payload.questions_per_attempt,
+        clear_questions_per_attempt=payload.clear_questions_per_attempt,
+        shares=payload.shares if "shares" in payload.model_fields_set else None,
+        user=user,
+        db=db,
+    )
+    return await service.exam_summary(exam, user, db)
+
+
 @router.delete(
     "/{exam_id}",
     response_model=DeletedOut,
@@ -164,7 +233,7 @@ async def delete_exam(exam_id: str, user: CurrentUserDep, db: SessionDep):
     "/{exam_id}/questions",
     response_model=QuestionOut,
     summary="Add a question",
-    description="Appends a question to the exam. Omit `number` to append at the end.",
+    description="Appends a question to the exam.",
     responses=NO_EXAM,
 )
 async def add_question(exam_id: str, payload: QuestionIn, user: CurrentUserDep, db: SessionDep):

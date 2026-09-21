@@ -21,6 +21,11 @@ class EmptyTitle(DetailedHTTPException):
     DETAIL = "Title cannot be empty"
 
 
+class AttemptLargerThanBank(DetailedHTTPException):
+    STATUS_CODE = 400
+    DETAIL = "Questions per attempt cannot exceed the questions available in the mix"
+
+
 class UnsupportedImageType(DetailedHTTPException):
     STATUS_CODE = 400
     DETAIL = "Unsupported image type"

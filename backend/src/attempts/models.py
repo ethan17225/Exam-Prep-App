@@ -46,6 +46,9 @@ class InProgressExam(Base):
     answers = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
     flagged = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     question_order = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    # Display order of each question's choices for this attempt. Empty until the
+    # client has shuffled (or left unshuffled) the paper it is sitting.
+    option_order = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
     remaining_seconds = Column(Integer, nullable=False)
     current_page = Column(Integer, nullable=False, default=0)
     total_questions = Column(Integer, nullable=False)

@@ -9,7 +9,7 @@ from src.schemas import ISODateTime
 
 
 class AnswerSubmission(BaseModel):
-    question_number: int = Field(ge=0, le=MAX_INT)
+    question_id: int = Field(ge=0, le=MAX_INT)
     answer: Any = None
     # Honoured only in practice mode — a graded run cannot self-mark.
     fib_correct: bool | None = None
@@ -24,17 +24,21 @@ class ExamSubmission(BaseModel):
     mode: AttemptMode = AttemptMode.EXAM
     # Ignored for graded attempts: it let a student grade only the questions they
     # answered correctly, since `total` was the size of the chosen subset.
-    question_numbers: list[int] | None = Field(default=None, max_length=MAX_QUESTIONS_PER_EXAM)
+    question_ids: list[int] | None = Field(default=None, max_length=MAX_QUESTIONS_PER_EXAM)
 
 
 class SaveProgressPayload(BaseModel):
     exam_id: str = Field(max_length=ID_LENGTH)
     mode: AttemptMode = AttemptMode.EXAM
-    # Keys are question numbers. Constraining them here stops a non-numeric key
+    # Keys are question ids. Constraining them here stops a non-numeric key
     # from wedging the admin dashboard's int() conversion for every instructor.
     answers: dict[Annotated[int, Field(ge=0, le=MAX_INT)], Any]
     flagged: list[int] = Field(max_length=MAX_QUESTIONS_PER_EXAM)
     question_order: list[int] = Field(max_length=MAX_QUESTIONS_PER_EXAM)
+    # Display order of choices, keyed by question id. Frozen after the first
+    # non-empty save on a graded or bank-backed attempt so a resume does not
+    # reshuffle the paper the student is already sitting.
+    option_order: dict[Annotated[int, Field(ge=0, le=MAX_INT)], Any] = Field(default_factory=dict)
     remaining_seconds: int = Field(ge=0, le=MAX_INT)
     current_page: int = Field(default=0, ge=0, le=MAX_INT)
 
@@ -49,6 +53,7 @@ class InProgressOut(BaseModel):
     answers: Any
     flagged: Any
     question_order: Any
+    option_order: Any = None
     remaining_seconds: int
     current_page: int
     total_questions: int

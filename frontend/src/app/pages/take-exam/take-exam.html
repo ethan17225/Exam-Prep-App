@@ -19,11 +19,16 @@
         }
         <span class="progress-text">{{ answeredCount() }}/{{ totalQuestions() }} answered</span>
         <span class="exam-type-summary">
-          <span class="type-chip type-chip-mcq">MCQ {{ typeCounts().mcq }}</span>
-          <span class="type-chip type-chip-sata">SATA {{ typeCounts().sata }}</span>
-          <span class="type-chip type-chip-fib">FIB {{ typeCounts().fib }}</span>
-          @if (typeCounts().other > 0) {
-            <span class="type-chip type-chip-other">Other {{ typeCounts().other }}</span>
+          @for (chip of typeChips(); track chip.kind) {
+            <span
+              class="type-chip"
+              [class.type-chip-mcq]="chip.tone === 'mcq'"
+              [class.type-chip-sata]="chip.tone === 'sata'"
+              [class.type-chip-fib]="chip.tone === 'fib'"
+              [class.type-chip-other]="chip.tone === 'other'"
+            >
+              {{ chip.kind }} {{ chip.count }}
+            </span>
           }
         </span>
       </div>
@@ -54,31 +59,31 @@
     <div class="progress-bar-track">
       <div class="progress-bar-fill" [style.width.%]="progress()"></div>
     </div>
-  </div>
 
-  <!-- Question navigator panel -->
-  @if (showNav()) {
-    <div class="q-nav-panel card">
-      <div class="q-nav-grid">
-        @for (n of navVm(); track n.number) {
-          <button
-            class="q-nav-btn"
-            [class.answered]="n.answered"
-            [class.flagged]="n.flagged"
-            [class.current]="n.current"
-            (click)="goTo(n.index)"
-          >
-            {{ n.index + 1 }}
-          </button>
-        }
+    <!-- Overlays the questions so opening it mid-page does not require a scroll. -->
+    @if (showNav()) {
+      <div class="q-nav-panel card">
+        <div class="q-nav-grid">
+          @for (n of navVm(); track n.id) {
+            <button
+              class="q-nav-btn"
+              [class.answered]="n.answered"
+              [class.flagged]="n.flagged"
+              [class.current]="n.current"
+              (click)="goTo(n.index)"
+            >
+              {{ n.index + 1 }}
+            </button>
+          }
+        </div>
+        <div class="q-nav-legend">
+          <span><span class="dot dot-answered"></span> Answered</span>
+          <span><span class="dot dot-flagged"></span> Flagged</span>
+          <span><span class="dot dot-current"></span> Current Page</span>
+        </div>
       </div>
-      <div class="q-nav-legend">
-        <span><span class="dot dot-answered"></span> Answered</span>
-        <span><span class="dot dot-flagged"></span> Flagged</span>
-        <span><span class="dot dot-current"></span> Current Page</span>
-      </div>
-    </div>
-  }
+    }
+  </div>
 
   <!-- Page info -->
   <div class="page-info">
@@ -88,13 +93,14 @@
   </div>
 
   <!-- Questions for current page -->
-  @for (q of pageQuestions(); track q.number; let i = $index) {
-    @let s = structVm().get(q.number)!;
-    @let st = stateVm().get(q.number)!;
+  @for (q of pageQuestions(); track q.id; let i = $index) {
+    @let s = structVm().get(q.id)!;
+    @let st = stateVm().get(q.id)!;
     <div
       class="card question-card"
+      [id]="'q-' + q.id"
       [class.revealed-correct]="st.correct"
-      [class.revealed-wrong]="isRevealed(q.number) && !st.correct"
+      [class.revealed-wrong]="isRevealed(q.id) && !st.correct"
     >
       <div class="question-header">
         <div class="question-badges">
@@ -111,13 +117,13 @@
         </div>
         <button
           class="flag-btn"
-          [class.flagged]="isFlagged(q.number)"
-          (click)="toggleFlag(q.number)"
+          [class.flagged]="isFlagged(q.id)"
+          (click)="toggleFlag(q.id)"
           title="Flag for review"
-          [attr.aria-label]="isFlagged(q.number) ? 'Unflag question' : 'Flag question for review'"
-          [attr.aria-pressed]="isFlagged(q.number)"
+          [attr.aria-label]="isFlagged(q.id) ? 'Unflag question' : 'Flag question for review'"
+          [attr.aria-pressed]="isFlagged(q.id)"
         >
-          {{ isFlagged(q.number) ? '⚑' : '⚐' }}
+          {{ isFlagged(q.id) ? '⚑' : '⚐' }}
         </button>
       </div>
 
@@ -155,27 +161,27 @@
                     <td class="matrix-cell">
                       <button
                         class="matrix-check"
-                        [class.checked]="isMatrixChecked(q.number, ri, col)"
+                        [class.checked]="isMatrixChecked(q.id, ri, col)"
                         [class.cell-correct]="
-                          isRevealed(q.number) &&
+                          isRevealed(q.id) &&
                           isMatrixExpected(q, ri, col) &&
-                          isMatrixChecked(q.number, ri, col)
+                          isMatrixChecked(q.id, ri, col)
                         "
                         [class.cell-missed]="
-                          isRevealed(q.number) &&
+                          isRevealed(q.id) &&
                           isMatrixExpected(q, ri, col) &&
-                          !isMatrixChecked(q.number, ri, col)
+                          !isMatrixChecked(q.id, ri, col)
                         "
                         [class.cell-wrong]="
-                          isRevealed(q.number) &&
+                          isRevealed(q.id) &&
                           !isMatrixExpected(q, ri, col) &&
-                          isMatrixChecked(q.number, ri, col)
+                          isMatrixChecked(q.id, ri, col)
                         "
-                        (click)="toggleMatrix(q.number, ri, col)"
-                        [disabled]="isRevealed(q.number)"
+                        (click)="toggleMatrix(q.id, ri, col)"
+                        [disabled]="isRevealed(q.id)"
                         [attr.aria-label]="row + ' — ' + col"
                       >
-                        {{ isMatrixChecked(q.number, ri, col) ? '☑' : '☐' }}
+                        {{ isMatrixChecked(q.id, ri, col) ? '☑' : '☐' }}
                       </button>
                     </td>
                   }
@@ -190,25 +196,25 @@
           @for (blank of s.cloze; track $index; let bi = $index) {
             <div
               class="cloze-blank"
-              [class.cloze-correct]="isRevealed(q.number) && isClozeBlankCorrect(q, bi)"
-              [class.cloze-wrong]="isRevealed(q.number) && !isClozeBlankCorrect(q, bi)"
+              [class.cloze-correct]="isRevealed(q.id) && isClozeBlankCorrect(q, bi)"
+              [class.cloze-wrong]="isRevealed(q.id) && !isClozeBlankCorrect(q, bi)"
             >
-              <label class="cloze-label" [for]="'cloze-' + q.number + '-' + bi">{{
+              <label class="cloze-label" [for]="'cloze-' + q.id + '-' + bi">{{
                 blank.label
               }}</label>
               <select
                 class="cloze-select"
-                [id]="'cloze-' + q.number + '-' + bi"
-                [ngModel]="getClozeAnswer(q.number, bi)"
+                [id]="'cloze-' + q.id + '-' + bi"
+                [ngModel]="getClozeAnswer(q.id, bi)"
                 (ngModelChange)="setClozeAnswer(q, bi, $event)"
-                [disabled]="isRevealed(q.number)"
+                [disabled]="isRevealed(q.id)"
               >
                 <option value="" disabled>Select an option…</option>
                 @for (choice of blank.choices; track choice) {
                   <option [value]="choice">{{ choice }}</option>
                 }
               </select>
-              @if (isRevealed(q.number) && !isClozeBlankCorrect(q, bi)) {
+              @if (isRevealed(q.id) && !isClozeBlankCorrect(q, bi)) {
                 <span class="cloze-expected">Correct: {{ clozeExpected(q, bi) }}</span>
               }
             </div>
@@ -222,24 +228,24 @@
               <div class="bowtie-cat-header">
                 <span class="bowtie-cat-name">{{ cat.name }}</span>
                 <span class="bowtie-count"
-                  >{{ bowtieSelectedCount(q.number, cat.name) }}/{{ cat.count }} selected</span
+                  >{{ bowtieSelectedCount(q.id, cat.name) }}/{{ cat.count }} selected</span
                 >
               </div>
               <div class="bowtie-choices">
                 @for (choice of cat.choices; track choice) {
                   <button
                     class="bowtie-choice"
-                    [class.selected]="isBowtieSelected(q.number, cat.name, choice)"
+                    [class.selected]="isBowtieSelected(q.id, cat.name, choice)"
                     [class.option-correct]="
-                      isRevealed(q.number) && isBowtieExpected(q, cat.name, choice)
+                      isRevealed(q.id) && isBowtieExpected(q, cat.name, choice)
                     "
                     [class.option-wrong]="
-                      isRevealed(q.number) &&
-                      isBowtieSelected(q.number, cat.name, choice) &&
+                      isRevealed(q.id) &&
+                      isBowtieSelected(q.id, cat.name, choice) &&
                       !isBowtieExpected(q, cat.name, choice)
                     "
-                    (click)="toggleBowtie(q.number, cat, choice)"
-                    [disabled]="isRevealed(q.number)"
+                    (click)="toggleBowtie(q.id, cat, choice)"
+                    [disabled]="isRevealed(q.id)"
                   >
                     {{ choice }}
                   </button>
@@ -255,8 +261,8 @@
           @for (item of st.rankOrder; track item; let ri = $index) {
             <div
               class="rank-item"
-              [class.rank-correct]="isRevealed(q.number) && isRankItemCorrect(q, ri)"
-              [class.rank-wrong]="isRevealed(q.number) && !isRankItemCorrect(q, ri)"
+              [class.rank-correct]="isRevealed(q.id) && isRankItemCorrect(q, ri)"
+              [class.rank-wrong]="isRevealed(q.id) && !isRankItemCorrect(q, ri)"
             >
               <span class="rank-pos">{{ ri + 1 }}</span>
               <span class="rank-text">{{ item }}</span>
@@ -264,7 +270,7 @@
                 <button
                   class="rank-btn"
                   (click)="moveRank(q, ri, -1)"
-                  [disabled]="isRevealed(q.number) || ri === 0"
+                  [disabled]="isRevealed(q.id) || ri === 0"
                   aria-label="Move up"
                 >
                   ▲
@@ -272,7 +278,7 @@
                 <button
                   class="rank-btn"
                   (click)="moveRank(q, ri, 1)"
-                  [disabled]="isRevealed(q.number) || ri === st.rankOrder.length - 1"
+                  [disabled]="isRevealed(q.id) || ri === st.rankOrder.length - 1"
                   aria-label="Move down"
                 >
                   ▼
@@ -281,7 +287,7 @@
             </div>
           }
         </div>
-        @if (!isRankConfirmed(q.number) && !isRevealed(q.number)) {
+        @if (!isRankConfirmed(q.id) && !isRevealed(q.id)) {
           <button class="btn btn-secondary btn-sm rank-confirm-btn" (click)="confirmRankOrder(q)">
             Confirm This Order
           </button>
@@ -293,18 +299,18 @@
           @for (tok of s.tokens; track $index; let ti = $index) {
             <button
               class="highlight-token"
-              [class.selected]="isHighlighted(q.number, ti)"
+              [class.selected]="isHighlighted(q.id, ti)"
               [class.option-correct]="
-                isRevealed(q.number) && isHighlightExpected(q, ti) && isHighlighted(q.number, ti)
+                isRevealed(q.id) && isHighlightExpected(q, ti) && isHighlighted(q.id, ti)
               "
               [class.option-missed]="
-                isRevealed(q.number) && isHighlightExpected(q, ti) && !isHighlighted(q.number, ti)
+                isRevealed(q.id) && isHighlightExpected(q, ti) && !isHighlighted(q.id, ti)
               "
               [class.option-wrong]="
-                isRevealed(q.number) && !isHighlightExpected(q, ti) && isHighlighted(q.number, ti)
+                isRevealed(q.id) && !isHighlightExpected(q, ti) && isHighlighted(q.id, ti)
               "
-              (click)="toggleHighlight(q.number, ti)"
-              [disabled]="isRevealed(q.number)"
+              (click)="toggleHighlight(q.id, ti)"
+              [disabled]="isRevealed(q.id)"
             >
               {{ tok }}
             </button>
@@ -322,15 +328,15 @@
                 [style.top.%]="region.y"
                 [style.width.%]="region.w"
                 [style.height.%]="region.h"
-                [class.selected]="isHotspotSelected(q.number, region.id)"
-                [class.region-correct]="isRevealed(q.number) && isHotspotExpected(q, region.id)"
+                [class.selected]="isHotspotSelected(q.id, region.id)"
+                [class.region-correct]="isRevealed(q.id) && isHotspotExpected(q, region.id)"
                 [class.region-wrong]="
-                  isRevealed(q.number) &&
-                  isHotspotSelected(q.number, region.id) &&
+                  isRevealed(q.id) &&
+                  isHotspotSelected(q.id, region.id) &&
                   !isHotspotExpected(q, region.id)
                 "
-                (click)="selectHotspot(q.number, region.id)"
-                [disabled]="isRevealed(q.number)"
+                (click)="selectHotspot(q.id, region.id)"
+                [disabled]="isRevealed(q.id)"
                 [title]="region.label"
                 [attr.aria-label]="region.label"
               ></button>
@@ -346,18 +352,18 @@
             @for (region of s.regions; track region.id) {
               <button
                 class="option-btn"
-                [class.selected]="isHotspotSelected(q.number, region.id)"
-                [class.option-correct]="isRevealed(q.number) && isHotspotExpected(q, region.id)"
+                [class.selected]="isHotspotSelected(q.id, region.id)"
+                [class.option-correct]="isRevealed(q.id) && isHotspotExpected(q, region.id)"
                 [class.option-wrong]="
-                  isRevealed(q.number) &&
-                  isHotspotSelected(q.number, region.id) &&
+                  isRevealed(q.id) &&
+                  isHotspotSelected(q.id, region.id) &&
                   !isHotspotExpected(q, region.id)
                 "
-                (click)="selectHotspot(q.number, region.id)"
-                [disabled]="isRevealed(q.number)"
+                (click)="selectHotspot(q.id, region.id)"
+                [disabled]="isRevealed(q.id)"
               >
                 <span class="option-indicator">{{
-                  isHotspotSelected(q.number, region.id) ? '●' : '○'
+                  isHotspotSelected(q.id, region.id) ? '●' : '○'
                 }}</span>
                 {{ region.label }}
               </button>
@@ -371,47 +377,47 @@
             type="text"
             placeholder="Type your answer..."
             [attr.aria-label]="'Answer for question ' + (pageStartNum() + i)"
-            [ngModel]="(getAnswer(q.number) ?? '') + ''"
-            (ngModelChange)="setTextAnswer(q.number, $event)"
-            [disabled]="isFibConfirmed(q.number)"
+            [ngModel]="(getAnswer(q.id) ?? '') + ''"
+            (ngModelChange)="setTextAnswer(q.id, $event)"
+            [disabled]="isFibConfirmed(q.id)"
           />
           <!-- Reveal + self-grade are PRACTICE ONLY. In a graded run this block
                showed the student the correct answer and then let them mark
                themselves — the SATA and MCQ paths were already guarded. -->
-          @if (mode() === 'practice' && !isFibConfirmed(q.number)) {
+          @if (mode() === 'practice' && !isFibConfirmed(q.id)) {
             <button
               class="btn btn-primary btn-sm fib-confirm-btn"
-              (click)="confirmFib(q.number)"
-              [disabled]="!isAnswered(q.number)"
+              (click)="confirmFib(q.id)"
+              [disabled]="!isAnswered(q.id)"
             >
               Confirm
             </button>
           }
         </div>
 
-        @if (mode() === 'practice' && isFibConfirmed(q.number)) {
+        @if (mode() === 'practice' && isFibConfirmed(q.id)) {
           <div class="fib-reveal">
             <div class="fib-correct-answer">
               <span class="fib-label">Correct answer:</span>
               <strong>{{ q.answer }}</strong>
             </div>
-            @if (getFibMark(q.number) === undefined) {
+            @if (getFibMark(q.id) === undefined) {
               <div class="fib-self-grade">
                 <span>Was your answer correct?</span>
-                <button class="btn btn-success btn-sm" (click)="markFib(q.number, true)">
+                <button class="btn btn-success btn-sm" (click)="markFib(q.id, true)">
                   Correct
                 </button>
-                <button class="btn btn-danger btn-sm" (click)="markFib(q.number, false)">
+                <button class="btn btn-danger btn-sm" (click)="markFib(q.id, false)">
                   Incorrect
                 </button>
               </div>
             } @else {
               <div
                 class="fib-grade-result"
-                [class.fib-grade-correct]="getFibMark(q.number)"
-                [class.fib-grade-wrong]="!getFibMark(q.number)"
+                [class.fib-grade-correct]="getFibMark(q.id)"
+                [class.fib-grade-wrong]="!getFibMark(q.id)"
               >
-                {{ getFibMark(q.number) ? '✓ Marked as correct' : '✗ Marked as incorrect' }}
+                {{ getFibMark(q.id) ? '✓ Marked as correct' : '✗ Marked as incorrect' }}
               </div>
             }
             @if (q.rationale) {
@@ -425,28 +431,25 @@
           @for (opt of s.options; track opt) {
             <button
               class="option-btn"
-              [class.selected]="isSataSelected(q.number, opt)"
-              [class.option-correct]="isRevealed(q.number) && isCorrectOption(q, opt)"
+              [class.selected]="isSataSelected(q.id, opt)"
+              [class.option-correct]="isRevealed(q.id) && isCorrectOption(q, opt)"
               [class.option-wrong]="
-                isRevealed(q.number) && isSataSelected(q.number, opt) && !isCorrectOption(q, opt)
+                isRevealed(q.id) && isSataSelected(q.id, opt) && !isCorrectOption(q, opt)
               "
-              (click)="toggleSATA(q.number, opt)"
-              [disabled]="isRevealed(q.number)"
+              (click)="toggleSATA(q.id, opt)"
+              [disabled]="isRevealed(q.id)"
             >
-              <span class="option-indicator">{{ isSataSelected(q.number, opt) ? '☑' : '☐' }}</span>
+              <span class="option-indicator">{{ isSataSelected(q.id, opt) ? '☑' : '☐' }}</span>
               {{ opt }}
             </button>
           }
         </div>
-        @if (mode() === 'practice' && !isRevealed(q.number) && isAnswered(q.number)) {
-          <button
-            class="btn btn-primary btn-sm check-answer-btn"
-            (click)="checkSATAAnswer(q.number)"
-          >
+        @if (mode() === 'practice' && !isRevealed(q.id) && isAnswered(q.id)) {
+          <button class="btn btn-primary btn-sm check-answer-btn" (click)="checkSATAAnswer(q.id)">
             Check Answer
           </button>
         }
-        @if (isRevealed(q.number) && q.rationale) {
+        @if (isRevealed(q.id) && q.rationale) {
           <div class="rationale"><strong>Rationale:</strong> {{ q.rationale }}</div>
         }
       } @else if (s.options.length) {
@@ -455,35 +458,32 @@
           @for (opt of s.options; track opt) {
             <button
               class="option-btn"
-              [class.selected]="isSelected(q.number, opt)"
-              [class.option-correct]="isRevealed(q.number) && isCorrectOption(q, opt)"
+              [class.selected]="isSelected(q.id, opt)"
+              [class.option-correct]="isRevealed(q.id) && isCorrectOption(q, opt)"
               [class.option-wrong]="
-                isRevealed(q.number) && isSelected(q.number, opt) && !isCorrectOption(q, opt)
+                isRevealed(q.id) && isSelected(q.id, opt) && !isCorrectOption(q, opt)
               "
-              (click)="selectMCQ(q.number, opt)"
-              [disabled]="isRevealed(q.number)"
+              (click)="selectMCQ(q.id, opt)"
+              [disabled]="isRevealed(q.id)"
             >
-              <span class="option-indicator">{{ isSelected(q.number, opt) ? '●' : '○' }}</span>
+              <span class="option-indicator">{{ isSelected(q.id, opt) ? '●' : '○' }}</span>
               {{ opt }}
             </button>
           }
         </div>
-        @if (isRevealed(q.number) && q.rationale) {
+        @if (isRevealed(q.id) && q.rationale) {
           <div class="rationale"><strong>Rationale:</strong> {{ q.rationale }}</div>
         }
       }
 
       <!-- Shared check/reveal block for advanced question types -->
       @if (s.advanced) {
-        @if (mode() === 'practice' && !isRevealed(q.number) && st.fullyAnswered) {
-          <button
-            class="btn btn-primary btn-sm check-answer-btn"
-            (click)="revealQuestion(q.number)"
-          >
+        @if (mode() === 'practice' && !isRevealed(q.id) && st.fullyAnswered) {
+          <button class="btn btn-primary btn-sm check-answer-btn" (click)="revealQuestion(q.id)">
             Check Answer
           </button>
         }
-        @if (isRevealed(q.number)) {
+        @if (isRevealed(q.id)) {
           <div class="fib-reveal">
             <div class="fib-correct-answer">
               <span class="fib-label">Correct answer:</span>

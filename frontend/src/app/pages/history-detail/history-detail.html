@@ -94,7 +94,7 @@
   @if (filteredResults().length === 0) {
     <div class="card empty-filter">No incorrect questions in this attempt.</div>
   } @else {
-    @for (q of filteredResults(); track q.question_number) {
+    @for (q of filteredResults(); track q.question_id) {
       <app-answer-review [question]="q" />
     }
   }

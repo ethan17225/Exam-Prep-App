@@ -1,0 +1,57 @@
+<div class="exams-header">
+  <h1 class="page-title">Question Banks</h1>
+  <form class="new-bank" (submit)="$event.preventDefault(); create()">
+    <input
+      type="text"
+      placeholder="New bank title"
+      aria-label="New bank title"
+      [ngModel]="newTitle()"
+      (ngModelChange)="newTitle.set($event)"
+    />
+    <button class="btn btn-primary" type="submit" [disabled]="creating()">
+      {{ creating() ? 'Creating...' : 'Add new Question Bank' }}
+    </button>
+  </form>
+</div>
+@if (createError()) {
+  <p class="rename-error">{{ createError() }}</p>
+}
+
+@if (loadError()) {
+  <div class="empty-state">
+    <p>{{ loadError() }}</p>
+    <button class="btn btn-primary" (click)="load()">Retry</button>
+  </div>
+} @else if (loading()) {
+  <p class="empty-state">Loading...</p>
+} @else if (banks().length === 0) {
+  <p class="empty-state">
+    No question banks yet. Create one above, add named sections, then make an exam from the mix.
+  </p>
+} @else {
+  <div class="exam-list">
+    @for (bank of banks(); track bank.id) {
+      <div class="card exam-card bank-row">
+        <div class="exam-body">
+          <h2 class="exam-title">{{ bank.title }}</h2>
+          <p class="exam-meta">
+            <span>{{ bank.section_count }} sections</span>
+            <span class="meta-sep" aria-hidden="true">·</span>
+            <span>{{ bank.question_count }} questions</span>
+            @if (bank.course_name) {
+              <span class="meta-sep" aria-hidden="true">·</span>
+              <span>{{ bank.course_name }}</span>
+            }
+          </p>
+          @if (deleteError()[bank.id]) {
+            <span class="rename-error">{{ deleteError()[bank.id] }}</span>
+          }
+        </div>
+        <div class="exam-actions">
+          <button class="btn btn-primary btn-sm" (click)="open(bank)">Edit</button>
+          <button class="btn btn-danger btn-sm" (click)="remove(bank)">Delete</button>
+        </div>
+      </div>
+    }
+  </div>
+}

@@ -46,21 +46,54 @@ def is_fib_question(q) -> bool:
     return qtype in FIB_TYPES or not q.options
 
 
+def classify_kind(q) -> str:
+    """Canonical kind label — same rules as `grade_question` / take-exam chips."""
+    qtype = _normalized_type(q)
+    if qtype in ADVANCED_TYPES:
+        return qtype
+    if qtype == QuestionType.SATA:
+        return QuestionType.SATA
+    if is_fib_question(q):
+        return QuestionType.FIB
+    return QuestionType.MCQ
+
+
+# Display order for per-kind chips: the three common kinds, then advanced.
+_KIND_ORDER = (
+    QuestionType.MCQ,
+    QuestionType.SATA,
+    QuestionType.FIB,
+    QuestionType.MATRIX,
+    QuestionType.CLOZE,
+    QuestionType.BOWTIE,
+    QuestionType.RANKING,
+    QuestionType.HIGHLIGHT,
+    QuestionType.HOTSPOT,
+)
+
+
+def question_kind_counts(questions: list) -> list[dict[str, int | str]]:
+    """Exact per-kind counts for kinds that are actually present."""
+    counts: dict[str, int] = {}
+    for q in questions:
+        kind = classify_kind(q)
+        counts[kind] = counts.get(kind, 0) + 1
+    return [{"kind": str(kind), "count": counts[kind]} for kind in _KIND_ORDER if kind in counts]
+
+
 def question_type_counts(questions: list) -> tuple[int, int, int, int]:
     """Return (mcq, sata, fib, other) using the same rules as submit grading."""
     mcq = sata = fib = other = 0
     for q in questions:
-        qtype = _normalized_type(q)
-        if qtype in ADVANCED_TYPES:
-            other += 1
-        elif qtype == QuestionType.SATA:
+        kind = classify_kind(q)
+        if kind == QuestionType.MCQ:
+            mcq += 1
+        elif kind == QuestionType.SATA:
             sata += 1
-        # Calls the shared predicate rather than restating its rule, which is the
-        # whole reason these two functions live in one file.
-        elif is_fib_question(q):
+        elif kind == QuestionType.FIB:
             fib += 1
         else:
-            mcq += 1
+            other += 1
     return mcq, sata, fib, other
 
 

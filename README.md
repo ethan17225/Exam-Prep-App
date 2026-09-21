@@ -204,19 +204,21 @@ in `.claude/skills/exam-api-practices/SKILL.md`.
 
 ## JSON Format
 
+`MCQ` and `SATA` accept any number of options, two or more. Each option carries
+its own letter prefix and `answer` refers to those letters, so nothing is capped
+at four.
+
 ```json
 [
   {
-    "number": 1,
     "topic": "Topic name",
     "type": "MCQ",
     "question": "Your question here?",
-    "options": ["A. Option 1", "B. Option 2", "C. Option 3", "D. Option 4"],
+    "options": ["A. Option 1", "B. Option 2", "C. Option 3", "D. Option 4", "E. Option 5"],
     "answer": "C",
     "rationale": "Explanation here."
   },
   {
-    "number": 2,
     "topic": "Topic name",
     "type": "SATA",
     "question": "Select all that apply.",
@@ -225,7 +227,6 @@ in `.claude/skills/exam-api-practices/SKILL.md`.
     "rationale": "Explanation here."
   },
   {
-    "number": 3,
     "topic": "Topic name",
     "type": "FIB",
     "question": "The answer is ___.",

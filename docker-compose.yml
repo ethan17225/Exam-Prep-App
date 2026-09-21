@@ -126,12 +126,16 @@ services:
     # LAST command, so without it a failed pg_dump still produced a valid empty
     # .gz, logged success, and the prune below then deleted the good backups.
     # The prune only runs after a dump has been verified.
+    #
+    # `&&` must trail its line, never lead the next one. A folded scalar keeps the
+    # newlines of these more-indented lines, and a line starting with `&&` is a
+    # sh syntax error — which crash-looped this container without touching the db.
     command: >
       sh -c 'umask 077; set -o pipefail; while true; do
         f=/backups/mcq_app_$$(date +%Y%m%d_%H%M%S).sql.gz;
-        if pg_dump -h db -U ${POSTGRES_USER:-postgres} ${POSTGRES_DB:-mcq_app} | gzip > $$f
-           && gzip -t $$f
-           && [ "$$(stat -c%s $$f)" -gt 1000 ]; then
+        if pg_dump -h db -U ${POSTGRES_USER:-postgres} ${POSTGRES_DB:-mcq_app} | gzip > $$f &&
+           gzip -t $$f &&
+           [ "$$(stat -c%s $$f)" -gt 1000 ]; then
           echo "backup ok: $$f ($$(stat -c%s $$f) bytes)";
           find /backups -name "mcq_app_*.sql.gz" -mtime +14 -delete;
         else

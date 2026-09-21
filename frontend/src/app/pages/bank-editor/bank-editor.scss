@@ -1,0 +1,100 @@
+.edit-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+
+  .page-title {
+    flex: 1;
+    margin: 0;
+  }
+}
+
+.add-section {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+
+  input {
+    min-width: 200px;
+    flex: 1;
+  }
+}
+
+.section-wrap {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+}
+
+.section-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.section-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  padding: 0.35rem 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.section-name-input {
+  flex: 1;
+  min-width: 160px;
+}
+
+.muted {
+  color: #888;
+  font-size: 0.85rem;
+}
+
+.section-tools {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0.75rem 0;
+}
+
+.paste-json {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+
+  textarea {
+    font-family: ui-monospace, monospace;
+    font-size: 0.82rem;
+  }
+}
+
+.form-error {
+  color: #c00;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.btn-ghost {
+  background: #f2f4f6;
+  color: #444;
+}
+
+@media (max-width: 640px) {
+  .edit-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .section-bar .btn,
+  .section-tools .btn {
+    min-height: 44px;
+  }
+}

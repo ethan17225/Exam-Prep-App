@@ -38,7 +38,7 @@
 
   <h2 class="section-title">Review</h2>
 
-  @for (q of r.results; track q.question_number) {
+  @for (q of r.results; track q.question_id) {
     <app-answer-review [question]="q" />
   }
 }

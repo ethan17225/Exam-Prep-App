@@ -1,11 +1,11 @@
 @if (auth.isLoggedIn()) {
   <nav class="nav">
-    <app-user-menu />
     <span class="nav-brand">Exam Prep</span>
     <div class="nav-links">
       <a routerLink="/overview" routerLinkActive="active">Overview</a>
       @if (auth.isInstructor()) {
         <a routerLink="/students" routerLinkActive="active">Students</a>
+        <a routerLink="/banks" routerLinkActive="active">Banks</a>
       }
       <a routerLink="/exams" routerLinkActive="active">Exams</a>
       <!-- An instructor takes no exams of their own, so their attempt history and
@@ -20,6 +20,7 @@
         <a routerLink="/tracking" routerLinkActive="active">Tracking</a>
       }
     </div>
+    <app-user-menu />
   </nav>
 }
 <main class="main" [class.main-plain]="!auth.isLoggedIn()">

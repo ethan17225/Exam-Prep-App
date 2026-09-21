@@ -46,7 +46,9 @@
 .user-menu {
   position: absolute;
   top: calc(100% + 0.5rem);
-  left: 0;
+  // Anchored right: the trigger sits at the nav's right edge, so a left-anchored
+  // popover would open off-screen.
+  right: 0;
   z-index: 300;
   min-width: 200px;
   padding: 0.35rem;
@@ -98,7 +100,7 @@
   }
 }
 
-// ── Mobile: first item in the bottom tab bar ──
+// ── Mobile: last item in the bottom tab bar ──
 @media (max-width: 640px) {
   :host {
     justify-content: center;
@@ -114,6 +116,6 @@
   .user-menu {
     top: auto;
     bottom: calc(100% + 0.4rem);
-    left: 0.4rem;
+    right: 0.4rem;
   }
 }

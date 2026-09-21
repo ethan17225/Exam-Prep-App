@@ -1,0 +1,69 @@
+.edit-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+
+  .page-title {
+    flex: 1;
+    margin: 0;
+  }
+}
+
+.upload-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1.1rem;
+}
+
+.field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #777;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.settings-title {
+  margin: 0.5rem 0 0;
+  font-size: 0.95rem;
+}
+
+.share-row {
+  display: grid;
+  grid-template-columns: 1fr 90px auto;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.muted {
+  color: #888;
+  font-size: 0.85rem;
+}
+
+.form-error {
+  color: #c00;
+  font-weight: 600;
+}
+
+.shuffle-toggle {
+  align-self: flex-start;
+  border: 1px solid #e2e2e2;
+  background: #fff;
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .share-row {
+    grid-template-columns: 1fr;
+  }
+
+  .btn {
+    min-height: 44px;
+  }
+}

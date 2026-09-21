@@ -74,8 +74,7 @@ export interface QuestionSection {
 }
 
 export interface Question {
-  id?: number;
-  number: number;
+  id: number;
   topic: string;
   type: string;
   question: string;
@@ -144,6 +143,38 @@ export function countQuestionTypes<T extends { type: string; options?: QuestionO
     else out.other += 1;
   }
   return out;
+}
+
+/** Chip order when an exam has few kinds: the three common ones, then the advanced ones. */
+export const QUESTION_KINDS: QuestionKind[] = ['MCQ', 'SATA', 'FIB', ...ADVANCED_KINDS];
+
+export interface QuestionKindCount {
+  kind: QuestionKind;
+  count: number;
+}
+
+/** Above this many distinct kinds, chips sort by prevalence rather than canonical order. */
+const KIND_SORT_THRESHOLD = 4;
+
+/**
+ * Exact per-kind counts for the kinds a question set actually contains — unlike
+ * `countQuestionTypes`, advanced kinds stay separate instead of collapsing into `other`.
+ * A long strip leads with the kinds the exam is mostly made of; ties keep canonical
+ * order, so the strip never reshuffles between renders.
+ */
+export function questionKindCounts<T extends { type: string; options?: QuestionOptions | null }>(
+  questions: T[],
+): QuestionKindCount[] {
+  const counts = new Map<QuestionKind, number>();
+  for (const q of questions) {
+    const kind = classifyQuestionType(q);
+    counts.set(kind, (counts.get(kind) ?? 0) + 1);
+  }
+  const present = QUESTION_KINDS.filter((kind) => counts.has(kind)).map((kind) => ({
+    kind,
+    count: counts.get(kind)!,
+  }));
+  return present.length > KIND_SORT_THRESHOLD ? present.sort((a, b) => b.count - a.count) : present;
 }
 
 // ── Structured option accessors ─────────────────────────────────
@@ -270,6 +301,61 @@ export function shuffle<T>(arr: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+/**
+ * Randomize the displayed choices on one question. MCQ/SATA/ranking shuffle the
+ * options array; cloze and bowtie shuffle each blank/category's choices.
+ * Highlight tokens and hotspot regions stay put — order is the content.
+ */
+export function shuffleQuestionOptions<
+  T extends { type: string; options?: QuestionOptions | null },
+>(q: T): T {
+  const kind = classifyQuestionType(q);
+  const opts = q.options;
+  if (kind === 'HIGHLIGHT' || kind === 'HOTSPOT' || kind === 'MATRIX' || kind === 'FIB') {
+    return q;
+  }
+  if (Array.isArray(opts) && opts.length > 1) {
+    return { ...q, options: shuffle(opts) };
+  }
+  if (kind === 'CLOZE' && opts && !Array.isArray(opts) && 'blanks' in opts) {
+    return {
+      ...q,
+      options: {
+        ...opts,
+        blanks: opts.blanks.map((b) => ({
+          ...b,
+          choices: b.choices.length > 1 ? shuffle(b.choices) : b.choices,
+        })),
+      },
+    };
+  }
+  if (kind === 'BOWTIE' && opts && !Array.isArray(opts) && 'categories' in opts) {
+    return {
+      ...q,
+      options: {
+        ...opts,
+        categories: opts.categories.map((c) => ({
+          ...c,
+          choices: c.choices.length > 1 ? shuffle(c.choices) : c.choices,
+        })),
+      },
+    };
+  }
+  return q;
+}
+
+/** Overlay a frozen per-question choice permutation onto the live bank/exam rows. */
+export function applyOptionOrder<T extends { id: number; options?: QuestionOptions | null }>(
+  questions: T[],
+  optionOrder: Record<string, QuestionOptions> | null | undefined,
+): T[] {
+  if (!optionOrder) return questions;
+  return questions.map((q) => {
+    const stored = optionOrder[String(q.id)];
+    return stored !== undefined ? { ...q, options: stored } : q;
+  });
 }
 
 /**
@@ -424,6 +510,11 @@ export interface DocumentContent {
   html: string;
 }
 
+export interface KindCount {
+  kind: string;
+  count: number;
+}
+
 export interface ExamSummary {
   id: string;
   title: string;
@@ -432,6 +523,10 @@ export interface ExamSummary {
   time_limit_minutes: number | null;
   /** The passing score as a percentage, 1-100. Chosen per exam at upload. */
   pass_grade: number;
+  /** When false, attempts keep insertion order instead of shuffling. */
+  shuffle: boolean;
+  /** How many questions a student sits per attempt. Null = every question. */
+  questions_per_attempt: number | null;
   /** Practice mode reveals the answer key, so a graded exam has this off. */
   allow_practice: boolean;
   /** Only the owner may rename, edit, delete or re-flag an exam. */
@@ -441,7 +536,18 @@ export interface ExamSummary {
   sata_count: number;
   fib_count: number;
   other_count?: number;
+  /** Present kinds only — preferred over the collapsed mcq/sata/fib/other fields. */
+  kind_counts: KindCount[];
   created_at: string;
+  /** Set when this exam draws each attempt from a question bank. */
+  bank_id?: string | null;
+}
+
+export interface SectionShare {
+  section_id: string;
+  name: string;
+  percent: number;
+  question_count: number;
 }
 
 export interface ExamDetail {
@@ -450,6 +556,8 @@ export interface ExamDetail {
   course_name?: string | null;
   time_limit_minutes?: number | null;
   pass_grade: number;
+  shuffle: boolean;
+  questions_per_attempt: number | null;
   /**
    * Whether `answer`/`rationale` are present on the questions below. The server
    * withholds them unless you own the exam or practice is allowed, so never
@@ -459,10 +567,40 @@ export interface ExamDetail {
   allow_practice: boolean;
   is_owner: boolean;
   questions: Question[];
+  bank_id?: string | null;
+  bank_backed?: boolean;
+  section_shares?: SectionShare[] | null;
+}
+
+export interface QuestionBankSummary {
+  id: string;
+  title: string;
+  course_id: string | null;
+  course_name: string | null;
+  section_count: number;
+  question_count: number;
+  created_at: string;
+}
+
+export interface BankSection {
+  id: string;
+  name: string;
+  position: number;
+  question_count: number;
+  questions: Question[];
+}
+
+export interface QuestionBankDetail {
+  id: string;
+  title: string;
+  course_id: string | null;
+  course_name: string | null;
+  created_at: string;
+  sections: BankSection[];
 }
 
 export interface AnswerSubmission {
-  question_number: number;
+  question_id: number;
   answer: AnswerValue;
   fib_correct?: boolean | null;
 }
@@ -472,10 +610,12 @@ export interface SubmissionPayload {
   answers: AnswerSubmission[];
   time_spent_seconds: number;
   mode?: string;
-  question_numbers?: number[];
+  question_ids?: number[];
 }
 
 export interface QuestionResult {
+  question_id: number;
+  /** 1-based position in this attempt — display only, not identity. */
   question_number: number;
   question: string;
   topic: string;
@@ -534,6 +674,8 @@ export interface InProgressExam {
   answers: Record<string, AnswerValue>;
   flagged: number[];
   question_order: number[];
+  /** Frozen display order of each question's choices for this attempt. */
+  option_order?: Record<string, QuestionOptions>;
   remaining_seconds: number;
   current_page: number;
   total_questions: number;
@@ -649,6 +791,7 @@ export interface SaveProgressPayload {
   answers: Record<string, AnswerValue>;
   flagged: number[];
   question_order: number[];
+  option_order?: Record<string, QuestionOptions>;
   remaining_seconds: number;
   current_page: number;
 }
@@ -665,10 +808,22 @@ export class ExamService {
     passGrade: number,
     courseId?: string,
     timeLimitMinutes?: number | null,
+    options?: {
+      shuffle?: boolean;
+      questionsPerAttempt?: number | null;
+    },
   ): Observable<{ exam_id: string; total_questions: number }> {
-    const body: Record<string, unknown> = { title, questions, pass_grade: passGrade };
+    const body: Record<string, unknown> = {
+      title,
+      questions,
+      pass_grade: passGrade,
+      shuffle: options?.shuffle ?? true,
+    };
     if (courseId) body['course_id'] = courseId;
     if (timeLimitMinutes) body['time_limit_minutes'] = timeLimitMinutes;
+    if (options?.questionsPerAttempt != null) {
+      body['questions_per_attempt'] = options.questionsPerAttempt;
+    }
     return this.http.post<{ exam_id: string; total_questions: number }>(`${this.base}/exams`, body);
   }
 
@@ -697,9 +852,11 @@ export class ExamService {
     return this.http.get<DocumentContent>(`${this.base}/documents/html`, { params });
   }
 
-  getExam(id: string, includeAnswers = false): Observable<ExamDetail> {
-    const params = includeAnswers ? '?include_answers=true' : '';
-    return this.http.get<ExamDetail>(`${this.base}/exams/${id}${params}`);
+  getExam(id: string, includeAnswers = false, mode?: string): Observable<ExamDetail> {
+    let params = new HttpParams();
+    if (includeAnswers) params = params.set('include_answers', 'true');
+    if (mode) params = params.set('mode', mode);
+    return this.http.get<ExamDetail>(`${this.base}/exams/${id}`, { params });
   }
 
   submitExam(payload: SubmissionPayload): Observable<ExamResult> {
@@ -746,6 +903,28 @@ export class ExamService {
     return this.http.patch<ExamSummary>(`${this.base}/exams/${id}/pass-grade`, {
       pass_grade: passGrade,
     });
+  }
+
+  updateExamSettings(
+    id: string,
+    settings: {
+      timeLimitMinutes?: number | null;
+      shuffle?: boolean;
+      questionsPerAttempt?: number | null;
+      clearQuestionsPerAttempt?: boolean;
+      shares?: { section_id: string; percent: number }[];
+    },
+  ): Observable<ExamSummary> {
+    const body: Record<string, unknown> = {};
+    if ('timeLimitMinutes' in settings)
+      body['time_limit_minutes'] = settings.timeLimitMinutes ?? null;
+    if (settings.shuffle !== undefined) body['shuffle'] = settings.shuffle;
+    if (settings.clearQuestionsPerAttempt) body['clear_questions_per_attempt'] = true;
+    else if (settings.questionsPerAttempt != null) {
+      body['questions_per_attempt'] = settings.questionsPerAttempt;
+    }
+    if (settings.shares) body['shares'] = settings.shares;
+    return this.http.patch<ExamSummary>(`${this.base}/exams/${id}/settings`, body);
   }
 
   saveProgress(payload: SaveProgressPayload): Observable<InProgressExam> {
@@ -819,5 +998,98 @@ export class ExamService {
 
   deleteQuestionImage(questionId: number): Observable<{ image: null }> {
     return this.http.delete<{ image: null }>(`${this.base}/questions/${questionId}/image`);
+  }
+
+  // ── Question banks (instructor) ──────────────────────────────
+
+  listBanks(): Observable<QuestionBankSummary[]> {
+    return this.http.get<QuestionBankSummary[]>(`${this.base}/question-banks`);
+  }
+
+  createBank(title: string, courseId?: string): Observable<QuestionBankSummary> {
+    const body: Record<string, unknown> = { title };
+    if (courseId) body['course_id'] = courseId;
+    return this.http.post<QuestionBankSummary>(`${this.base}/question-banks`, body);
+  }
+
+  getBank(id: string): Observable<QuestionBankDetail> {
+    return this.http.get<QuestionBankDetail>(`${this.base}/question-banks/${id}`);
+  }
+
+  updateBank(
+    id: string,
+    patch: { title?: string; course_id?: string | null },
+  ): Observable<QuestionBankSummary> {
+    return this.http.patch<QuestionBankSummary>(`${this.base}/question-banks/${id}`, patch);
+  }
+
+  deleteBank(id: string): Observable<{ deleted: boolean }> {
+    return this.http.delete<{ deleted: boolean }>(`${this.base}/question-banks/${id}`);
+  }
+
+  addBankSection(bankId: string, name: string): Observable<BankSection> {
+    return this.http.post<BankSection>(`${this.base}/question-banks/${bankId}/sections`, { name });
+  }
+
+  renameBankSection(bankId: string, sectionId: string, name: string): Observable<BankSection> {
+    return this.http.patch<BankSection>(
+      `${this.base}/question-banks/${bankId}/sections/${sectionId}`,
+      { name },
+    );
+  }
+
+  deleteBankSection(bankId: string, sectionId: string): Observable<{ deleted: boolean }> {
+    return this.http.delete<{ deleted: boolean }>(
+      `${this.base}/question-banks/${bankId}/sections/${sectionId}`,
+    );
+  }
+
+  addBankQuestions(
+    bankId: string,
+    sectionId: string,
+    questions: Partial<Question>[],
+  ): Observable<{ added: number }> {
+    return this.http.post<{ added: number }>(
+      `${this.base}/question-banks/${bankId}/sections/${sectionId}/questions`,
+      { questions },
+    );
+  }
+
+  updateBankQuestion(
+    bankId: string,
+    sectionId: string,
+    questionId: number,
+    patch: Partial<Question>,
+  ): Observable<Question> {
+    return this.http.patch<Question>(
+      `${this.base}/question-banks/${bankId}/sections/${sectionId}/questions/${questionId}`,
+      patch,
+    );
+  }
+
+  deleteBankQuestion(
+    bankId: string,
+    sectionId: string,
+    questionId: number,
+  ): Observable<{ deleted: boolean }> {
+    return this.http.delete<{ deleted: boolean }>(
+      `${this.base}/question-banks/${bankId}/sections/${sectionId}/questions/${questionId}`,
+    );
+  }
+
+  createExamFromBank(payload: {
+    title: string;
+    bank_id: string;
+    shares: { section_id: string; percent: number }[];
+    questions_per_attempt: number;
+    course_id?: string;
+    time_limit_minutes?: number | null;
+    pass_grade: number;
+    shuffle: boolean;
+  }): Observable<{ exam_id: string; total_questions: number }> {
+    return this.http.post<{ exam_id: string; total_questions: number }>(
+      `${this.base}/exams/from-bank`,
+      payload,
+    );
   }
 }

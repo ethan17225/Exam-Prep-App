@@ -52,33 +52,34 @@
   }
 }
 
-.course-badge {
-  display: inline-block;
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 0.12rem 0.5rem;
-  border-radius: 4px;
-  background: #f0eaff;
-  color: #6b3fa0;
-  letter-spacing: 0.02em;
-  width: fit-content;
-}
-
 .exam-list {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.75rem;
 }
 
 .exam-row {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 0.35rem;
+}
+
+.exam-row--personal .exam-card {
+  border-left: 3px solid #111;
+}
+
+.exam-row--shared .exam-card {
+  border-left: 3px solid #6b3fa0;
 }
 
 .exam-card {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
   transition: border-color 0.15s;
 
   &:hover {
@@ -86,39 +87,77 @@
   }
 }
 
-.exam-top-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.exam-info {
+.exam-body {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  flex: 1;
-  min-width: 0;
+  gap: 0.55rem;
+  padding: 1rem 1.1rem 0.85rem;
+}
+
+.exam-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
 }
 
 .exam-title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.3;
+  color: #111;
+}
+
+.course-badge {
+  display: inline-block;
+  font-size: 0.72rem;
   font-weight: 600;
-  font-size: 0.95rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: #f0eaff;
+  color: #6b3fa0;
+  letter-spacing: 0.02em;
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.inline-rename {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
+.origin-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+  width: fit-content;
 
-.title-input {
-  min-width: 200px;
-  max-width: 320px;
+  &.origin-personal {
+    background: #f0f0f0;
+    color: #333;
+  }
+
+  &.origin-shared {
+    background: #eef;
+    color: #44c;
+  }
 }
 
 .exam-meta {
-  font-size: 0.8rem;
-  color: #888;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.35rem;
+  margin: 0;
+  font-size: 0.84rem;
+  color: #666;
+  line-height: 1.4;
+}
+
+.meta-sep {
+  color: #bbb;
 }
 
 .exam-type-counts {
@@ -129,10 +168,10 @@
 }
 
 .exam-type-count {
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   font-weight: 600;
-  padding: 0.12rem 0.4rem;
-  border-radius: 4px;
+  padding: 0.18rem 0.5rem;
+  border-radius: 5px;
 
   &.pill-mcq {
     background: #e8f0ff;
@@ -155,6 +194,20 @@
   }
 }
 
+.inline-rename {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.title-input {
+  min-width: 200px;
+  max-width: 320px;
+  flex: 1;
+}
+
 .rename-error {
   font-size: 0.78rem;
   color: #c00;
@@ -163,9 +216,10 @@
 .inline-count {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
-  margin-top: 0.65rem;
-  padding-top: 0.65rem;
+  margin: 0 1.1rem;
+  padding: 0.75rem 0;
   border-top: 1px solid #f0f0f0;
   font-size: 0.82rem;
   color: #555;
@@ -183,13 +237,24 @@
 .exam-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  flex-shrink: 0;
+  justify-content: flex-start;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1.1rem;
+  border-top: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.exam-actions-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
 }
 
 .btn-sm {
-  padding: 0.35rem 0.75rem;
-  font-size: 0.8rem;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.82rem;
 }
 
 /* 3-dot control sits outside the card; hidden until row hover (or menu open / keyboard) */
@@ -254,6 +319,17 @@
   &:hover {
     background: #f5f5f5;
   }
+
+  &.menu-option-danger {
+    color: #c00;
+    border-top: 1px solid #f0f0f0;
+    margin-top: 0.2rem;
+    padding-top: 0.65rem;
+
+    &:hover {
+      background: #fff5f5;
+    }
+  }
 }
 
 @media (max-width: 640px) {
@@ -280,13 +356,17 @@
     width: 100%;
   }
 
-  .exam-top-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.65rem;
+  .exam-body {
+    padding: 0.9rem 0.95rem 0.75rem;
   }
 
   .exam-actions {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.7rem 0.95rem;
+  }
+
+  .exam-actions-primary {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.4rem;
@@ -307,19 +387,6 @@
       max-width: 100%;
       width: 100%;
     }
-  }
-
-  .inline-count {
-    flex-wrap: wrap;
-  }
-
-  .count-input {
-    flex: 1;
-    min-width: 60px;
-  }
-
-  .exam-row {
-    align-items: stretch;
   }
 
   .exam-card-menu {

@@ -238,7 +238,7 @@ questions = detail["questions"]
 check("questions include id and image fields", all("id" in q and "image" in q for q in questions))
 
 # ── Submit all-correct answers ──────────────────────────────────
-subs = [{"question_number": q["number"], "answer": q["answer"], "fib_correct": None} for q in questions]
+subs = [{"question_id": q["id"], "answer": q["answer"], "fib_correct": None} for q in questions]
 result = post(
     f"/exams/{exam_id}/submit",
     {
@@ -251,7 +251,7 @@ result = post(
 check(
     "all-correct submission scores 100%",
     result["score"] == 100.0,
-    f"score={result['score']}, wrong={[r['question_number'] for r in result['results'] if not r['is_correct']]}",
+    f"score={result['score']}, wrong={[r['question_id'] for r in result['results'] if not r['is_correct']]}",
 )
 delete(f"/history/{result['id']}")
 
@@ -268,8 +268,7 @@ wrong_by_type = {
     "FIB": "999999",
 }
 subs2 = [
-    {"question_number": q["number"], "answer": wrong_by_type.get(q["type"].upper(), ""), "fib_correct": None}
-    for q in questions
+    {"question_id": q["id"], "answer": wrong_by_type.get(q["type"].upper(), ""), "fib_correct": None} for q in questions
 ]
 result2 = post(
     f"/exams/{exam_id}/submit",
@@ -284,7 +283,7 @@ check("all-wrong submission scores 0%", result2["score"] == 0.0, f"score={result
 delete(f"/history/{result2['id']}")
 
 # ── Question CRUD ───────────────────────────────────────────────
-q7 = next(q for q in questions if q["number"] == 7)
+q7 = next(q for q in questions if q["type"].upper() == "MCQ")
 updated = patch(f"/exams/{exam_id}/questions/{q7['id']}", {"topic": "Updated"})
 check("question PATCH works", updated["topic"] == "Updated")
 patch(f"/exams/{exam_id}/questions/{q7['id']}", {"topic": "MCQ"})
@@ -292,7 +291,6 @@ patch(f"/exams/{exam_id}/questions/{q7['id']}", {"topic": "MCQ"})
 new_q = post(
     f"/exams/{exam_id}/questions",
     {
-        "number": 0,
         "topic": "Test",
         "type": "MCQ",
         "question": "Temp question?",
@@ -301,7 +299,7 @@ new_q = post(
         "rationale": "",
     },
 )
-check("question POST assigns next number", new_q["number"] == 10, str(new_q["number"]))
+check("question POST returns an id", isinstance(new_q.get("id"), int), str(new_q))
 
 # ── Image upload ────────────────────────────────────────────────
 png = bytes.fromhex(

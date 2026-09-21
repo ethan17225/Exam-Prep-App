@@ -19,6 +19,7 @@ from src.attempts.models import History, InProgressExam
 from src.attempts.schemas import ExamSubmission, SaveProgressPayload
 from src.auth.models import User
 from src.constants import MAX_INT
+from src.exams import service as exams_service
 from src.exams.models import Exam
 from src.grading.service import grade_question, is_fib_question
 from src.identifiers import new_id
@@ -86,21 +87,50 @@ async def _open_attempt(exam_id: str, mode: AttemptMode, user: User, db: AsyncSe
     return (await db.execute(stmt)).scalar_one_or_none()
 
 
+async def get_open_attempt(exam_id: str, mode: AttemptMode, user: User, db: AsyncSession):
+    """The caller's open attempt, unlocked. Used by GET exam to return a frozen paper."""
+    stmt = select(InProgressExam).where(
+        InProgressExam.user_id == user.id,
+        InProgressExam.exam_id == exam_id,
+        InProgressExam.mode == mode,
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
 async def save_progress(payload: SaveProgressPayload, exam: Exam, user: User, db: AsyncSession) -> Row:
     """Returns the upserted row. It is a Core `Row`, not an ORM instance —
     `InProgressOut` reads it by attribute either way."""
     if payload.mode is AttemptMode.PRACTICE and not exam.allow_practice:
         raise PracticeDisabled()
 
-    if payload.mode is AttemptMode.EXAM:
+    existing = None
+    if payload.mode is AttemptMode.EXAM or exam.bank_id:
         existing = await _open_attempt(exam.id, payload.mode, user, db)
+
+    if payload.mode is AttemptMode.EXAM:
         deadline = _deadline(exam, existing.started_at) if existing else None
         if deadline and datetime.now() > deadline:
             # Refuse further answers once time is up. The attempt row is left in
             # place so the student can still submit what the server already has.
             raise AttemptExpired()
 
+    question_order = payload.question_order
+    option_order = payload.option_order
+    if exam.bank_id:
+        # The client must not pick the paper. Freeze the first server-side draw
+        # for the life of this attempt, including practice.
+        if existing and existing.question_order:
+            question_order = list(existing.question_order)
+        else:
+            question_order = await exams_service.draw_attempt_order(exam.id, exam.shuffle, db)
+    if (payload.mode is AttemptMode.EXAM or exam.bank_id) and existing and existing.option_order:
+        option_order = existing.option_order
+
     now = datetime.now()
+    # A graded attempt freezes its question set on first insert: rewriting
+    # question_order on later autosaves would let a student drop hard questions
+    # mid-paper. Practice may still reshuffle between sessions — except on a
+    # bank-backed exam, where the draw is the paper.
     stmt = pg_insert(InProgressExam.__table__).values(
         id=new_id(),
         user_id=user.id,
@@ -109,10 +139,11 @@ async def save_progress(payload: SaveProgressPayload, exam: Exam, user: User, db
         mode=payload.mode,
         answers=payload.answers,
         flagged=payload.flagged,
-        question_order=payload.question_order,
+        question_order=question_order,
+        option_order=option_order,
         remaining_seconds=payload.remaining_seconds,
         current_page=payload.current_page,
-        total_questions=len(payload.question_order),
+        total_questions=len(question_order),
         answered_count=len(payload.answers),
         started_at=now,
         saved_at=now,
@@ -120,19 +151,26 @@ async def save_progress(payload: SaveProgressPayload, exam: Exam, user: User, db
     # id and started_at are deliberately absent from the update: rewriting id
     # breaks the live resume link, and rewriting started_at resets the
     # dashboard's elapsed timer on every autosave.
+    update_fields = {
+        "exam_title": stmt.excluded.exam_title,
+        "answers": stmt.excluded.answers,
+        "flagged": stmt.excluded.flagged,
+        "remaining_seconds": stmt.excluded.remaining_seconds,
+        "current_page": stmt.excluded.current_page,
+        "answered_count": stmt.excluded.answered_count,
+        "saved_at": stmt.excluded.saved_at,
+    }
+    if payload.mode is AttemptMode.PRACTICE and not exam.bank_id:
+        update_fields["question_order"] = stmt.excluded.question_order
+        update_fields["total_questions"] = stmt.excluded.total_questions
+        update_fields["option_order"] = stmt.excluded.option_order
+    elif not (existing and existing.option_order):
+        # First non-empty choice permutation sticks; an earlier empty save (the
+        # bank-backed start handshake) must not freeze an empty map forever.
+        update_fields["option_order"] = stmt.excluded.option_order
     stmt = stmt.on_conflict_do_update(
         index_elements=["user_id", "exam_id", "mode"],
-        set_={
-            "exam_title": stmt.excluded.exam_title,
-            "answers": stmt.excluded.answers,
-            "flagged": stmt.excluded.flagged,
-            "question_order": stmt.excluded.question_order,
-            "remaining_seconds": stmt.excluded.remaining_seconds,
-            "current_page": stmt.excluded.current_page,
-            "total_questions": stmt.excluded.total_questions,
-            "answered_count": stmt.excluded.answered_count,
-            "saved_at": stmt.excluded.saved_at,
-        },
+        set_=update_fields,
     ).returning(InProgressExam.__table__)
     # RETURNING rather than a follow-up SELECT: one round trip on the hottest
     # write path, and no chance of reading a stale identity-map row.
@@ -235,27 +273,36 @@ async def submit(exam: Exam, submission: ExamSubmission, user: User, db: AsyncSe
         if over_time:
             answer_map = {int(k): v for k, v in (attempt.answers or {}).items()}
         else:
-            answer_map = {a.question_number: a.answer for a in submission.answers}
-        # Self-marking and client-chosen question subsets are practice-only.
-        selected_questions = list(exam.questions)
+            answer_map = {a.question_id: a.answer for a in submission.answers}
+        # The attempt's frozen question_order is authoritative — not the
+        # submission's question_ids (which a student could cherry-pick) and
+        # not every question on the exam (which would ignore questions_per_attempt).
+        # Load by id: bank-backed exams have no rows on exam.questions.
+        if attempt.question_order:
+            selected_questions = await exams_service.questions_in_order(attempt.question_order, db)
+        else:
+            selected_questions = list(exam.questions)
     else:
         elapsed = submission.time_spent_seconds
-        answer_map = {a.question_number: a.answer for a in submission.answers}
-        fib_mark_map = {a.question_number: a.fib_correct for a in submission.answers if a.fib_correct is not None}
-        selected_questions = exam.questions
-        if submission.question_numbers:
-            selected_set = set(submission.question_numbers)
-            selected_questions = [q for q in exam.questions if q.number in selected_set]
+        answer_map = {a.question_id: a.answer for a in submission.answers}
+        fib_mark_map = {a.question_id: a.fib_correct for a in submission.answers if a.fib_correct is not None}
+        if submission.question_ids:
+            selected_questions = await exams_service.questions_in_order(submission.question_ids, db)
             if not selected_questions:
                 raise NoValidQuestions()
-
+        elif attempt.question_order:
+            selected_questions = await exams_service.questions_in_order(attempt.question_order, db)
+            if not selected_questions:
+                raise NoValidQuestions()
+        else:
+            selected_questions = list(exam.questions)
     results = []
     correct_count = 0
-    for q in selected_questions:
-        user_answer = answer_map.get(q.number)
+    for display_number, q in enumerate(selected_questions, start=1):
+        user_answer = answer_map.get(q.id)
 
-        if is_fib_question(q) and q.number in fib_mark_map:
-            is_correct = fib_mark_map[q.number]
+        if is_fib_question(q) and q.id in fib_mark_map:
+            is_correct = fib_mark_map[q.id]
         else:
             # Graded FIB is exact/numeric only. The lenient substring match is a
             # study aid; with self-marking gone it would otherwise *be* the grade.
@@ -266,7 +313,10 @@ async def submit(exam: Exam, submission: ExamSubmission, user: User, db: AsyncSe
 
         results.append(
             {
-                "question_number": q.number,
+                "question_id": q.id,
+                # 1-based position in this attempt — what review screens show as Qn.
+                # Not Question.id, which is a global serial and not a display label.
+                "question_number": display_number,
                 "question": q.question,
                 "topic": q.topic,
                 "type": q.type,

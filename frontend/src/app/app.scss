@@ -14,8 +14,13 @@
   font-weight: 700;
   font-size: 1.1rem;
   letter-spacing: -0.02em;
-  // Pushes the links away from the brand and the avatar without a spacer element.
+  // Pushes the links away from the brand without a spacer element.
   margin-right: 1rem;
+}
+
+// Sits at the far right, however many links the role puts in the middle.
+app-user-menu {
+  margin-left: auto;
 }
 
 .nav-links {
@@ -65,7 +70,7 @@
     top: auto;
     left: 0;
     right: 0;
-    // The avatar and the tab strip share one row, with the avatar pinned left.
+    // The tab strip and the avatar share one row, with the avatar pinned right.
     gap: 0;
     padding: 0;
     padding-bottom: env(safe-area-inset-bottom);
@@ -81,7 +86,7 @@
 
   .nav-links {
     // min-width: 0 lets the scrollable strip shrink beside the fixed avatar
-    // instead of forcing the avatar off the left edge.
+    // instead of forcing the avatar off the right edge.
     flex: 1;
     min-width: 0;
     gap: 0;
