@@ -64,6 +64,25 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/students/students').then((m) => m.StudentsPage),
       },
       {
+        path: 'banks',
+        canActivate: [instructorGuard],
+        loadComponent: () => import('./pages/banks/banks').then((m) => m.BanksPage),
+      },
+      {
+        path: 'banks/:id/create-exam',
+        canActivate: [instructorGuard],
+        loadComponent: () =>
+          import('./pages/create-exam-from-bank/create-exam-from-bank').then(
+            (m) => m.CreateExamFromBankPage,
+          ),
+      },
+      {
+        path: 'banks/:id',
+        canActivate: [instructorGuard],
+        loadComponent: () =>
+          import('./pages/bank-editor/bank-editor').then((m) => m.BankEditorPage),
+      },
+      {
         path: 'upload',
         canActivate: [classroomGuard],
         loadComponent: () => import('./pages/upload/upload').then((m) => m.UploadPage),

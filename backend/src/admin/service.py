@@ -8,7 +8,7 @@ from src.attempts.constants import AttemptMode
 from src.auth import service as auth_service
 from src.exams import service as exams_service
 from src.grading.constants import DEFAULT_PASS_GRADE
-from src.grading.service import GradableRow, grade_question
+from src.grading.service import grade_question
 
 
 def _remaining_seconds(record, time_limit_minutes: int | None, now: datetime) -> int:
@@ -36,17 +36,26 @@ async def build_dashboard(limit: int, db: AsyncSession) -> list[dict]:
     # columns grading reads.
     exam_ids = {r.exam_id for r in rows}
     exam_settings = await exams_service.settings_by_exam_ids(exam_ids, db) if exam_ids else {}
-    questions_by_exam: dict[str, dict[int, GradableRow]] = {eid: {} for eid in exam_ids}
-    if exam_ids:
-        for exam_id, number, qtype, answer, options in await exams_service.questions_by_exam_ids(exam_ids, db):
-            questions_by_exam[exam_id][number] = GradableRow(qtype, answer, options)
+    qids: set[int] = set()
+    for r in rows:
+        for key in r.answers or {}:
+            try:
+                qids.add(int(key))
+            except (TypeError, ValueError):
+                continue
+        for qid in r.question_order or []:
+            try:
+                qids.add(int(qid))
+            except (TypeError, ValueError):
+                continue
+    q_by_id = await exams_service.gradable_by_ids(qids, db) if qids else {}
 
     now = datetime.now()
     out = []
     for r in rows:
         correct_count = 0
         wrong_count = 0
-        q_map = questions_by_exam.get(r.exam_id, {})
+        q_map = q_by_id
         for qnum_str, user_answer in (r.answers or {}).items():
             # Answer keys arrive from the client; a non-numeric key must not
             # wedge this endpoint for every instructor.

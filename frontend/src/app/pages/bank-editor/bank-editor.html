@@ -1,0 +1,107 @@
+@if (loadError()) {
+  <div class="empty-state">
+    <p>{{ loadError() }}</p>
+    <button class="btn btn-primary" (click)="load()">Retry</button>
+  </div>
+} @else if (loading()) {
+  <p class="empty-state">Loading bank...</p>
+} @else {
+  <div class="edit-header">
+    <button class="btn btn-secondary btn-sm" (click)="goBack()">← Banks</button>
+    <h1 class="page-title">{{ title() }}</h1>
+    <button class="btn btn-primary btn-sm" (click)="createExam()">Create exam from bank</button>
+  </div>
+
+  @if (deleteError()) {
+    <p class="form-error">{{ deleteError() }}</p>
+  }
+
+  <form class="add-section" (submit)="$event.preventDefault(); addSection()">
+    <input
+      type="text"
+      placeholder="New section name"
+      aria-label="New section name"
+      [ngModel]="newSectionName()"
+      (ngModelChange)="newSectionName.set($event)"
+    />
+    <button class="btn btn-secondary" type="submit" [disabled]="addingSection()">
+      {{ addingSection() ? 'Adding...' : '+ Add section' }}
+    </button>
+  </form>
+
+  @for (section of sections(); track section.id) {
+    <div class="card section-wrap">
+      <div class="section-bar">
+        @if (section.renaming) {
+          <input
+            class="section-name-input"
+            [ngModel]="section.nameDraft"
+            (ngModelChange)="patchSection(section.id, { nameDraft: $event })"
+          />
+          <button class="btn btn-primary btn-sm" (click)="saveSectionName(section)">Save</button>
+        } @else {
+          <button class="section-toggle" type="button" (click)="toggleSection(section)">
+            {{ section.collapsed ? '▸' : '▾' }}
+            <strong>{{ section.name }}</strong>
+            <span class="muted">{{ section.drafts.length }} questions</span>
+          </button>
+          <button
+            class="btn btn-ghost btn-sm"
+            (click)="patchSection(section.id, { renaming: true })"
+          >
+            Rename
+          </button>
+        }
+        <button class="btn btn-danger btn-sm" (click)="deleteSection(section)">Delete</button>
+      </div>
+
+      @if (!section.collapsed) {
+        <div class="section-tools">
+          <button class="btn btn-secondary btn-sm" (click)="addQuestion(section)">
+            {{ addingQuestion()[section.id] ? 'Adding...' : '+ Add question' }}
+          </button>
+          <button class="btn btn-ghost btn-sm" (click)="togglePaste(section)">
+            {{ section.pasteOpen ? 'Cancel JSON' : 'Paste JSON' }}
+          </button>
+        </div>
+        @if (section.pasteOpen) {
+          <div class="paste-json">
+            <textarea
+              rows="8"
+              placeholder="Paste a JSON array of questions"
+              [ngModel]="section.pasteText"
+              (ngModelChange)="patchSection(section.id, { pasteText: $event, pasteError: '' })"
+            ></textarea>
+            <button class="btn btn-primary btn-sm" (click)="pasteJson(section)">
+              Add from JSON
+            </button>
+            @if (section.pasteError) {
+              <p class="form-error">{{ section.pasteError }}</p>
+            }
+          </div>
+        }
+        @for (d of section.drafts; track d.id; let i = $index) {
+          <app-question-editor-card
+            [draft]="d"
+            [index]="i"
+            [expanded]="!!expanded()[d.id]"
+            [saving]="!!saving()[d.id]"
+            [saved]="!!saved()[d.id]"
+            [uploading]="!!uploading()[d.id]"
+            [error]="draftError()[d.id] || ''"
+            (expandToggle)="toggleExpand(d)"
+            (draftChange)="replaceDraft($event)"
+            (save)="save($event)"
+            (remove)="deleteQuestion($event)"
+            (imageFile)="uploadImage(d.id, $event)"
+            (removeImage)="removeImage(d)"
+          />
+        } @empty {
+          <p class="empty-state">No questions in this section yet.</p>
+        }
+      }
+    </div>
+  } @empty {
+    <p class="empty-state">Add a named section to hold questions.</p>
+  }
+}

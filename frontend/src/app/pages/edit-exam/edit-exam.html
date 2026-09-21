@@ -8,653 +8,136 @@
 } @else {
   <div class="edit-header">
     <button class="btn btn-secondary btn-sm" (click)="goBack()">← Back to Exams</button>
-    <h1 class="page-title">Edit Questions — {{ examTitle() }}</h1>
-    <button class="btn btn-primary btn-sm" (click)="addQuestion()" [disabled]="addingQuestion()">
-      {{ addingQuestion() ? 'Adding...' : '+ Add Question' }}
-    </button>
+    <h1 class="page-title">
+      {{ bankId() ? 'Exam settings' : 'Edit Questions' }} — {{ examTitle() }}
+    </h1>
+    @if (bankId()) {
+      <button class="btn btn-secondary btn-sm" (click)="goToBank()">Edit bank</button>
+    } @else {
+      <button class="btn btn-primary btn-sm" (click)="addQuestion()" [disabled]="addingQuestion()">
+        {{ addingQuestion() ? 'Adding...' : '+ Add Question' }}
+      </button>
+    }
   </div>
 
-  <p class="edit-hint">
-    Click a question to edit it. You can change the type, options and correct answer, and attach an
-    image (e.g. an ECG strip or an anatomy diagram for hotspot questions).
-  </p>
-
-  @for (d of drafts(); track d.id) {
-    <div class="card q-card" [class.expanded]="expanded()[d.id]">
-      <div
-        class="q-summary"
-        role="button"
-        tabindex="0"
-        [attr.aria-expanded]="!!expanded()[d.id]"
-        (click)="toggleExpand(d)"
-        (keydown.enter)="toggleExpand(d)"
-      >
-        <span class="q-num">#{{ d.number }}</span>
-        <span
-          class="badge"
-          [class.badge-mcq]="kindOf(d) === 'MCQ'"
-          [class.badge-sata]="kindOf(d) === 'SATA'"
-          [class.badge-fib]="kindOf(d) === 'FIB'"
-          [class.badge-other]="kindOf(d) !== 'MCQ' && kindOf(d) !== 'SATA' && kindOf(d) !== 'FIB'"
+  <div class="card settings-card">
+    <h2 class="settings-title">Attempt settings</h2>
+    <div class="settings-grid">
+      <label class="settings-field" for="edit-time-limit">
+        <span>Time limit (minutes)</span>
+        <input
+          id="edit-time-limit"
+          type="number"
+          min="1"
+          placeholder="No limit"
+          [ngModel]="timeLimitMinutes()"
+          (ngModelChange)="timeLimitMinutes.set($event || null)"
+        />
+      </label>
+      <label class="settings-field" for="edit-attempt-size">
+        <span>Questions per attempt</span>
+        <input
+          id="edit-attempt-size"
+          type="number"
+          min="1"
+          [attr.max]="totalQuestions() || null"
+          [placeholder]="bankId() ? '' : 'All ' + (totalQuestions() || '')"
+          [ngModel]="questionsPerAttempt()"
+          (ngModelChange)="questionsPerAttempt.set($event || null)"
+        />
+      </label>
+      <div class="settings-field settings-field-wide">
+        <span>Question order</span>
+        <button
+          type="button"
+          class="shuffle-toggle"
+          role="switch"
+          [attr.aria-checked]="shuffle()"
+          (click)="shuffle.set(!shuffle())"
         >
-          {{ d.type }}
-        </span>
-        @if (d.image) {
-          <span class="img-indicator" title="Has image">IMG</span>
-        }
-        <span class="q-preview">{{ preview(d) }}</span>
-        <span class="expand-icon">{{ expanded()[d.id] ? '▾' : '▸' }}</span>
+          <span class="shuffle-track" [class.on]="shuffle()">
+            <span class="shuffle-thumb"></span>
+          </span>
+          <span class="shuffle-copy">
+            <strong>{{ shuffle() ? 'Shuffle on' : 'Shuffle off' }}</strong>
+            <span class="settings-hint">{{
+              shuffle()
+                ? 'Questions and answer choices are randomized for each attempt'
+                : 'Questions keep the order from the database'
+            }}</span>
+          </span>
+        </button>
       </div>
-
-      @if (expanded()[d.id]) {
-        <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
-        <div class="q-form" (click)="$event.stopPropagation()">
-          <div class="form-row form-row-inline">
-            <label>
-              <span class="field-label">Number</span>
-              <input
-                class="num-input"
-                type="number"
-                [ngModel]="d.number"
-                (ngModelChange)="setDraftField(d, 'number', $event)"
-              />
-            </label>
-            <label>
-              <span class="field-label">Topic</span>
-              <input
-                type="text"
-                [ngModel]="d.topic"
-                (ngModelChange)="setDraftField(d, 'topic', $event)"
-                placeholder="e.g. Pharmacology"
-              />
-            </label>
-            <label>
-              <span class="field-label">Type</span>
-              <select [ngModel]="d.type" (ngModelChange)="onTypeChange(d, $event)">
-                @for (t of questionTypes; track t) {
-                  <option [value]="t">{{ t }}</option>
-                }
-              </select>
-            </label>
-          </div>
-
-          <div class="form-row">
-            <span class="field-label">Question</span>
-            <textarea
-              rows="4"
-              [ngModel]="d.question"
-              (ngModelChange)="setDraftField(d, 'question', $event)"
-            ></textarea>
-          </div>
-
-          <!-- Tabbed patient data sections -->
-          <div class="form-row">
-            <span class="field-label">
-              Patient Data Sections (optional)
-              <small class="field-hint"
-                >Two or more sections display as tabs when taking the exam.</small
-              >
-            </span>
-
-            <div class="sections-editor">
-              @for (section of d.sections; track $index; let si = $index) {
-                <div class="section-card">
-                  <div class="section-head">
-                    <input
-                      class="section-title-input"
-                      placeholder="Tab title (e.g. Nurses' Notes)"
-                      [ngModel]="section.title"
-                      (ngModelChange)="setSectionTitle(d, si, $event)"
-                    />
-                    <div class="section-head-actions">
-                      <button
-                        class="icon-btn"
-                        title="Move up"
-                        aria-label="Move tab up"
-                        (click)="moveSection(d, si, -1)"
-                      >
-                        ↑
-                      </button>
-                      <button
-                        class="icon-btn"
-                        title="Move down"
-                        aria-label="Move tab down"
-                        (click)="moveSection(d, si, 1)"
-                      >
-                        ↓
-                      </button>
-                      <button class="icon-btn" (click)="toggleSection(d, si)">
-                        {{ section.collapsed ? 'Expand' : 'Collapse' }}
-                      </button>
-                      <button
-                        class="icon-btn danger"
-                        title="Remove tab"
-                        aria-label="Remove tab"
-                        (click)="removeSection(d, si)"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-
-                  @if (!section.collapsed) {
-                    <div class="section-body">
-                      @for (block of section.blocks; track $index; let bi = $index) {
-                        <div class="block-card">
-                          <div class="block-head">
-                            <span class="block-kind">{{ block.kind }}</span>
-                            <div class="section-head-actions">
-                              <button
-                                class="icon-btn"
-                                title="Move up"
-                                aria-label="Move block up"
-                                (click)="moveBlock(d, si, bi, -1)"
-                              >
-                                ↑
-                              </button>
-                              <button
-                                class="icon-btn"
-                                title="Move down"
-                                aria-label="Move block down"
-                                (click)="moveBlock(d, si, bi, 1)"
-                              >
-                                ↓
-                              </button>
-                              <button
-                                class="icon-btn danger"
-                                title="Remove block"
-                                aria-label="Remove block"
-                                (click)="removeBlock(d, si, bi)"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          </div>
-
-                          @if (block.kind === 'text') {
-                            <textarea
-                              rows="3"
-                              placeholder="Paragraph of chart text"
-                              [ngModel]="block.text"
-                              (ngModelChange)="setBlockField(d, si, bi, 'text', $event)"
-                            ></textarea>
-                          } @else if (block.kind === 'list') {
-                            <textarea
-                              rows="3"
-                              placeholder="One bullet per line"
-                              [ngModel]="block.itemsText"
-                              (ngModelChange)="setBlockField(d, si, bi, 'itemsText', $event)"
-                            ></textarea>
-                          } @else {
-                            <input
-                              class="table-caption-input"
-                              placeholder="Table caption (optional)"
-                              [ngModel]="block.caption"
-                              (ngModelChange)="setBlockField(d, si, bi, 'caption', $event)"
-                            />
-
-                            <div class="table-edit-scroll">
-                              <table class="table-editor">
-                                <thead>
-                                  <tr>
-                                    @for (header of block.headers; track $index; let hi = $index) {
-                                      <th>
-                                        <input
-                                          [ngModel]="header"
-                                          (ngModelChange)="setHeader(d, si, bi, hi, $event)"
-                                          placeholder="Header"
-                                        />
-                                        <button
-                                          class="col-del"
-                                          title="Remove column"
-                                          aria-label="Remove column"
-                                          (click)="removeTableColumn(d, si, bi, hi)"
-                                        >
-                                          ✕
-                                        </button>
-                                      </th>
-                                    }
-                                    <th class="row-actions-col"></th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  @for (row of block.rows; track $index; let ri = $index) {
-                                    <tr>
-                                      @for (cell of row; track $index; let ci = $index) {
-                                        <td>
-                                          <input
-                                            [ngModel]="cell"
-                                            (ngModelChange)="setCell(d, si, bi, ri, ci, $event)"
-                                          />
-                                        </td>
-                                      }
-                                      <td class="row-actions-col">
-                                        <button
-                                          class="icon-btn danger"
-                                          title="Remove row"
-                                          aria-label="Remove row"
-                                          (click)="removeTableRow(d, si, bi, ri)"
-                                        >
-                                          ✕
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  }
-                                </tbody>
-                              </table>
-                            </div>
-
-                            <div class="block-actions">
-                              <button class="btn btn-ghost btn-xs" (click)="addTableRow(d, si, bi)">
-                                + Row
-                              </button>
-                              <button
-                                class="btn btn-ghost btn-xs"
-                                (click)="addTableColumn(d, si, bi)"
-                              >
-                                + Column
-                              </button>
-                              <button class="btn btn-ghost btn-xs" (click)="togglePaste(d, si, bi)">
-                                {{ block.pasteOpen ? 'Cancel Paste' : 'Paste Table' }}
-                              </button>
-                            </div>
-
-                            @if (block.pasteOpen) {
-                              <div class="paste-box">
-                                <textarea
-                                  rows="4"
-                                  placeholder="Paste rows from a spreadsheet or CSV. First line becomes the headers."
-                                  [ngModel]="block.pasteText"
-                                  (ngModelChange)="setBlockField(d, si, bi, 'pasteText', $event)"
-                                ></textarea>
-                                <button
-                                  class="btn btn-secondary btn-xs"
-                                  (click)="applyPastedTable(d, si, bi)"
-                                >
-                                  Apply
-                                </button>
-                              </div>
-                            }
-                          }
-                        </div>
-                      }
-
-                      <div class="block-actions">
-                        <button class="btn btn-ghost btn-xs" (click)="addBlock(d, si, 'text')">
-                          + Text
-                        </button>
-                        <button class="btn btn-ghost btn-xs" (click)="addBlock(d, si, 'list')">
-                          + List
-                        </button>
-                        <button class="btn btn-ghost btn-xs" (click)="addBlock(d, si, 'table')">
-                          + Table
-                        </button>
-                      </div>
-                    </div>
-                  }
-                </div>
-              }
-
-              <button class="btn btn-secondary btn-xs add-section-btn" (click)="addSection(d)">
-                + Add Section Tab
-              </button>
-            </div>
-          </div>
-
-          <!-- Image -->
-          <div class="form-row">
-            <span class="field-label">Image (optional)</span>
-            @if (d.image) {
-              <div class="image-block">
-                @if (kindOf(d) === 'HOTSPOT') {
-                  <!-- Hotspot region editor: draw rectangles on the image -->
-                  <div
-                    class="hs-editor"
-                    #hsWrap
-                    (mousedown)="startRegionDraw($event, d, hsWrap)"
-                    (mousemove)="moveRegionDraw($event, hsWrap)"
-                    (mouseup)="endRegionDraw()"
-                    (mouseleave)="endRegionDraw()"
-                  >
-                    <img [src]="d.image" alt="Question image" draggable="false" />
-                    @for (region of d.regions; track region.id; let ri = $index) {
-                      <div
-                        class="hs-region"
-                        [class.hs-correct]="d.hotspotAnswer === region.id"
-                        [style.left.%]="region.x"
-                        [style.top.%]="region.y"
-                        [style.width.%]="region.w"
-                        [style.height.%]="region.h"
-                      >
-                        <span class="hs-region-num">{{ ri + 1 }}</span>
-                      </div>
-                    }
-                  </div>
-                  <p class="hs-hint">Drag on the image to draw a clickable region.</p>
-                } @else {
-                  <img class="image-preview" [src]="d.image" alt="Question image" />
-                }
-                <div class="image-actions">
-                  <label class="btn btn-secondary btn-sm file-btn">
-                    {{ uploading()[d.id] ? 'Uploading...' : 'Replace Image' }}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      (change)="onImageSelected($event, d)"
-                      hidden
-                    />
-                  </label>
-                  <button class="btn btn-danger btn-sm" (click)="removeImage(d)">
-                    Remove Image
-                  </button>
-                </div>
-              </div>
-            } @else {
-              <label class="btn btn-secondary btn-sm file-btn">
-                {{ uploading()[d.id] ? 'Uploading...' : 'Upload Image' }}
-                <input type="file" accept="image/*" (change)="onImageSelected($event, d)" hidden />
-              </label>
-            }
-          </div>
-
-          <!-- Type-specific editors -->
-          @if (kindOf(d) === 'MCQ' || kindOf(d) === 'SATA') {
-            <div class="form-row">
-              <span class="field-label"
-                >Options (one per line, prefixed with a letter, e.g. "A. Text")</span
-              >
-              <textarea
-                rows="5"
-                [ngModel]="d.optionsText"
-                (ngModelChange)="setDraftField(d, 'optionsText', $event)"
-              ></textarea>
-            </div>
-            <div class="form-row">
-              <span class="field-label">
-                {{
-                  kindOf(d) === 'SATA'
-                    ? 'Correct letters (comma-separated, e.g. A, B, D)'
-                    : 'Correct letter (e.g. C)'
-                }}
-              </span>
-              <input
-                type="text"
-                [ngModel]="d.answerText"
-                (ngModelChange)="setDraftField(d, 'answerText', $event)"
-              />
-            </div>
-          } @else if (kindOf(d) === 'FIB') {
-            <div class="form-row">
-              <span class="field-label">Expected answer (numeric or short text)</span>
-              <input
-                type="text"
-                [ngModel]="d.answerText"
-                (ngModelChange)="setDraftField(d, 'answerText', $event)"
-              />
-            </div>
-          } @else if (kindOf(d) === 'MATRIX') {
-            <div class="form-row form-row-inline">
-              <label class="grow">
-                <span class="field-label">Rows (one per line)</span>
-                <textarea
-                  rows="6"
-                  [ngModel]="d.matrixRowsText"
-                  (ngModelChange)="setDraftField(d, 'matrixRowsText', $event)"
-                ></textarea>
-              </label>
-              <label class="grow">
-                <span class="field-label">Columns (one per line)</span>
-                <textarea
-                  rows="6"
-                  [ngModel]="d.matrixColsText"
-                  (ngModelChange)="setDraftField(d, 'matrixColsText', $event)"
-                ></textarea>
-              </label>
-            </div>
-            @if (matrixRowLines(d).length && matrixColLines(d).length) {
-              <div class="form-row">
-                <span class="field-label">Correct answers (check all correct cells)</span>
-                <div class="matrix-wrap">
-                  <table class="matrix-table">
-                    <thead>
-                      <tr>
-                        <th></th>
-                        @for (col of matrixColLines(d); track col) {
-                          <th>{{ col }}</th>
-                        }
-                      </tr>
-                    </thead>
-                    <tbody>
-                      @for (row of matrixRowLines(d); track $index; let ri = $index) {
-                        <tr>
-                          <td class="matrix-row-label">{{ row }}</td>
-                          @for (col of matrixColLines(d); track col) {
-                            <td>
-                              <input
-                                type="checkbox"
-                                [attr.aria-label]="row + ' — ' + col"
-                                [checked]="isMatrixAnswerChecked(d, ri, col)"
-                                (change)="toggleMatrixAnswer(d, ri, col)"
-                              />
-                            </td>
-                          }
-                        </tr>
-                      }
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            }
-          } @else if (kindOf(d) === 'CLOZE') {
-            <div class="form-row">
-              <span class="field-label">Dropdown blanks</span>
-              @for (blank of d.clozeBlanks; track $index; let bi = $index) {
-                <div class="sub-card">
-                  <div class="sub-card-head">
-                    <input
-                      class="grow"
-                      type="text"
-                      [ngModel]="blank.label"
-                      (ngModelChange)="setClozeField(d, bi, 'label', $event)"
-                      placeholder="Blank label"
-                    />
-                    <button class="btn btn-danger btn-sm" (click)="removeClozeBlank(d, bi)">
-                      Remove
-                    </button>
-                  </div>
-                  <span class="field-label">Choices (one per line)</span>
-                  <textarea
-                    rows="3"
-                    [ngModel]="blank.choicesText"
-                    (ngModelChange)="setClozeField(d, bi, 'choicesText', $event)"
-                  ></textarea>
-                  <span class="field-label">Correct choice</span>
-                  <select
-                    [ngModel]="blank.answer"
-                    (ngModelChange)="setClozeField(d, bi, 'answer', $event)"
-                  >
-                    <option value="" disabled>Select...</option>
-                    @for (choice of clozeChoiceLines(blank); track choice) {
-                      <option [value]="choice">{{ choice }}</option>
-                    }
-                  </select>
-                </div>
-              }
-              <button class="btn btn-secondary btn-sm" (click)="addClozeBlank(d)">
-                + Add Blank
-              </button>
-            </div>
-          } @else if (kindOf(d) === 'BOWTIE') {
-            <div class="form-row">
-              <span class="field-label">Categories (drop zones)</span>
-              @for (cat of d.bowtieCategories; track $index; let ci = $index) {
-                <div class="sub-card">
-                  <div class="sub-card-head">
-                    <input
-                      class="grow"
-                      type="text"
-                      [ngModel]="cat.name"
-                      (ngModelChange)="setBowtieField(d, ci, 'name', $event)"
-                      placeholder="Category name"
-                    />
-                    <label class="count-label">
-                      Select
-                      <input
-                        class="num-input"
-                        type="number"
-                        min="1"
-                        [ngModel]="cat.count"
-                        (ngModelChange)="setBowtieField(d, ci, 'count', $event)"
-                      />
-                    </label>
-                    <button class="btn btn-danger btn-sm" (click)="removeBowtieCategory(d, ci)">
-                      Remove
-                    </button>
-                  </div>
-                  <span class="field-label">Choices (one per line)</span>
-                  <textarea
-                    rows="4"
-                    [ngModel]="cat.choicesText"
-                    (ngModelChange)="setBowtieField(d, ci, 'choicesText', $event)"
-                  ></textarea>
-                  @if (bowtieChoiceLines(cat).length) {
-                    <span class="field-label">Correct choice(s)</span>
-                    <div class="check-list">
-                      @for (choice of bowtieChoiceLines(cat); track choice) {
-                        <label class="check-item">
-                          <input
-                            type="checkbox"
-                            [checked]="isBowtieAnswer(cat, choice)"
-                            (change)="toggleBowtieAnswer(d, ci, choice)"
-                          />
-                          {{ choice }}
-                        </label>
-                      }
-                    </div>
-                  }
-                </div>
-              }
-              <button class="btn btn-secondary btn-sm" (click)="addBowtieCategory(d)">
-                + Add Category
-              </button>
-            </div>
-          } @else if (kindOf(d) === 'RANKING') {
-            <div class="form-row">
-              <span class="field-label"
-                >Items in the CORRECT order (one per line, best/highest first). They are shown
-                shuffled to the test taker.</span
-              >
-              <textarea
-                rows="5"
-                [ngModel]="d.rankingText"
-                (ngModelChange)="setDraftField(d, 'rankingText', $event)"
-              ></textarea>
-            </div>
-          } @else if (kindOf(d) === 'HIGHLIGHT') {
-            <div class="form-row">
-              <span class="field-label"
-                >Phrases (check the ones the test taker should highlight)</span
-              >
-              @for (tok of d.highlightTokens; track $index; let ti = $index) {
-                <div class="token-row">
-                  <input
-                    type="checkbox"
-                    [checked]="tok.correct"
-                    (change)="toggleTokenCorrect(d, ti)"
-                    title="Correct phrase"
-                    aria-label="Correct phrase"
-                  />
-                  <input
-                    class="grow"
-                    type="text"
-                    [ngModel]="tok.text"
-                    (ngModelChange)="setTokenText(d, ti, $event)"
-                    placeholder="Phrase text"
-                  />
-                  <button
-                    class="btn btn-danger btn-sm"
-                    aria-label="Remove phrase"
-                    (click)="removeHighlightToken(d, ti)"
-                  >
-                    ✕
-                  </button>
-                </div>
-              }
-              <button class="btn btn-secondary btn-sm" (click)="addHighlightToken(d)">
-                + Add Phrase
-              </button>
-            </div>
-          } @else if (kindOf(d) === 'HOTSPOT') {
-            <div class="form-row">
-              <span class="field-label">Regions</span>
-              @if (!d.image) {
-                <p class="hs-hint">
-                  Upload an image above, then drag on it to draw clickable regions. Without an
-                  image, regions are shown as text buttons.
-                </p>
-              }
-              @for (region of d.regions; track region.id; let ri = $index) {
-                <div class="token-row">
-                  <span class="region-num">{{ ri + 1 }}</span>
-                  <input
-                    class="grow"
-                    type="text"
-                    [ngModel]="region.label"
-                    (ngModelChange)="setRegionLabel(d, ri, $event)"
-                    placeholder="Region label"
-                  />
-                  <label class="check-item">
-                    <input
-                      type="radio"
-                      [name]="'hs-answer-' + d.id"
-                      [checked]="d.hotspotAnswer === region.id"
-                      (change)="setDraftField(d, 'hotspotAnswer', region.id)"
-                    />
-                    Correct
-                  </label>
-                  <button
-                    class="btn btn-danger btn-sm"
-                    aria-label="Remove region"
-                    (click)="removeRegion(d, ri)"
-                  >
-                    ✕
-                  </button>
-                </div>
-              }
-              <button class="btn btn-secondary btn-sm" (click)="addManualRegion(d)">
-                + Add Region Manually
-              </button>
-            </div>
-          }
-
-          <div class="form-row">
-            <span class="field-label">Rationale (optional)</span>
-            <textarea
-              rows="3"
-              [ngModel]="d.rationale"
-              (ngModelChange)="setDraftField(d, 'rationale', $event)"
-            ></textarea>
-          </div>
-
-          @if (draftError()[d.id]) {
-            <p class="form-error">{{ draftError()[d.id] }}</p>
-          }
-
-          <div class="form-actions">
-            <button class="btn btn-primary" (click)="save(d)" [disabled]="saving()[d.id]">
-              {{ saving()[d.id] ? 'Saving...' : saved()[d.id] ? 'Saved ✓' : 'Save Question' }}
-            </button>
-            <button class="btn btn-danger" (click)="deleteQuestion(d)">Delete Question</button>
-          </div>
-        </div>
+    </div>
+    @if (bankId() && sectionShares().length) {
+      <div class="share-grid">
+        <p class="settings-title">Section mix</p>
+        <p class="settings-hint">
+          Percentages split the exam across sections. They do not need to sum to 100.
+        </p>
+        @for (share of sharePreview(); track share.section_id) {
+          <label class="settings-field">
+            <span>{{ share.name }} — {{ share.n }} of {{ share.question_count }}</span>
+            <input
+              type="number"
+              min="1"
+              max="100"
+              [ngModel]="share.percent"
+              (ngModelChange)="setSharePercent(share.section_id, $event)"
+            />
+          </label>
+        }
+      </div>
+    }
+    <div class="settings-actions">
+      <button class="btn btn-primary btn-sm" (click)="saveSettings()" [disabled]="savingSettings()">
+        {{ savingSettings() ? 'Saving...' : 'Save settings' }}
+      </button>
+      @if (settingsSaved()) {
+        <span class="settings-ok">Saved</span>
+      }
+      @if (settingsError()) {
+        <span class="settings-err">{{ settingsError() }}</span>
       }
     </div>
-  } @empty {
-    <!-- Reachable straight from Upload's manual mode, which creates the exam with
-         no questions at all. Without this the page is a header over blank space. -->
-    <p class="empty-state">
-      This exam has no questions yet. Use <strong>+ Add Question</strong> above to create the first
-      one.
+  </div>
+
+  @if (!bankId()) {
+    <p class="edit-hint">
+      Click a question to edit it. You can change the type, options and correct answer, and attach
+      an image (e.g. an ECG strip or an anatomy diagram for hotspot questions).
     </p>
+  } @else {
+    <p class="edit-hint">
+      Questions live on the bank. Changing the length or mix here applies to future attempts; open
+      attempts keep the paper they already drew.
+    </p>
+  }
+
+  @if (!bankId()) {
+    @for (d of drafts(); track d.id; let i = $index) {
+      <app-question-editor-card
+        [draft]="d"
+        [index]="i"
+        [expanded]="!!expanded()[d.id]"
+        [saving]="!!saving()[d.id]"
+        [saved]="!!saved()[d.id]"
+        [uploading]="!!uploading()[d.id]"
+        [error]="draftError()[d.id] || ''"
+        (expandToggle)="toggleExpand(d)"
+        (draftChange)="replaceDraft($event)"
+        (save)="save($event)"
+        (remove)="deleteQuestion($event)"
+        (imageFile)="uploadImage(d.id, $event)"
+        (removeImage)="removeImage(d)"
+      />
+    } @empty {
+      <!-- Reachable straight from Upload's manual mode, which creates the exam with
+         no questions at all. Without this the page is a header over blank space. -->
+      <p class="empty-state">
+        This exam has no questions yet. Use <strong>+ Add Question</strong> above to create the
+        first one.
+      </p>
+    }
   }
 }

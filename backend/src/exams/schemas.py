@@ -24,8 +24,6 @@ Answer = Annotated[Any, AfterValidator(_not_none)]
 
 
 class QuestionIn(BaseModel):
-    # 0 means "append at the end", which is what the route documents.
-    number: int = Field(default=0, ge=0, le=MAX_INT)
     topic: str = Field(max_length=2000)
     # Deliberately `str`, not the QuestionType enum: the documented JSON upload
     # format allows arbitrary type strings and grading normalizes them.
@@ -42,7 +40,6 @@ class QuestionIn(BaseModel):
 
 
 class QuestionUpdate(BaseModel):
-    number: int | None = Field(default=None, ge=0, le=MAX_INT)
     topic: str | None = Field(default=None, max_length=2000)
     type: str | None = Field(default=None, max_length=30)
     question: str | None = Field(default=None, max_length=20000)
@@ -67,6 +64,10 @@ class ExamCreate(BaseModel):
     # upload form makes it a required field. 0 is not a pass mark and >100 is
     # unreachable, so both are 422 rather than an exam nobody can pass.
     pass_grade: int = Field(default=DEFAULT_PASS_GRADE, ge=1, le=100)
+    # When false, attempts keep insertion order (Question.id) instead of shuffling.
+    shuffle: bool = True
+    # How many questions a student sits per attempt. None = every question.
+    questions_per_attempt: int | None = Field(default=None, ge=1, le=MAX_QUESTIONS_PER_EXAM)
 
 
 class ExamTitleUpdate(BaseModel):
@@ -85,14 +86,48 @@ class ExamPassGradeUpdate(BaseModel):
     pass_grade: int = Field(ge=1, le=100)
 
 
+class SectionShareIn(BaseModel):
+    section_id: str = Field(max_length=ID_LENGTH)
+    percent: int = Field(ge=1, le=100)
+
+
+class ExamFromBank(BaseModel):
+    title: str = Field(max_length=255)
+    bank_id: str = Field(max_length=ID_LENGTH)
+    shares: list[SectionShareIn] = Field(min_length=1)
+    # How many questions a student sits. Percents split this total across sections.
+    questions_per_attempt: int = Field(ge=1, le=MAX_QUESTIONS_PER_EXAM)
+    course_id: str | None = Field(default=None, max_length=ID_LENGTH)
+    time_limit_minutes: int | None = Field(default=None, ge=0, le=MAX_INT)
+    pass_grade: int = Field(ge=1, le=100)
+    shuffle: bool = True
+
+
+class ExamSettingsUpdate(BaseModel):
+    """Partial update for the edit-portal settings strip. Absent fields are left alone."""
+
+    time_limit_minutes: int | None = Field(default=None, ge=0, le=MAX_INT)
+    shuffle: bool | None = None
+    questions_per_attempt: int | None = Field(default=None, ge=1, le=MAX_QUESTIONS_PER_EXAM)
+    # Explicit clear: PATCH bodies cannot distinguish "absent" from "null" for
+    # questions_per_attempt without model_fields_set, which the service reads.
+    clear_questions_per_attempt: bool = False
+    shares: list[SectionShareIn] | None = None
+
+
 class ExamCreatedOut(BaseModel):
     exam_id: str
     total_questions: int
 
 
+class KindCountOut(BaseModel):
+    kind: str
+    count: int
+
+
 class ExamSummaryOut(BaseModel):
-    """Built by `service.exam_summary` — `course_name` is joined and the four
-    counts are aggregated, so this is not a straight projection of the row."""
+    """Built by `service.exam_summary` — `course_name` is joined and the counts
+    are aggregated, so this is not a straight projection of the row."""
 
     id: str
     title: str
@@ -100,6 +135,8 @@ class ExamSummaryOut(BaseModel):
     course_name: str | None
     time_limit_minutes: int | None
     pass_grade: int
+    shuffle: bool
+    questions_per_attempt: int | None
     allow_practice: bool
     is_owner: bool
     total_questions: int
@@ -107,7 +144,10 @@ class ExamSummaryOut(BaseModel):
     sata_count: int
     fib_count: int
     other_count: int
+    kind_counts: list[KindCountOut]
     created_at: ISODateTime
+    # Null on a regular exam. Set when this exam draws from a question bank.
+    bank_id: str | None = None
 
 
 class QuestionOut(BaseModel):
@@ -116,7 +156,6 @@ class QuestionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    number: int
     topic: str
     type: str
     question: str
@@ -139,7 +178,6 @@ class ExamQuestionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    number: int
     topic: str
     type: str
     question: str
@@ -150,6 +188,13 @@ class ExamQuestionOut(BaseModel):
     rationale: str | None = None
 
 
+class SectionShareOut(BaseModel):
+    section_id: str
+    name: str
+    percent: int
+    question_count: int
+
+
 class ExamDetailOut(BaseModel):
     id: str
     title: str
@@ -157,12 +202,17 @@ class ExamDetailOut(BaseModel):
     course_name: str | None
     time_limit_minutes: int | None
     pass_grade: int
+    shuffle: bool
+    questions_per_attempt: int | None
     # Whether `answer`/`rationale` are present on the questions below. Explicit
     # so the client never infers the answer gate from a missing field.
     answers_included: bool
     allow_practice: bool
     is_owner: bool
     questions: list[ExamQuestionOut]
+    bank_id: str | None = None
+    bank_backed: bool = False
+    section_shares: list[SectionShareOut] | None = None
 
 
 class ImageOut(BaseModel):

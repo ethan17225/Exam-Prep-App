@@ -7,7 +7,10 @@ import {
   isAnswerCorrect,
   kindFromType,
   progressPercent,
+  questionKindCounts,
   shuffle,
+  shuffleQuestionOptions,
+  applyOptionOrder,
 } from './exam.service';
 
 /** Minimal question builder for grading tests. */
@@ -16,7 +19,7 @@ function q(
   answer: Question['answer'],
   options: Question['options'] = null,
 ): Question {
-  return { number: 1, topic: 't', type, question: 'q', options, answer };
+  return { id: 1, topic: 't', type, question: 'q', options, answer };
 }
 
 const letters = ['A. One', 'B. Two', 'C. Three'];
@@ -106,6 +109,41 @@ describe('classifyQuestionType / kindFromType', () => {
   });
 });
 
+describe('questionKindCounts', () => {
+  const many = (type: string, n: number): Question[] =>
+    Array.from({ length: n }, () => q(type, 'A', letters));
+
+  it('omits kinds the exam does not contain', () => {
+    expect(questionKindCounts([...many('MCQ', 2), ...many('SATA', 1)])).toEqual([
+      { kind: 'MCQ', count: 2 },
+      { kind: 'SATA', count: 1 },
+    ]);
+    expect(questionKindCounts([])).toEqual([]);
+  });
+
+  it('keeps canonical order at four kinds or fewer', () => {
+    const kinds = questionKindCounts([...many('MATRIX', 9), ...many('MCQ', 1), ...many('SATA', 5)]);
+    expect(kinds.map((k) => k.kind)).toEqual(['MCQ', 'SATA', 'MATRIX']);
+  });
+
+  it('sorts by count descending past four kinds, canonical order breaking ties', () => {
+    const kinds = questionKindCounts([
+      ...many('MCQ', 1),
+      ...many('SATA', 2),
+      ...many('FIB', 7),
+      ...many('MATRIX', 2),
+      ...many('CLOZE', 4),
+    ]);
+    expect(kinds).toEqual([
+      { kind: 'FIB', count: 7 },
+      { kind: 'CLOZE', count: 4 },
+      { kind: 'SATA', count: 2 },
+      { kind: 'MATRIX', count: 2 },
+      { kind: 'MCQ', count: 1 },
+    ]);
+  });
+});
+
 describe('formatting helpers', () => {
   it('formatDuration picks the two most significant units', () => {
     expect(formatDuration(3900)).toBe('1h 5m');
@@ -129,5 +167,24 @@ describe('formatting helpers', () => {
     const out = shuffle(input);
     expect(input).toEqual([1, 2, 3, 4, 5]);
     expect([...out].sort()).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('shuffleQuestionOptions permutes MCQ choices and leaves highlight tokens', () => {
+    const mcq = q('MCQ', 'A', ['A. One', 'B. Two', 'C. Three', 'D. Four']);
+    const shuffled = shuffleQuestionOptions(mcq);
+    expect(mcq.options).toEqual(['A. One', 'B. Two', 'C. Three', 'D. Four']);
+    expect([...(shuffled.options as string[])].sort()).toEqual(
+      ['A. One', 'B. Two', 'C. Three', 'D. Four'].sort(),
+    );
+
+    const highlight = q('HIGHLIGHT', [0], { tokens: ['keep', 'this', 'order'] });
+    expect(shuffleQuestionOptions(highlight).options).toEqual(highlight.options);
+  });
+
+  it('applyOptionOrder overlays a frozen permutation by question id', () => {
+    const questions = [q('MCQ', 'A', ['A', 'B']), { ...q('MCQ', 'B', ['C', 'D']), id: 2 }];
+    const out = applyOptionOrder(questions, { '2': ['D', 'C'] });
+    expect(out[0]!.options).toEqual(['A', 'B']);
+    expect(out[1]!.options).toEqual(['D', 'C']);
   });
 });

@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 from httpx2 import AsyncClient
+from pydantic import ValidationError
 
 from src.attempts.router import history_router, progress_router
 from src.attempts.schemas import HistorySummaryOut
@@ -22,6 +23,9 @@ from src.auth.exceptions import InstructorRequired, InvalidInviteCode, Registrat
 from src.auth.schemas import RegisterIn
 from src.constants import MAX_QUESTIONS_PER_EXAM
 from src.exams.exceptions import EmptyTitle, ExamNotFound, QuestionNotFound
+from src.exams.router import router as exams_router
+from src.exams.schemas import ExamFromBank
+from src.exams.service import allocate_section_draws
 from src.grading.service import grade_question
 from src.identifiers import ID_LENGTH, new_id
 from src.platform_admin.constants import AUDIT_AREAS, AuditAction
@@ -32,6 +36,7 @@ SRC = Path(__file__).resolve().parent.parent / "src"
 ANONYMOUS_GET_PATHS = [
     "/api/exams",
     "/api/courses",
+    "/api/question-banks",
     "/api/history",
     "/api/history/topic-stats",
     "/api/in-progress",
@@ -65,6 +70,19 @@ async def test_anonymous_mutations_are_rejected(anon: AsyncClient):
     assert (await anon.post("/api/exams/abc/submit", json={})).status_code == 401
     assert (await anon.delete("/api/exams/abc")).status_code == 401
     assert (await anon.post("/api/in-progress", json={})).status_code == 401
+    assert (await anon.post("/api/question-banks", json={"title": "x"})).status_code == 401
+    assert (
+        await anon.post(
+            "/api/exams/from-bank",
+            json={
+                "title": "x",
+                "bank_id": "b" * 12,
+                "shares": [{"section_id": "s" * 12, "percent": 50}],
+                "questions_per_attempt": 10,
+                "pass_grade": 72,
+            },
+        )
+    ).status_code == 401
 
 
 async def test_garbage_token_is_rejected(anon: AsyncClient):
@@ -74,7 +92,13 @@ async def test_garbage_token_is_rejected(anon: AsyncClient):
 
 @pytest.mark.parametrize(
     "path",
-    ["/api/admin/dashboard", "/api/admin/overview", "/api/admin/students", "/api/admin/students/u9"],
+    [
+        "/api/admin/dashboard",
+        "/api/admin/overview",
+        "/api/admin/students",
+        "/api/admin/students/u9",
+        "/api/question-banks",
+    ],
 )
 async def test_student_is_blocked_from_instructor_routes(as_student: AsyncClient, path: str):
     assert (await as_student.get(path)).status_code == 403
@@ -194,6 +218,20 @@ async def test_admin_is_not_staff():
     assert UserRole.STUDENT not in STAFF_ROLES
 
 
+async def test_student_cannot_create_exam_from_bank(as_student: AsyncClient):
+    resp = await as_student.post(
+        "/api/exams/from-bank",
+        json={
+            "title": "x",
+            "bank_id": "b" * 12,
+            "shares": [{"section_id": "s" * 12, "percent": 50}],
+            "questions_per_attempt": 10,
+            "pass_grade": 72,
+        },
+    )
+    assert resp.status_code == 403
+
+
 async def test_anonymous_profile_mutations_are_rejected(anon: AsyncClient):
     # These write the caller's own row, so an unauthenticated one has nothing to
     # write — and the avatar delete unlinks a file.
@@ -203,7 +241,7 @@ async def test_anonymous_profile_mutations_are_rejected(anon: AsyncClient):
 
 # ── Input bounds: 422, never 500 ───────────────────────────────────
 
-ONE_QUESTION = {"number": 1, "topic": "t", "type": "MCQ", "question": "q", "answer": "a"}
+ONE_QUESTION = {"topic": "t", "type": "MCQ", "question": "q", "answer": "a"}
 
 
 @pytest.mark.parametrize(
@@ -258,11 +296,10 @@ async def test_null_answer_is_rejected(as_student: AsyncClient):
     assert resp.status_code == 422
 
 
-async def test_question_number_may_be_omitted(as_student: AsyncClient):
-    # The route documents "omit `number` to append at the end", so omitting it
-    # must not be a validation error. (It reaches the dead DB and 500s, which is
-    # proof enough that validation let it through.)
-    body = {k: v for k, v in ONE_QUESTION.items() if k != "number"}
+async def test_legacy_question_number_is_ignored(as_student: AsyncClient):
+    # Pre-drop JSON uploads still carry `"number"`. Extra fields must not 422 —
+    # the column is gone, and identity is Question.id assigned on insert.
+    body = {**ONE_QUESTION, "number": 1}
     resp = await as_student.post("/api/exams", json={"title": "ok", "questions": [body]})
     assert resp.status_code != 422
 
@@ -423,6 +460,54 @@ def test_not_owned_is_indistinguishable_from_not_found():
     assert ExamNotFound.STATUS_CODE == QuestionNotFound.STATUS_CODE == 404
 
 
+@pytest.mark.parametrize("percent", [0, 101, -1])
+def test_section_share_percent_is_bounded(percent: int):
+    with pytest.raises(ValidationError):
+        ExamFromBank(
+            title="x",
+            bank_id="b" * 12,
+            shares=[{"section_id": "s" * 12, "percent": percent}],
+            questions_per_attempt=10,
+            pass_grade=72,
+        )
+
+
+@pytest.mark.parametrize("total", [0, -1])
+def test_from_bank_attempt_size_is_bounded(total: int):
+    with pytest.raises(ValidationError):
+        ExamFromBank(
+            title="x",
+            bank_id="b" * 12,
+            shares=[{"section_id": "s" * 12, "percent": 50}],
+            questions_per_attempt=total,
+            pass_grade=72,
+        )
+
+
+def test_allocate_section_draws_hits_total():
+    assert allocate_section_draws(10, [100, 100], [50, 50]) == [5, 5]
+    assert allocate_section_draws(10, [100, 100], [70, 30]) == [7, 3]
+    # Short section: leftover seats spill so the attempt still has 10 questions.
+    assert allocate_section_draws(10, [5, 100], [70, 30]) == [5, 5]
+    # Legacy: percent of each section's own size (Python 3 round, 2.5 → 2).
+    assert allocate_section_draws(None, [5, 10], [50, 100]) == [2, 10]
+    assert allocate_section_draws(1, [10, 10], [50, 50]) == [1, 0]
+
+
+async def test_instructor_bank_title_too_long_is_422(as_instructor: AsyncClient):
+    resp = await as_instructor.post("/api/question-banks", json={"title": "x" * 300})
+    assert resp.status_code == 422
+
+
+def test_bank_backed_attempts_draw_server_side():
+    # A client-supplied question_order on a bank exam would let a student pick
+    # the paper. The first insert must sample, and later saves must not rewrite it.
+    source = (SRC / "attempts" / "service.py").read_text(encoding="utf-8")
+    assert "draw_attempt_order" in source
+    assert "if payload.mode is AttemptMode.PRACTICE and not exam.bank_id:" in source
+    assert "option_order" in source
+
+
 @pytest.mark.parametrize(
     "url,payload",
     [
@@ -448,7 +533,7 @@ async def test_unknown_attempt_mode_is_rejected(as_student: AsyncClient, url: st
 
 def test_graded_attempts_cannot_self_mark_or_pick_their_own_questions():
     # Both fields stay in the schema (wire contract) but submit ignores them for
-    # a graded run: self-marking was a free 100%, and question_numbers let a
+    # a graded run: self-marking was a free 100%, and question_ids let a
     # student be scored over only the questions they got right.
     source = (SRC / "attempts" / "service.py").read_text(encoding="utf-8")
     assert "graded = mode is AttemptMode.EXAM" in source
@@ -480,6 +565,7 @@ def test_ids_are_wide_enough_and_unique():
     [
         (progress_router, "/api/in-progress/by-exam/{exam_id}", "/api/in-progress/{record_id}"),
         (history_router, "/api/history/topic-stats", "/api/history/{record_id}"),
+        (exams_router, "/api/exams/from-bank", "/api/exams/{exam_id}"),
     ],
 )
 def test_fixed_paths_precede_parameterized_siblings(router, fixed: str, parameterized: str):

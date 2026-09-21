@@ -8,6 +8,7 @@
       }
       @if (auth.isInstructor()) {
         <a routerLink="/students" routerLinkActive="active">Students</a>
+        <a routerLink="/banks" routerLinkActive="active">Banks</a>
       }
       @if (!auth.isAdmin()) {
         <a routerLink="/exams" routerLinkActive="active">Exams</a>

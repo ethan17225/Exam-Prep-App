@@ -29,7 +29,8 @@ interface AuthResponse {
 const TOKEN_KEY = 'exam_token';
 const USER_KEY = 'exam_user';
 /** Prefix of the per-attempt autosave mirror written by take-exam. */
-export const PROGRESS_KEY_PREFIX = 'exam_progress_';
+export const PROGRESS_KEY_PREFIX = 'exam_progress_v2_';
+const LEGACY_PROGRESS_KEY_PREFIX = 'exam_progress_';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -157,7 +158,7 @@ export class AuthService {
     // outlive the session, and the next signed-in user resuming the same exam
     // would restore the previous user's answers into their own attempt.
     for (const key of Object.keys(localStorage)) {
-      if (key.startsWith(PROGRESS_KEY_PREFIX)) localStorage.removeItem(key);
+      if (key.startsWith(LEGACY_PROGRESS_KEY_PREFIX)) localStorage.removeItem(key);
     }
   }
 

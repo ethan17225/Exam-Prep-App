@@ -14,7 +14,13 @@
   font-weight: 700;
   font-size: 1.1rem;
   letter-spacing: -0.02em;
+  // Pushes the links away from the brand without a spacer element.
   margin-right: 1rem;
+}
+
+// Sits at the far right, however many links the role puts in the middle.
+app-user-menu {
+  margin-left: auto;
 }
 
 .nav-links {

@@ -1,4 +1,12 @@
-import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  signal,
+  computed,
+  Injector,
+  afterNextRender,
+} from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { map, of, switchMap } from 'rxjs';
@@ -15,12 +23,14 @@ import {
   BowtieCategory,
   ClozeBlank,
   HotspotRegion,
-  countQuestionTypes,
+  questionKindCounts,
   classifyQuestionType,
   formatAnswerForDisplay,
   formatClock,
   isAnswerCorrect,
   shuffle,
+  shuffleQuestionOptions,
+  applyOptionOrder,
   matrixRows,
   matrixColumns,
   clozeBlanks,
@@ -50,6 +60,21 @@ interface QuestionStateVm {
   rankOrder: string[];
   hotspotLabel: string;
   correctText: string;
+}
+
+/** One count chip in the sticky header's type strip. */
+interface TypeChipVm {
+  kind: QuestionKind;
+  count: number;
+  tone: 'mcq' | 'sata' | 'fib' | 'other';
+}
+
+/** The six advanced kinds share the one amber chip colour; the three common kinds have their own. */
+function chipTone(kind: QuestionKind): TypeChipVm['tone'] {
+  if (kind === 'MCQ') return 'mcq';
+  if (kind === 'SATA') return 'sata';
+  if (kind === 'FIB') return 'fib';
+  return 'other';
 }
 
 @Component({
@@ -84,9 +109,16 @@ export class TakeExamPage implements OnInit, OnDestroy {
   private examId = '';
   private resumeId: string | null = null;
   private selectedQuestionCount: number | null = null;
+  private shuffleEnabled = false;
 
   totalQuestions = computed(() => this.questions().length);
-  typeCounts = computed(() => countQuestionTypes(this.questions()));
+  typeChips = computed<TypeChipVm[]>(() =>
+    questionKindCounts(this.questions()).map(({ kind, count }) => ({
+      kind,
+      count,
+      tone: chipTone(kind),
+    })),
+  );
   answeredCount = computed(() => this.answers().size);
   progress = computed(() =>
     this.totalQuestions() > 0
@@ -108,7 +140,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
     const vms = new Map<number, QuestionStructVm>();
     for (const q of this.pageQuestions()) {
       const kind = classifyQuestionType(q);
-      vms.set(q.number, {
+      vms.set(q.id, {
         kind,
         advanced: kind !== 'MCQ' && kind !== 'SATA' && kind !== 'FIB',
         options: Array.isArray(q.options) ? q.options : [],
@@ -127,9 +159,9 @@ export class TakeExamPage implements OnInit, OnDestroy {
     const struct = this.structVm();
     const vms = new Map<number, QuestionStateVm>();
     for (const q of this.pageQuestions()) {
-      const s = struct.get(q.number)!;
-      const revealed = this.revealed().has(q.number);
-      vms.set(q.number, {
+      const s = struct.get(q.id)!;
+      const revealed = this.revealed().has(q.id);
+      vms.set(q.id, {
         correct: revealed && this.isQuestionCorrect(q),
         fullyAnswered: this.isFullyAnswered(q),
         rankOrder: s.kind === 'RANKING' ? this.rankOrder(q) : [],
@@ -145,10 +177,10 @@ export class TakeExamPage implements OnInit, OnDestroy {
     const flagged = this.flagged();
     const page = this.currentPage();
     return this.questions().map((q, i) => ({
-      number: q.number,
+      id: q.id,
       index: i,
-      answered: this.isAnsweredValue(answers.get(q.number)),
-      flagged: flagged.has(q.number),
+      answered: this.isAnsweredValue(answers.get(q.id)),
+      flagged: flagged.has(q.id),
       current: Math.floor(i / this.questionsPerPage) === page,
     }));
   });
@@ -163,6 +195,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
     private router: Router,
     private examService: ExamService,
     private auth: AuthService,
+    private injector: Injector,
   ) {}
 
   ngOnInit(): void {
@@ -187,7 +220,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
     this.examService
       // Answers are requested ONLY for practice. A graded run must never have the
       // key in the browser — it is one devtools panel away from the student.
-      .getExam(this.examId, practice)
+      .getExam(this.examId, practice, this.mode())
       .pipe(
         switchMap((exam) =>
           this.resumeId
@@ -206,6 +239,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
           }
 
           this.examTitle.set(exam.title);
+          this.shuffleEnabled = !!exam.shuffle;
 
           const limit = exam.time_limit_minutes ? exam.time_limit_minutes * 60 : 180 * 60;
           this.timeLimitSeconds.set(limit);
@@ -214,12 +248,48 @@ export class TakeExamPage implements OnInit, OnDestroy {
             this.restoreProgress(exam.questions, saved);
             this.loading.set(false);
             this.startTimer();
+          } else if (exam.bank_backed) {
+            this.questions.set([]);
+            this.remainingSeconds.set(limit);
+            this.persistProgress({
+              allowEmpty: true,
+              onError: (err) =>
+                this.loadError.set(
+                  err?.error?.detail ||
+                    'Could not start this attempt. Check your connection and try again — ' +
+                      'do not begin answering until it starts.',
+                ),
+              onSuccess: () => {
+                this.examService.getExam(this.examId, practice, this.mode()).subscribe({
+                  next: (drawn) => {
+                    this.questions.set(this.withShuffledOptions(drawn.questions));
+                    this.persistProgress();
+                    this.loading.set(false);
+                    this.startTimer();
+                  },
+                  error: (err) => {
+                    this.loading.set(false);
+                    this.loadError.set(
+                      err?.error?.detail ||
+                        'The attempt started but the questions could not be loaded.',
+                    );
+                  },
+                });
+              },
+            });
           } else {
-            const shuffled = shuffle(exam.questions);
-            const takeCount = this.selectedQuestionCount
-              ? Math.min(Math.max(this.selectedQuestionCount, 1), shuffled.length)
-              : shuffled.length;
-            this.questions.set(shuffled.slice(0, takeCount));
+            // Prefer the exam's own attempt size over a leftover ?count= query
+            // param from older bookmarks; the query param is still accepted as a
+            // practice override when the exam itself has no limit.
+            const pool = exam.shuffle ? shuffle([...exam.questions]) : [...exam.questions];
+            const configured =
+              exam.questions_per_attempt != null
+                ? exam.questions_per_attempt
+                : this.selectedQuestionCount;
+            const takeCount = configured
+              ? Math.min(Math.max(configured, 1), pool.length)
+              : pool.length;
+            this.questions.set(this.withShuffledOptions(pool.slice(0, takeCount)));
             this.remainingSeconds.set(limit);
             // The first save is what creates the attempt server-side. If it
             // fails there is nothing to submit into later, so block rather than
@@ -265,11 +335,16 @@ export class TakeExamPage implements OnInit, OnDestroy {
     const local = this.readLocalProgress(saved.saved_at);
     const source = local ?? saved;
 
-    const questionMap = new Map(allQuestions.map((q) => [q.number, q]));
+    const questionMap = new Map(allQuestions.map((q) => [q.id, q]));
     const ordered = source.question_order
-      .map((num) => questionMap.get(num))
+      .map((qid) => questionMap.get(qid))
       .filter((q): q is Question => !!q);
-    this.questions.set(ordered);
+    const paper = ordered.length ? ordered : [...allQuestions];
+    const frozen = source.option_order;
+    const hasFrozen = !!frozen && Object.keys(frozen).length > 0;
+    this.questions.set(
+      hasFrozen ? applyOptionOrder(paper, frozen) : this.withShuffledOptions(paper),
+    );
 
     const restoredAnswers = new Map<number, AnswerValue>();
     for (const [key, val] of Object.entries(source.answers)) {
@@ -281,6 +356,11 @@ export class TakeExamPage implements OnInit, OnDestroy {
     this.currentPage.set(source.current_page);
   }
 
+  private withShuffledOptions(questions: Question[]): Question[] {
+    if (!this.shuffleEnabled) return questions;
+    return questions.map(shuffleQuestionOptions);
+  }
+
   ngOnDestroy(): void {
     if (this.timerInterval) clearInterval(this.timerInterval);
     if (this.autoSaveTimeout) clearTimeout(this.autoSaveTimeout);
@@ -290,8 +370,27 @@ export class TakeExamPage implements OnInit, OnDestroy {
 
   goTo(index: number): void {
     const page = Math.floor(index / this.questionsPerPage);
+    const pageChanged = page !== this.currentPage();
+    const qid = this.questions()[index]?.id;
     this.currentPage.set(page);
     this.showNav.set(false);
+    if (qid == null) return;
+
+    const scrollToQuestion = (): void => {
+      const el = document.getElementById(`q-${qid}`);
+      if (!el) return;
+      const header = document.querySelector('.exam-header-sticky') as HTMLElement | null;
+      const offset = (header?.offsetHeight ?? 0) + 12;
+      const top = el.getBoundingClientRect().top + window.scrollY - offset;
+      window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    };
+
+    if (pageChanged) {
+      // Wait until the new page's cards are painted before scrolling to one.
+      afterNextRender(scrollToQuestion, { injector: this.injector });
+    } else {
+      scrollToQuestion();
+    }
   }
 
   prevPage(): void {
@@ -400,10 +499,10 @@ export class TakeExamPage implements OnInit, OnDestroy {
   }
 
   setClozeAnswer(q: Question, blankIdx: number, value: string): void {
-    if (this.isRevealed(q.number)) return;
-    const list = this.clozeAnswer(q.number, clozeBlanks(q).length);
+    if (this.isRevealed(q.id)) return;
+    const list = this.clozeAnswer(q.id, clozeBlanks(q).length);
     list[blankIdx] = value;
-    this.setAnswer(q.number, list);
+    this.setAnswer(q.id, list);
   }
 
   getClozeAnswer(qNum: number, blankIdx: number): string {
@@ -416,7 +515,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
   }
 
   isClozeBlankCorrect(q: Question, blankIdx: number): boolean {
-    const user = this.getClozeAnswer(q.number, blankIdx).trim().toLowerCase();
+    const user = this.getClozeAnswer(q.id, blankIdx).trim().toLowerCase();
     return !!user && user === this.clozeExpected(q, blankIdx).trim().toLowerCase();
   }
 
@@ -465,23 +564,23 @@ export class TakeExamPage implements OnInit, OnDestroy {
   // ── RANKING ─────────────────────────────────────────────────
 
   private rankOrder(q: Question): string[] {
-    const ans = this.answers().get(q.number);
+    const ans = this.answers().get(q.id);
     if (Array.isArray(ans) && ans.length > 0) return ans as string[];
     return rankingItems(q);
   }
 
   moveRank(q: Question, index: number, delta: number): void {
-    if (this.isRevealed(q.number)) return;
+    if (this.isRevealed(q.id)) return;
     const order = [...this.rankOrder(q)];
     const target = index + delta;
     if (target < 0 || target >= order.length) return;
     [order[index], order[target]] = [order[target], order[index]];
-    this.setAnswer(q.number, order);
+    this.setAnswer(q.id, order);
   }
 
   confirmRankOrder(q: Question): void {
-    if (this.isRevealed(q.number)) return;
-    this.setAnswer(q.number, [...this.rankOrder(q)]);
+    if (this.isRevealed(q.id)) return;
+    this.setAnswer(q.id, [...this.rankOrder(q)]);
   }
 
   isRankConfirmed(qNum: number): boolean {
@@ -536,7 +635,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
   }
 
   private hotspotSelectedLabel(q: Question): string {
-    const ans = this.answers().get(q.number);
+    const ans = this.answers().get(q.id);
     if (!ans || typeof ans !== 'string') return '';
     return hotspotRegions(q).find((r) => r.id === ans)?.label ?? '';
   }
@@ -577,8 +676,8 @@ export class TakeExamPage implements OnInit, OnDestroy {
 
   private isQuestionCorrect(q: Question): boolean {
     // FIB is self-marked in practice mode; everything else grades exactly as the server does.
-    if (this.kind(q) === 'FIB') return this.getFibMark(q.number) === true;
-    return isAnswerCorrect(q, this.getAnswer(q.number) ?? null);
+    if (this.kind(q) === 'FIB') return this.getFibMark(q.id) === true;
+    return isAnswerCorrect(q, this.getAnswer(q.id) ?? null);
   }
 
   // ── FIB Confirm & Self-Grade ────────────────────────────────
@@ -635,18 +734,18 @@ export class TakeExamPage implements OnInit, OnDestroy {
   private isFullyAnswered(q: Question): boolean {
     const kind = this.kind(q);
     if (kind === 'MATRIX') {
-      const ans = this.matrixAnswer(q.number);
+      const ans = this.matrixAnswer(q.id);
       return matrixRows(q).every((_, i) => (ans[String(i)] ?? []).length > 0);
     }
     if (kind === 'CLOZE') {
       const blanks = clozeBlanks(q);
-      return blanks.length > 0 && blanks.every((_, i) => this.getClozeAnswer(q.number, i) !== '');
+      return blanks.length > 0 && blanks.every((_, i) => this.getClozeAnswer(q.id, i) !== '');
     }
     if (kind === 'BOWTIE') {
-      const ans = this.bowtieAnswer(q.number);
+      const ans = this.bowtieAnswer(q.id);
       return bowtieCategories(q).every((c) => (ans[c.name] ?? []).length >= (c.count || 1));
     }
-    return this.isAnswered(q.number);
+    return this.isAnswered(q.id);
   }
 
   // ── Auto-save ──────────────────────────────────────────────
@@ -663,13 +762,21 @@ export class TakeExamPage implements OnInit, OnDestroy {
     return `${PROGRESS_KEY_PREFIX}${this.auth.user()?.id ?? 'anon'}_${this.examId}_${this.mode()}`;
   }
 
-  private persistProgress(hooks?: { onSuccess?: () => void; onError?: () => void }): void {
-    if (this.questions().length === 0) return;
+  private persistProgress(hooks?: {
+    onSuccess?: () => void;
+    onError?: (err?: { error?: { detail?: string } }) => void;
+    allowEmpty?: boolean;
+  }): void {
+    if (this.questions().length === 0 && !hooks?.allowEmpty) return;
     this.autoSaveStatus.set('saving');
 
     const answersObj: Record<string, AnswerValue> = {};
     for (const [key, val] of this.answers()) {
       answersObj[String(key)] = val;
+    }
+    const optionOrder: Record<string, NonNullable<Question['options']>> = {};
+    for (const q of this.questions()) {
+      if (q.options != null) optionOrder[String(q.id)] = q.options;
     }
 
     const payload = {
@@ -677,7 +784,8 @@ export class TakeExamPage implements OnInit, OnDestroy {
       mode: this.mode(),
       answers: answersObj,
       flagged: [...this.flagged()],
-      question_order: this.questions().map((q) => q.number),
+      question_order: this.questions().map((q) => q.id),
+      option_order: optionOrder,
       remaining_seconds: this.remainingSeconds(),
       current_page: this.currentPage(),
     };
@@ -707,9 +815,9 @@ export class TakeExamPage implements OnInit, OnDestroy {
       },
       // 'idle' looked identical to "nothing to save", so a whole exam could fail
       // to save with no visible hint. Surface it.
-      error: () => {
+      error: (err) => {
         this.autoSaveStatus.set('error');
-        hooks?.onError?.();
+        hooks?.onError?.(err);
       },
     });
   }
@@ -753,11 +861,11 @@ export class TakeExamPage implements OnInit, OnDestroy {
     const practice = this.mode() === 'practice';
     const timeSpent = this.timeLimitSeconds() - this.remainingSeconds();
     const subs: AnswerSubmission[] = this.questions().map((q) => ({
-      question_number: q.number,
-      answer: this.answers().get(q.number) ?? (this.kind(q) === 'SATA' ? [] : ''),
+      question_id: q.id,
+      answer: this.answers().get(q.id) ?? (this.kind(q) === 'SATA' ? [] : ''),
       // Self-marking is a study aid. The server ignores it for a graded run, so
       // do not imply a contract that no longer exists.
-      fib_correct: practice ? (this.getFibMark(q.number) ?? null) : null,
+      fib_correct: practice ? (this.getFibMark(q.id) ?? null) : null,
     }));
 
     this.examService
@@ -769,7 +877,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
         time_spent_seconds: timeSpent,
         mode: this.mode(),
         // Likewise ignored when graded: the whole paper is scored.
-        ...(practice ? { question_numbers: this.questions().map((q) => q.number) } : {}),
+        ...(practice ? { question_ids: this.questions().map((q) => q.id) } : {}),
       })
       .subscribe({
         next: (result) => {

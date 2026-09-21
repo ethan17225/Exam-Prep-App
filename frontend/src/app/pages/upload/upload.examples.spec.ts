@@ -2,13 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { EXAMPLE_TYPES, JSON_EXAMPLES, buildExampleJson } from './upload.examples';
 
-/** The numbers the assembler wrote, in order. */
-function numbersIn(json: string): number[] {
-  return [...json.matchAll(/"number":\s*(\d+)/g)].map((m) => Number(m[1]));
-}
-
-function parse(json: string): { type: string; number: number }[] {
-  return JSON.parse(json) as { type: string; number: number }[];
+function parse(json: string): { type: string }[] {
+  return JSON.parse(json) as { type: string }[];
 }
 
 describe('buildExampleJson', () => {
@@ -34,23 +29,17 @@ describe('buildExampleJson', () => {
     }
   });
 
-  it('renumbers from 1 consecutively whatever the subset', () => {
-    // The numbers are the array's own identifiers; a subset that kept the original
-    // numbering would upload questions numbered 2, 5, 9.
-    expect(numbersIn(buildExampleJson(new Set(['SATA'])))).toEqual([1]);
-    expect(numbersIn(buildExampleJson(new Set(['SATA', 'HOTSPOT'])))).toEqual([1, 2]);
-    expect(numbersIn(buildExampleJson(new Set()))).toEqual(
-      JSON_EXAMPLES.map((_, index) => index + 1),
-    );
+  it('omits a client-assigned number field', () => {
+    // Identity is Question.id, assigned on insert. A leftover `"number"` in the
+    // example would reintroduce the field we dropped.
+    const json = buildExampleJson(new Set());
+    expect(json).not.toContain('"number"');
+    expect(json).not.toContain('__N__');
   });
 
   it('keeps the tab order regardless of the order types were picked', () => {
     const picked = parse(buildExampleJson(new Set(['HOTSPOT', 'FIB'])));
     expect(picked.map((q) => q.type)).toEqual(['FIB', 'HOTSPOT']);
-  });
-
-  it('leaves no unsubstituted number placeholder', () => {
-    expect(buildExampleJson(new Set())).not.toContain('__N__');
   });
 
   it('ignores a type with no example rather than emitting an empty array', () => {

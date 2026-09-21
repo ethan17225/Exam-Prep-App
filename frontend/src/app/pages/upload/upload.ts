@@ -35,6 +35,9 @@ export class UploadPage implements OnInit {
   courseError = signal('');
   timeLimitMinutes = signal<number | null>(null);
   passGrade = signal<number | null>(DEFAULT_PASS_GRADE);
+  shuffle = signal(true);
+  /** Null means "all questions". */
+  questionsPerAttempt = signal<number | null>(null);
 
   readonly exampleTypes = EXAMPLE_TYPES;
   /** Empty means the "All" tab: every type is shown. */
@@ -188,6 +191,23 @@ export class UploadPage implements OnInit {
     if (timeLimit && timeLimit <= 0) timeLimit = null; // invalid times ignored
 
     const manual = this.mode() === 'manual';
+    let attemptSize = this.questionsPerAttempt();
+    if (attemptSize != null) {
+      if (!Number.isFinite(attemptSize) || attemptSize < 1) {
+        this.loading.set(false);
+        this.error.set('Questions per attempt must be a positive number, or left blank for all.');
+        return;
+      }
+      attemptSize = Math.floor(attemptSize);
+      if (!manual && questions.length > 0 && attemptSize > questions.length) {
+        this.loading.set(false);
+        this.error.set(
+          `Questions per attempt (${attemptSize}) cannot exceed the number of questions (${questions.length}).`,
+        );
+        return;
+      }
+    }
+
     this.examService
       .createExam(
         titleVal,
@@ -195,6 +215,10 @@ export class UploadPage implements OnInit {
         Math.round(grade),
         this.selectedCourseId(),
         timeLimit,
+        {
+          shuffle: this.shuffle(),
+          questionsPerAttempt: attemptSize,
+        },
       )
       .subscribe({
         next: (res) => {

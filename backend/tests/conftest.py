@@ -92,6 +92,7 @@ async def as_student(student: User) -> AsyncClient:
 
 @pytest_asyncio.fixture
 async def as_instructor(instructor: User) -> AsyncClient:
+    """Client authenticated as an instructor, via dependency_overrides."""
     app.dependency_overrides[get_current_user] = lambda: instructor
     async with _client() as client:
         yield client

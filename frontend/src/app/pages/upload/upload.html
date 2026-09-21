@@ -94,6 +94,42 @@
     max="100"
   />
 
+  <label class="field-label" for="upload-attempt-size"
+    >Questions per attempt
+    <span class="field-hint">(Leave blank to include every question)</span></label
+  >
+  <input
+    id="upload-attempt-size"
+    type="number"
+    [ngModel]="questionsPerAttempt()"
+    (ngModelChange)="questionsPerAttempt.set($event || null)"
+    placeholder="All questions"
+    min="1"
+  />
+
+  <div class="shuffle-field">
+    <span class="field-label">Question order</span>
+    <button
+      type="button"
+      class="shuffle-toggle"
+      role="switch"
+      [attr.aria-checked]="shuffle()"
+      (click)="shuffle.set(!shuffle())"
+    >
+      <span class="shuffle-track" [class.on]="shuffle()">
+        <span class="shuffle-thumb"></span>
+      </span>
+      <span class="shuffle-copy">
+        <strong>{{ shuffle() ? 'Shuffle on' : 'Shuffle off' }}</strong>
+        <span class="field-hint">{{
+          shuffle()
+            ? 'Questions and answer choices are randomized for each attempt'
+            : 'Questions keep the order from the database'
+        }}</span>
+      </span>
+    </button>
+  </div>
+
   @if (mode() === 'json') {
     <label class="field-label" for="upload-json">Questions JSON</label>
     <textarea
@@ -165,6 +201,11 @@
         the image afterwards via <em>Edit Questions</em>)
       </li>
     </ul>
+    <p class="format-note">
+      <code>MCQ</code> and <code>SATA</code> take any number of options, two or more — there is no
+      four-option limit. Keep prefixing each one with its letter (<code>E.</code>,
+      <code>F.</code> and so on) and use those same letters in <code>answer</code>.
+    </p>
     <p class="format-note">
       Any question type can also carry an image (e.g. an ECG strip) — attach it after upload via the
       exam's <em>Edit Questions</em> menu.

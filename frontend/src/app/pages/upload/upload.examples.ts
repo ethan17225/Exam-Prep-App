@@ -3,8 +3,8 @@
  * type. Kept out of the component because it is ~150 lines of literal data.
  *
  * `body` is the object exactly as it should appear inside the array, indented two
- * spaces, with `__N__` where the question number goes — the numbers have to be
- * consecutive in whatever subset the user picked, so they cannot be hardcoded.
+ * spaces. Identity is assigned on insert (`Question.id`); there is no client-supplied
+ * number field.
  */
 export interface JsonExample {
   /** The type tab this example appears under. Not unique: MCQ has two. */
@@ -29,7 +29,6 @@ export const JSON_EXAMPLES: JsonExample[] = [
   {
     type: 'MCQ',
     body: `  {
-    "number": __N__,
     "topic": "Pharmacology",
     "type": "MCQ",
     "question": "Which medication is a beta-blocker?",
@@ -37,7 +36,8 @@ export const JSON_EXAMPLES: JsonExample[] = [
       "A. Metoprolol",
       "B. Lisinopril",
       "C. Amlodipine",
-      "D. Losartan"
+      "D. Losartan",
+      "E. Hydrochlorothiazide"
     ],
     "answer": "A",
     "rationale": "Metoprolol is a selective beta-1 blocker."
@@ -46,7 +46,6 @@ export const JSON_EXAMPLES: JsonExample[] = [
   {
     type: 'SATA',
     body: `  {
-    "number": __N__,
     "topic": "Infection Control",
     "type": "SATA",
     "question": "Which are standard precautions? Select all that apply.",
@@ -63,7 +62,6 @@ export const JSON_EXAMPLES: JsonExample[] = [
   {
     type: 'FIB',
     body: `  {
-    "number": __N__,
     "topic": "Anatomy",
     "type": "FIB",
     "question": "The largest organ of the human body is the ____.",
@@ -74,7 +72,6 @@ export const JSON_EXAMPLES: JsonExample[] = [
   {
     type: 'MATRIX',
     body: `  {
-    "number": __N__,
     "topic": "Endocrine",
     "type": "MATRIX",
     "question": "For each finding, check the matching diabetes type.",
@@ -89,7 +86,6 @@ export const JSON_EXAMPLES: JsonExample[] = [
   {
     type: 'CLOZE',
     body: `  {
-    "number": __N__,
     "topic": "Diabetes",
     "type": "CLOZE",
     "question": "The client should be instructed to [1] and [2] if the blood sugar is 60 mg/dL.",
@@ -106,7 +102,6 @@ export const JSON_EXAMPLES: JsonExample[] = [
   {
     type: 'BOWTIE',
     body: `  {
-    "number": __N__,
     "topic": "Newborn",
     "type": "BOWTIE",
     "question": "Drag one condition and two interventions.",
@@ -126,7 +121,6 @@ export const JSON_EXAMPLES: JsonExample[] = [
   {
     type: 'RANKING',
     body: `  {
-    "number": __N__,
     "topic": "Urinary",
     "type": "RANKING",
     "question": "Rank from highest risk to lowest risk for UTI.",
@@ -138,7 +132,6 @@ export const JSON_EXAMPLES: JsonExample[] = [
   {
     type: 'HIGHLIGHT',
     body: `  {
-    "number": __N__,
     "topic": "Assessment",
     "type": "HIGHLIGHT",
     "question": "Click to highlight the findings that require follow-up.",
@@ -152,7 +145,6 @@ export const JSON_EXAMPLES: JsonExample[] = [
   {
     type: 'HOTSPOT',
     body: `  {
-    "number": __N__,
     "topic": "Pediatrics",
     "type": "HOTSPOT",
     "question": "Click the location where the nurse should pull the pinna.",
@@ -172,7 +164,6 @@ export const JSON_EXAMPLES: JsonExample[] = [
   {
     type: 'MCQ',
     body: `  {
-    "number": __N__,
     "topic": "Hypoglycemia Management",
     "type": "MCQ",
     "question": "The client is alert and able to swallow. Which action should the nurse take first?",
@@ -212,13 +203,12 @@ export const JSON_EXAMPLES: JsonExample[] = [
 ];
 
 /**
- * Assembles the example array for the chosen types, renumbering from 1.
+ * Assembles the example array for the chosen types.
  *
  * An empty selection means "All" — the same output as before this was filterable,
  * so the default view is unchanged.
  */
 export function buildExampleJson(selected: ReadonlySet<string>): string {
   const chosen = selected.size ? JSON_EXAMPLES.filter((e) => selected.has(e.type)) : JSON_EXAMPLES;
-  const bodies = chosen.map((e, index) => e.body.replace('__N__', String(index + 1)));
-  return `[\n${bodies.join(',\n')}\n]`;
+  return `[\n${chosen.map((e) => e.body).join(',\n')}\n]`;
 }

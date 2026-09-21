@@ -1,0 +1,102 @@
+@if (loadError()) {
+  <div class="empty-state">
+    <p>{{ loadError() }}</p>
+    <button class="btn btn-primary" (click)="goBack()">Back</button>
+  </div>
+} @else if (loading()) {
+  <p class="empty-state">Loading bank...</p>
+} @else {
+  <div class="edit-header">
+    <button class="btn btn-secondary btn-sm" (click)="goBack()">← Bank</button>
+    <h1 class="page-title">Create exam from {{ bank()?.title }}</h1>
+  </div>
+
+  <div class="card upload-card">
+    <label class="field-label" for="from-bank-title">Exam title</label>
+    <input
+      id="from-bank-title"
+      type="text"
+      [ngModel]="title()"
+      (ngModelChange)="title.set($event)"
+    />
+
+    <label class="field-label" for="from-bank-course">Course</label>
+    <select
+      id="from-bank-course"
+      [ngModel]="selectedCourseId()"
+      (ngModelChange)="selectedCourseId.set($event)"
+    >
+      <option value="">No course</option>
+      @for (course of courses(); track course.id) {
+        <option [value]="course.id">{{ course.name }}</option>
+      }
+    </select>
+
+    <label class="field-label" for="from-bank-time">Time limit (minutes)</label>
+    <input
+      id="from-bank-time"
+      type="number"
+      min="1"
+      placeholder="No limit"
+      [ngModel]="timeLimitMinutes()"
+      (ngModelChange)="timeLimitMinutes.set($event || null)"
+    />
+
+    <label class="field-label" for="from-bank-pass">Pass grade (%)</label>
+    <input
+      id="from-bank-pass"
+      type="number"
+      min="1"
+      max="100"
+      [ngModel]="passGrade()"
+      (ngModelChange)="passGrade.set($event)"
+    />
+
+    <label class="field-label" for="from-bank-attempt-size"
+      >Questions per attempt
+      <span class="muted"> (of {{ poolSize() }} in the selected sections)</span></label
+    >
+    <input
+      id="from-bank-attempt-size"
+      type="number"
+      min="1"
+      [attr.max]="poolSize() || null"
+      [ngModel]="questionsPerAttempt()"
+      (ngModelChange)="questionsPerAttempt.set($event || null)"
+    />
+
+    <button
+      type="button"
+      class="shuffle-toggle"
+      role="switch"
+      [attr.aria-checked]="shuffle()"
+      (click)="shuffle.set(!shuffle())"
+    >
+      {{ shuffle() ? 'Shuffle on — questions and choices' : 'Shuffle off' }}
+    </button>
+
+    <h2 class="settings-title">Section mix</h2>
+    <p class="muted">Percentages split the exam across sections. They do not need to sum to 100.</p>
+    @for (row of preview(); track row.id) {
+      <label class="share-row">
+        <span>{{ row.name }}</span>
+        <input
+          type="number"
+          min="0"
+          max="100"
+          [ngModel]="row.percent"
+          (ngModelChange)="setPercent(row.id, $event)"
+        />
+        <span class="muted">{{ row.n }} of {{ row.size }}</span>
+      </label>
+    }
+    <p class="muted">Students sit {{ totalDraw() }} questions per attempt.</p>
+
+    @if (error()) {
+      <p class="form-error">{{ error() }}</p>
+    }
+    <button class="btn btn-primary" (click)="submit()" [disabled]="submitting()">
+      {{ submitting() ? 'Creating...' : 'Create exam' }}
+    </button>
+  </div>
+}

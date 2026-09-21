@@ -1,11 +1,12 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { ExamService, ExamSummary, Course } from '../../services/exam.service';
+import { AuthService } from '../../services/auth.service';
+import { ExamService, ExamSummary, Course, KindCount } from '../../services/exam.service';
 
 @Component({
   selector: 'app-exams',
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   templateUrl: './exams.html',
   styleUrl: './exams.scss',
 })
@@ -14,14 +15,10 @@ export class ExamsPage implements OnInit {
   courses = signal<Course[]>([]);
   selectedCourseId = signal<string>('');
   titleDrafts = signal<Record<string, string>>({});
-  timeLimitDrafts = signal<Record<string, number | null>>({});
-  questionCounts = signal<Record<string, number>>({});
   loadingRename = signal<Record<string, boolean>>({});
   renameError = signal<Record<string, string>>({});
-  loadingTimeLimit = signal<Record<string, boolean>>({});
-  timeLimitError = signal<Record<string, string>>({});
   menuOpen = signal<string | null>(null);
-  editMode = signal<Record<string, 'rename' | 'count' | 'time-limit' | null>>({});
+  editMode = signal<Record<string, 'rename' | null>>({});
   searchQuery = signal('');
   loading = signal(true);
   loadError = signal('');
@@ -43,12 +40,46 @@ export class ExamsPage implements OnInit {
 
   constructor(
     private examService: ExamService,
+    private auth: AuthService,
     private router: Router,
   ) {}
 
   ngOnInit(): void {
     this.loadCourses();
     this.load();
+  }
+
+  isInstructor(): boolean {
+    return this.auth.isInstructor();
+  }
+
+  /** Students only get the ⋮ menu on exams they own; instructor-shared ones are take-only. */
+  showMenu(exam: ExamSummary): boolean {
+    return exam.is_owner;
+  }
+
+  kindCounts(exam: ExamSummary): KindCount[] {
+    return exam.kind_counts?.length
+      ? exam.kind_counts
+      : [
+          ...(exam.mcq_count ? [{ kind: 'MCQ', count: exam.mcq_count }] : []),
+          ...(exam.sata_count ? [{ kind: 'SATA', count: exam.sata_count }] : []),
+          ...(exam.fib_count ? [{ kind: 'FIB', count: exam.fib_count }] : []),
+          ...(exam.other_count ? [{ kind: 'Other', count: exam.other_count }] : []),
+        ];
+  }
+
+  /** How many questions a student actually sits, given the exam's attempt size. */
+  attemptSize(exam: ExamSummary): number {
+    if (exam.questions_per_attempt == null) return exam.total_questions;
+    return Math.max(1, Math.min(exam.total_questions, exam.questions_per_attempt));
+  }
+
+  chipTone(kind: string): 'mcq' | 'sata' | 'fib' | 'other' {
+    if (kind === 'MCQ') return 'mcq';
+    if (kind === 'SATA') return 'sata';
+    if (kind === 'FIB') return 'fib';
+    return 'other';
   }
 
   loadCourses(): void {
@@ -62,16 +93,10 @@ export class ExamsPage implements OnInit {
       next: (data) => {
         this.exams.set(data);
         const titleDrafts: Record<string, string> = {};
-        const limitDrafts: Record<string, number | null> = {};
-        const counts: Record<string, number> = {};
         for (const exam of data) {
           titleDrafts[exam.id] = exam.title;
-          limitDrafts[exam.id] = exam.time_limit_minutes;
-          counts[exam.id] = counts[exam.id] ?? exam.total_questions;
         }
         this.titleDrafts.set(titleDrafts);
-        this.timeLimitDrafts.set(limitDrafts);
-        this.questionCounts.set(counts);
         this.loading.set(false);
       },
       error: (err) => {
@@ -87,15 +112,7 @@ export class ExamsPage implements OnInit {
 
   start(exam: ExamSummary, mode: 'exam' | 'practice'): void {
     this.menuOpen.set(null);
-    if (mode === 'exam') {
-      // A graded run is always the whole paper — the server ignores any subset,
-      // because choosing one let a student be scored over only what they knew.
-      this.router.navigate(['/exam', exam.id], { queryParams: { mode } });
-      return;
-    }
-    const selected = this.questionCounts()[exam.id] ?? exam.total_questions;
-    const count = Math.max(1, Math.min(exam.total_questions, Math.floor(selected)));
-    this.router.navigate(['/exam', exam.id], { queryParams: { mode, count } });
+    this.router.navigate(['/exam', exam.id], { queryParams: { mode } });
   }
 
   toggleAllowPractice(exam: ExamSummary): void {
@@ -122,26 +139,30 @@ export class ExamsPage implements OnInit {
 
   editQuestions(exam: ExamSummary): void {
     this.menuOpen.set(null);
+    if (exam.bank_id) {
+      this.router.navigate(['/banks', exam.bank_id]);
+      return;
+    }
+    this.router.navigate(['/exams', exam.id, 'edit']);
+  }
+
+  editExamSettings(exam: ExamSummary): void {
+    this.menuOpen.set(null);
     this.router.navigate(['/exams', exam.id, 'edit']);
   }
 
   openFlashcards(exam: ExamSummary): void {
     this.menuOpen.set(null);
-    const selected = this.questionCounts()[exam.id] ?? exam.total_questions;
-    const count = Math.max(1, Math.min(exam.total_questions, Math.floor(selected)));
-    this.router.navigate(['/flashcards', exam.id], { queryParams: { count, shuffle: true } });
+    const count = exam.questions_per_attempt
+      ? Math.max(1, Math.min(exam.total_questions, exam.questions_per_attempt))
+      : exam.total_questions;
+    this.router.navigate(['/flashcards', exam.id], {
+      queryParams: { count, shuffle: exam.shuffle },
+    });
   }
 
   updateTitleDraft(examId: string, value: string): void {
     this.titleDrafts.set({ ...this.titleDrafts(), [examId]: value });
-  }
-
-  updateQuestionCount(exam: ExamSummary, value: string): void {
-    const parsed = Number(value);
-    const count = Number.isFinite(parsed)
-      ? Math.max(1, Math.min(exam.total_questions, Math.floor(parsed)))
-      : exam.total_questions;
-    this.questionCounts.set({ ...this.questionCounts(), [exam.id]: count });
   }
 
   saveTitle(exam: ExamSummary, event: Event): void {
@@ -160,6 +181,7 @@ export class ExamsPage implements OnInit {
       next: () => {
         this.loadingRename.set({ ...this.loadingRename(), [exam.id]: false });
         this.menuOpen.set(null);
+        this.editMode.set({ ...this.editMode(), [exam.id]: null });
         this.load();
       },
       error: (err) => {
@@ -167,36 +189,6 @@ export class ExamsPage implements OnInit {
         this.renameError.set({
           ...this.renameError(),
           [exam.id]: err?.error?.detail || 'Rename failed.',
-        });
-      },
-    });
-  }
-
-  updateTimeLimitDraft(id: string, val: number | null): void {
-    this.timeLimitDrafts.set({ ...this.timeLimitDrafts(), [id]: val });
-  }
-
-  saveTimeLimit(exam: ExamSummary, event: Event): void {
-    event.stopPropagation();
-    let limit = this.timeLimitDrafts()[exam.id];
-    if (limit && limit <= 0) limit = null;
-
-    if (limit === exam.time_limit_minutes) return;
-
-    this.loadingTimeLimit.set({ ...this.loadingTimeLimit(), [exam.id]: true });
-    this.timeLimitError.set({ ...this.timeLimitError(), [exam.id]: '' });
-
-    this.examService.updateTimeLimit(exam.id, limit).subscribe({
-      next: () => {
-        this.loadingTimeLimit.set({ ...this.loadingTimeLimit(), [exam.id]: false });
-        this.menuOpen.set(null);
-        this.load();
-      },
-      error: (err) => {
-        this.loadingTimeLimit.set({ ...this.loadingTimeLimit(), [exam.id]: false });
-        this.timeLimitError.set({
-          ...this.timeLimitError(),
-          [exam.id]: err?.error?.detail || 'Update failed.',
         });
       },
     });
@@ -213,27 +205,24 @@ export class ExamsPage implements OnInit {
     }
   }
 
-  pickMenuOption(examId: string, option: 'rename' | 'count' | 'time-limit'): void {
+  pickMenuOption(examId: string, option: 'rename'): void {
     this.editMode.set({ ...this.editMode(), [examId]: option });
-  }
-
-  closeMenu(): void {
-    const current = this.menuOpen();
-    if (current) {
-      this.editMode.set({ ...this.editMode(), [current]: null });
-    }
     this.menuOpen.set(null);
   }
 
-  remove(id: string, event: Event): void {
-    event.stopPropagation();
+  closeMenu(): void {
+    this.menuOpen.set(null);
+  }
+
+  remove(exam: ExamSummary): void {
+    this.menuOpen.set(null);
     if (!confirm('Delete this exam and all of its questions?')) return;
-    this.examService.deleteExam(id).subscribe({
+    this.examService.deleteExam(exam.id).subscribe({
       next: () => this.load(),
       error: (err) => {
         this.deleteError.set({
           ...this.deleteError(),
-          [id]: err?.error?.detail || 'Delete failed.',
+          [exam.id]: err?.error?.detail || 'Delete failed.',
         });
       },
     });

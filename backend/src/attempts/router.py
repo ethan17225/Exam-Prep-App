@@ -21,6 +21,7 @@ from src.attempts.schemas import (
     TopicStatOut,
 )
 from src.auth.dependencies import CurrentUserDep
+from src.banks.exceptions import EmptyBankDraw
 from src.database import SessionDep
 from src.exams import service as exams_service
 from src.exams.exceptions import ExamNotFound
@@ -60,7 +61,7 @@ async def submit_exam(exam_id: str, submission: ExamSubmission, user: CurrentUse
     responses={
         status.HTTP_403_FORBIDDEN: {"description": PracticeDisabled.DETAIL},
         status.HTTP_404_NOT_FOUND: {"description": ExamNotFound.DETAIL},
-        status.HTTP_409_CONFLICT: {"description": AttemptExpired.DETAIL},
+        status.HTTP_409_CONFLICT: {"description": f"{AttemptExpired.DETAIL}; {EmptyBankDraw.DETAIL}"},
     },
 )
 async def save_progress(payload: SaveProgressPayload, user: CurrentUserDep, db: SessionDep):
