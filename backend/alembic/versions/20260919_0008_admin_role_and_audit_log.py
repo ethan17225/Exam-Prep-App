@@ -15,8 +15,8 @@ Two things, both needed before the platform surface can work at all:
 native Postgres ENUM would have needed an ALTER TYPE here, which cannot run
 inside a transaction and which autogenerate does not model.
 
-Revision ID: 0004
-Revises: 0003
+Revision ID: 0008
+Revises: 0007
 Create Date: 2026-09-19
 """
 
@@ -27,8 +27,8 @@ import sqlalchemy as sa
 from alembic import op
 from src.identifiers import ID_LENGTH
 
-revision: str = "0004"
-down_revision: str | None = "0003"
+revision: str = "0008"
+down_revision: str | None = "0007"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
