@@ -46,7 +46,10 @@
 .user-menu {
   position: absolute;
   top: calc(100% + 0.5rem);
-  left: 0;
+  // The trigger sits on the right of the bar; opening left keeps the popover
+  // on screen instead of overflowing past the viewport edge.
+  right: 0;
+  left: auto;
   z-index: 300;
   min-width: 200px;
   padding: 0.35rem;
@@ -114,6 +117,7 @@
   .user-menu {
     top: auto;
     bottom: calc(100% + 0.4rem);
-    left: 0.4rem;
+    right: 0.4rem;
+    left: auto;
   }
 }

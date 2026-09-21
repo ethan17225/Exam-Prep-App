@@ -2,6 +2,8 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
+import { UserRole } from './auth.service';
+
 /** Structured options for MATRIX questions: a grid of rows x columns. */
 export interface MatrixOptions {
   rows: string[];
@@ -653,6 +655,218 @@ export interface SaveProgressPayload {
   current_page: number;
 }
 
+// ── Platform administration ─────────────────────────────────────
+//
+// Everything below is served from `/api/platform`, which requires the admin
+// role exactly — `/api/admin` is the instructor surface and accepts either staff
+// role. The two prefixes are not interchangeable.
+
+/** Shared page envelope for the admin listing endpoints. */
+export interface Paged<T> {
+  items: T[];
+  /** Matches the current filter, not the table — tells the page if more exist. */
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** One account as the Users table lists it. Counts are aggregates, not columns. */
+export interface AdminUser {
+  id: string;
+  email: string;
+  role: UserRole;
+  /** Null until onboarding sets it, which also flags a half-finished sign-up. */
+  display_name: string | null;
+  avatar: string | null;
+  /** Staff only, and a credential: holding it enrols students under that account. */
+  invite_code: string | null;
+  instructor_id: string | null;
+  instructor_name: string | null;
+  /** Size of this account's own roster. Always 0 for a student. */
+  student_count: number;
+  attempts: number;
+  in_progress_count: number;
+  created_at: string;
+}
+
+export interface AdminUserRollup {
+  attempts: number;
+  exam_attempts: number;
+  practice_attempts: number;
+  average_score: number;
+  best_score: number;
+  pass_rate: number;
+  total_seconds: number;
+  last_attempt_at: string | null;
+}
+
+export interface AdminUserDetail {
+  user: AdminUser;
+  rollup: AdminUserRollup;
+  owned_exams: number;
+  owned_courses: number;
+  /** Populated for staff only: the accounts enrolled with this one. */
+  students: AdminUser[];
+  recent_attempts: StudentAttempt[];
+}
+
+export interface AdminUserCreate {
+  email: string;
+  password: string;
+  role: UserRole;
+  display_name?: string | null;
+  /** Required for a student, ignored for staff. */
+  instructor_id?: string | null;
+}
+
+/** Partial update. Omit a field to leave it alone. */
+export interface AdminUserUpdate {
+  role?: UserRole;
+  display_name?: string;
+  instructor_id?: string | null;
+}
+
+/** A staff member with their class aggregates and enrolment code. */
+export interface AdminInstructor {
+  instructor_id: string;
+  display_name: string | null;
+  email: string;
+  role: UserRole;
+  invite_code: string | null;
+  students: number;
+  attempts: number;
+  average_score: number;
+  pass_rate: number;
+  last_attempt_at: string | null;
+}
+
+export interface AdminExam {
+  id: string;
+  title: string;
+  owner_id: string;
+  owner_email: string | null;
+  owner_name: string | null;
+  course_name: string | null;
+  is_shared: boolean;
+  allow_practice: boolean;
+  pass_grade: number;
+  time_limit_minutes: number | null;
+  total_questions: number;
+  created_at: string;
+}
+
+export interface AdminCourse {
+  id: string;
+  name: string;
+  owner_id: string;
+  owner_email: string | null;
+  owner_name: string | null;
+  is_shared: boolean;
+  created_at: string;
+}
+
+/** Partial update for an exam or a course. Omit a field to leave it alone. */
+export interface AdminContentUpdate {
+  is_shared?: boolean;
+  owner_id?: string;
+}
+
+export interface AuditEntry {
+  id: string;
+  /** Null once the acting admin's account is deleted; the email survives. */
+  actor_id: string | null;
+  actor_email: string;
+  action: string;
+  target_type: string;
+  target_id: string | null;
+  target_label: string;
+  detail: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface PlatformOverview {
+  user_count: number;
+  student_count: number;
+  instructor_count: number;
+  admin_count: number;
+  /** Registered but never named, so every sign-in returns them to onboarding. */
+  pending_onboarding: number;
+  course_count: number;
+  exam_count: number;
+  attempts: number;
+  recent_attempts: number;
+  live_now: number;
+  average_score: number;
+  pass_rate: number;
+  total_seconds: number;
+  attempts_per_day: DailyPoint[];
+  /** Ten 10-point score bands, low to high. Always exactly ten entries. */
+  score_buckets: number[];
+  passed_count: number;
+  failed_count: number;
+  instructor_rollups: AdminInstructor[];
+  topic_stats: TopicStat[];
+}
+
+export interface SystemCounts {
+  users: number;
+  courses: number;
+  exams: number;
+  questions: number;
+  attempts: number;
+  in_progress: number;
+  audit_entries: number;
+}
+
+export interface StorageStat {
+  files: number;
+  bytes: number;
+}
+
+/** `available` is false when ./backups is not mounted into the API container. */
+export interface BackupInfo {
+  available: boolean;
+  files: number;
+  bytes: number;
+  latest_name: string | null;
+  latest_bytes: number | null;
+  latest_at: string | null;
+}
+
+export interface SystemInfo {
+  environment: string;
+  api_docs_enabled: boolean;
+  log_level: string;
+  postgres_version: string;
+  database_bytes: number;
+  counts: SystemCounts;
+  uploads: StorageStat;
+  documents: StorageStat;
+  backups: BackupInfo;
+}
+
+/** Human-readable byte size: "4.2 MB", "812 kB", "0 B". */
+export function formatBytes(bytes: number): string {
+  if (bytes <= 0) return '0 B';
+  const units = ['B', 'kB', 'MB', 'GB', 'TB'];
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / 1024 ** exponent;
+  // Whole bytes never need a decimal; everything else reads better with one.
+  return `${exponent === 0 ? value : value.toFixed(1)} ${units[exponent]}`;
+}
+
+/** "user.role_changed" -> "Role changed". Keeps the log readable without a map. */
+export function formatAuditAction(action: string): string {
+  const verb = action.split('.').slice(1).join('.') || action;
+  const words = verb.replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** Title-cased role, for badges and pickers. */
+export function formatRole(role: UserRole): string {
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
 @Injectable({ providedIn: 'root' })
 export class ExamService {
   private base = '/api';
@@ -774,6 +988,19 @@ export class ExamService {
     return this.http.get<AdminDashboardItem[]>(`${this.base}/admin/dashboard`);
   }
 
+  /**
+   * Clear somebody else's open attempt. Students cannot discard a graded attempt
+   * of their own, so without this an abandoned one locks them out of that exam.
+   *
+   * Two routes do the same thing and the caller's role decides which: the
+   * platform one writes an audit entry, the instructor one does not. Prefer the
+   * audited path whenever the caller can use it — see `resetLiveAttempt` on the
+   * Tracking page, which is the only caller of either.
+   */
+  resetStudentAttempt(recordId: string): Observable<{ deleted: boolean }> {
+    return this.http.delete<{ deleted: boolean }>(`${this.base}/admin/in-progress/${recordId}`);
+  }
+
   // ── Instructor analytics ─────────────────────────────────────
   //
   // All three are instructor-only and scoped server-side to the caller's own
@@ -789,6 +1016,127 @@ export class ExamService {
 
   getStudentDetail(studentId: string): Observable<StudentDetail> {
     return this.http.get<StudentDetail>(`${this.base}/admin/students/${studentId}`);
+  }
+
+  // ── Platform administration ──────────────────────────────────
+  //
+  // Admin-only, and deployment-wide rather than scoped to one instructor's
+  // students. Note the prefix: `/api/platform`, not `/api/admin`.
+
+  getPlatformOverview(): Observable<PlatformOverview> {
+    return this.http.get<PlatformOverview>(`${this.base}/platform/overview`);
+  }
+
+  listAdminUsers(
+    query: string,
+    role: UserRole | '',
+    limit: number,
+    offset: number,
+  ): Observable<Paged<AdminUser>> {
+    let params = new HttpParams().set('limit', limit).set('offset', offset);
+    if (query) params = params.set('q', query);
+    if (role) params = params.set('role', role);
+    return this.http.get<Paged<AdminUser>>(`${this.base}/platform/users`, { params });
+  }
+
+  getAdminUser(userId: string): Observable<AdminUserDetail> {
+    return this.http.get<AdminUserDetail>(`${this.base}/platform/users/${userId}`);
+  }
+
+  createAdminUser(payload: AdminUserCreate): Observable<AdminUser> {
+    return this.http.post<AdminUser>(`${this.base}/platform/users`, payload);
+  }
+
+  updateAdminUser(userId: string, patch: AdminUserUpdate): Observable<AdminUser> {
+    return this.http.patch<AdminUser>(`${this.base}/platform/users/${userId}`, patch);
+  }
+
+  resetUserPassword(userId: string, newPassword: string): Observable<{ revoked: boolean }> {
+    return this.http.post<{ revoked: boolean }>(`${this.base}/platform/users/${userId}/password`, {
+      new_password: newPassword,
+    });
+  }
+
+  revokeUserSessions(userId: string): Observable<{ revoked: boolean }> {
+    return this.http.post<{ revoked: boolean }>(
+      `${this.base}/platform/users/${userId}/revoke-sessions`,
+      {},
+    );
+  }
+
+  deleteAdminUser(userId: string): Observable<{ deleted: boolean }> {
+    return this.http.delete<{ deleted: boolean }>(`${this.base}/platform/users/${userId}`);
+  }
+
+  listAdminInstructors(): Observable<AdminInstructor[]> {
+    return this.http.get<AdminInstructor[]>(`${this.base}/platform/instructors`);
+  }
+
+  rotateInviteCode(userId: string): Observable<{ invite_code: string }> {
+    return this.http.post<{ invite_code: string }>(
+      `${this.base}/platform/instructors/${userId}/rotate-code`,
+      {},
+    );
+  }
+
+  reassignStudents(fromId: string, toInstructorId: string): Observable<{ moved: number }> {
+    return this.http.post<{ moved: number }>(
+      `${this.base}/platform/instructors/${fromId}/reassign-students`,
+      { to_instructor_id: toInstructorId },
+    );
+  }
+
+  listAdminExams(
+    query: string,
+    shared: boolean | null,
+    limit: number,
+    offset: number,
+  ): Observable<Paged<AdminExam>> {
+    let params = new HttpParams().set('limit', limit).set('offset', offset);
+    if (query) params = params.set('q', query);
+    if (shared !== null) params = params.set('shared', shared);
+    return this.http.get<Paged<AdminExam>>(`${this.base}/platform/exams`, { params });
+  }
+
+  updateAdminExam(examId: string, patch: AdminContentUpdate): Observable<{ updated: boolean }> {
+    return this.http.patch<{ updated: boolean }>(`${this.base}/platform/exams/${examId}`, patch);
+  }
+
+  deleteAdminExam(examId: string): Observable<{ deleted: boolean }> {
+    return this.http.delete<{ deleted: boolean }>(`${this.base}/platform/exams/${examId}`);
+  }
+
+  listAdminCourses(query: string, limit: number, offset: number): Observable<Paged<AdminCourse>> {
+    let params = new HttpParams().set('limit', limit).set('offset', offset);
+    if (query) params = params.set('q', query);
+    return this.http.get<Paged<AdminCourse>>(`${this.base}/platform/courses`, { params });
+  }
+
+  updateAdminCourse(courseId: string, patch: AdminContentUpdate): Observable<{ updated: boolean }> {
+    return this.http.patch<{ updated: boolean }>(
+      `${this.base}/platform/courses/${courseId}`,
+      patch,
+    );
+  }
+
+  deleteAdminCourse(courseId: string): Observable<{ deleted: boolean }> {
+    return this.http.delete<{ deleted: boolean }>(`${this.base}/platform/courses/${courseId}`);
+  }
+
+  /** The audited twin of `resetStudentAttempt`. */
+  resetPlatformAttempt(recordId: string): Observable<{ deleted: boolean }> {
+    return this.http.delete<{ deleted: boolean }>(`${this.base}/platform/in-progress/${recordId}`);
+  }
+
+  listAudit(action: string, limit: number, offset: number): Observable<Paged<AuditEntry>> {
+    let params = new HttpParams().set('limit', limit).set('offset', offset);
+    // Prefix match server-side, so "user." selects every account action.
+    if (action) params = params.set('action', action);
+    return this.http.get<Paged<AuditEntry>>(`${this.base}/platform/audit`, { params });
+  }
+
+  getSystemInfo(): Observable<SystemInfo> {
+    return this.http.get<SystemInfo>(`${this.base}/platform/system`);
   }
 
   // ── Question editing ─────────────────────────────────────────

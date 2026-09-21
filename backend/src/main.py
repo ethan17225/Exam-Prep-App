@@ -22,6 +22,7 @@ from src.documents.constants import DOCS_URL_PREFIX
 from src.documents.router import router as documents_router
 from src.exams.router import questions_router
 from src.exams.router import router as exams_router
+from src.platform_admin.router import router as platform_router
 from src.storage import UPLOADS_URL_PREFIX, storage_settings
 
 logging.basicConfig(
@@ -119,4 +120,6 @@ app.include_router(questions_router)
 app.include_router(submit_router)
 app.include_router(progress_router)
 app.include_router(history_router)
+# /api/admin is the instructor read view; /api/platform is the admin write view.
 app.include_router(admin_router)
+app.include_router(platform_router)

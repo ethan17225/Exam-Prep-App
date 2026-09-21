@@ -16,13 +16,15 @@ from src.attempts.router import history_router, progress_router
 from src.attempts.schemas import HistorySummaryOut
 from src.auth import service as auth_service
 from src.auth.config import auth_settings
-from src.auth.constants import UserRole
-from src.auth.exceptions import InvalidInviteCode
+from src.auth.constants import REGISTRABLE_ROLES, STAFF_ROLES, UserRole
+from src.auth.dependencies import require_instructor
+from src.auth.exceptions import InstructorRequired, InvalidInviteCode, RegistrationClosed
 from src.auth.schemas import RegisterIn
 from src.constants import MAX_QUESTIONS_PER_EXAM
 from src.exams.exceptions import EmptyTitle, ExamNotFound, QuestionNotFound
 from src.grading.service import grade_question
 from src.identifiers import ID_LENGTH, new_id
+from src.platform_admin.constants import AUDIT_AREAS, AuditAction
 from src.storage import ALLOWED_IMAGE_EXTENSIONS
 
 SRC = Path(__file__).resolve().parent.parent / "src"
@@ -37,6 +39,14 @@ ANONYMOUS_GET_PATHS = [
     "/api/admin/overview",
     "/api/admin/students",
     "/api/admin/students/u1",
+    "/api/platform/overview",
+    "/api/platform/users",
+    "/api/platform/users/u1",
+    "/api/platform/instructors",
+    "/api/platform/exams",
+    "/api/platform/courses",
+    "/api/platform/audit",
+    "/api/platform/system",
     "/api/documents",
     "/api/auth/me",
     # StaticFiles mounts: dependencies do not apply to them, so these prove the
@@ -68,6 +78,120 @@ async def test_garbage_token_is_rejected(anon: AsyncClient):
 )
 async def test_student_is_blocked_from_instructor_routes(as_student: AsyncClient, path: str):
     assert (await as_student.get(path)).status_code == 403
+
+
+# ── The admin gate ─────────────────────────────────────────────────
+
+PLATFORM_GET_PATHS = [
+    "/api/platform/overview",
+    "/api/platform/users",
+    "/api/platform/users/u9",
+    "/api/platform/instructors",
+    "/api/platform/exams",
+    "/api/platform/courses",
+    "/api/platform/audit",
+    "/api/platform/system",
+]
+
+PLATFORM_MUTATIONS = [
+    ("post", "/api/platform/users", {"email": "a@b.co", "password": "password1", "role": "admin"}),
+    ("patch", "/api/platform/users/u9", {"role": "admin"}),
+    ("post", "/api/platform/users/u9/password", {"new_password": "password1"}),
+    ("post", "/api/platform/users/u9/revoke-sessions", {}),
+    ("delete", "/api/platform/users/u9", None),
+    ("post", "/api/platform/instructors/u9/rotate-code", {}),
+    ("post", "/api/platform/instructors/u9/reassign-students", {"to_instructor_id": "u2"}),
+    ("patch", "/api/platform/exams/e9", {"is_shared": False}),
+    ("delete", "/api/platform/exams/e9", None),
+    ("patch", "/api/platform/courses/c9", {"is_shared": False}),
+    ("delete", "/api/platform/courses/c9", None),
+    ("delete", "/api/platform/in-progress/p9", None),
+]
+
+
+@pytest.mark.parametrize("path", PLATFORM_GET_PATHS)
+async def test_student_is_blocked_from_platform_routes(as_student: AsyncClient, path: str):
+    assert (await as_student.get(path)).status_code == 403
+
+
+@pytest.mark.parametrize("path", PLATFORM_GET_PATHS)
+async def test_instructor_is_blocked_from_platform_routes(as_instructor: AsyncClient, path: str):
+    # Instructors teach; they do not administer the deployment. These routes
+    # can change any account's role, so the gate is exact equality.
+    assert (await as_instructor.get(path)).status_code == 403
+
+
+@pytest.mark.parametrize("method,path,payload", PLATFORM_MUTATIONS)
+async def test_instructor_cannot_call_platform_mutations(
+    as_instructor: AsyncClient, method: str, path: str, payload: dict | None
+):
+    kwargs = {"json": payload} if payload is not None else {}
+    assert (await getattr(as_instructor, method)(path, **kwargs)).status_code == 403
+
+
+@pytest.mark.parametrize("method,path,payload", PLATFORM_MUTATIONS)
+async def test_anonymous_cannot_call_platform_mutations(
+    anon: AsyncClient, method: str, path: str, payload: dict | None
+):
+    kwargs = {"json": payload} if payload is not None else {}
+    assert (await getattr(anon, method)(path, **kwargs)).status_code == 401
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/api/admin/dashboard", "/api/admin/overview", "/api/admin/students"],
+)
+async def test_admin_is_blocked_from_instructor_routes(as_admin: AsyncClient, path: str):
+    # Admin is a third role, not a teacher. The class pages stay behind the
+    # instructor gate; the platform console is the admin's equivalent.
+    assert (await as_admin.get(path)).status_code == 403
+
+
+async def test_instructor_gate_accepts_the_string_the_column_stores(instructor):
+    # User.role is String(10). After Postgres the value is the str "instructor",
+    # not the UserRole member. The fixtures construct users with the enum, so
+    # they cannot catch an `is` comparison — and that is exactly what 403'd a
+    # student who had just been promoted.
+    instructor.role = "instructor"
+    assert await require_instructor(instructor) is instructor
+
+    instructor.role = "student"
+    with pytest.raises(InstructorRequired):
+        await require_instructor(instructor)
+
+
+def test_every_audit_action_falls_under_a_filterable_area():
+    # The audit page filters by prefix ("user." selects every account action) and
+    # offers one chip per area. An action in a sixth area would be reachable only
+    # under "All", so adding one has to mean adding its chip too.
+    for action in AuditAction:
+        area, _, verb = str(action).partition(".")
+        assert verb, f"{action} is missing its <area>.<verb> shape"
+        assert area in AUDIT_AREAS, f"{action} needs '{area}' in AUDIT_AREAS and a chip to match"
+
+
+def test_the_platform_reset_route_goes_through_the_audited_service():
+    # This route duplicates DELETE /api/admin/in-progress/{id}, and the audit
+    # entry is the entire reason it exists. Reaching past its own service to
+    # `reset_attempt_unscoped` would delete the same row while logging nothing,
+    # leaving the two routes indistinguishable.
+    source = (SRC / "platform_admin" / "router.py").read_text(encoding="utf-8")
+    assert "reset_attempt_unscoped" not in source
+    assert "service.reset_attempt(record_id, user, db)" in source
+
+    # The service reads the row before deleting it, so the entry can name the
+    # student and exam instead of an id that no longer resolves to anything.
+    service_source = (SRC / "platform_admin" / "service.py").read_text(encoding="utf-8")
+    assert "AuditAction.ATTEMPT_RESET" in service_source
+
+
+async def test_admin_is_not_staff():
+    # STAFF_ROLES is who teaches: shared content, enrolment codes, a class page.
+    # An admin does none of those, so putting them in here would mint them a
+    # code and list them on every instructor picker.
+    assert UserRole.ADMIN not in STAFF_ROLES
+    assert UserRole.INSTRUCTOR in STAFF_ROLES
+    assert UserRole.STUDENT not in STAFF_ROLES
 
 
 async def test_anonymous_profile_mutations_are_rejected(anon: AsyncClient):
@@ -213,6 +337,32 @@ def test_registration_defaults_to_student():
 async def test_unknown_registration_role_is_422(anon: AsyncClient, role: str):
     body = {"email": "a@b.co", "password": "password1", "invite_code": "x", "role": role}
     assert (await anon.post("/api/auth/register", json=body)).status_code == 422
+
+
+def test_admin_is_a_real_role_but_not_a_registrable_one():
+    # "admin" is 422 above because of RegisterIn's validator, NOT because the role
+    # does not exist — it does, and the distinction is the whole vulnerability.
+    # `register`'s student branch stores whatever role it is handed, so with admin
+    # left registrable, anyone holding an instructor's enrolment code could sign
+    # themselves up as one.
+    assert UserRole.ADMIN in UserRole
+    assert UserRole.ADMIN not in REGISTRABLE_ROLES
+    assert set(REGISTRABLE_ROLES) == {UserRole.STUDENT, UserRole.INSTRUCTOR}
+
+
+async def test_register_service_refuses_an_admin_role_on_its_own(instructor):
+    # Defence in depth: bypass the schema entirely and call the service with an
+    # admin role and a valid enrolment code. It must refuse before any insert,
+    # because this is the escalation path rather than a validation slip.
+    payload = RegisterIn(email="x@example.com", password="password1", invite_code=instructor.invite_code)
+    # model_construct skips validation, standing in for a future caller that
+    # reaches the service without going through RegisterIn.
+    escalated = payload.model_copy(update={"role": UserRole.ADMIN})
+    db = _FakeSession([instructor, None])
+
+    with pytest.raises(RegistrationClosed):
+        await auth_service.register(escalated, db)
+    assert db.added == []
 
 
 async def test_wrong_instructor_code_cannot_mint_an_instructor(anon: AsyncClient):

@@ -6,7 +6,7 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from src.auth.constants import UserRole
+from src.auth.constants import STAFF_ROLES
 from src.auth.models import User
 from src.authz import visible
 from src.courses import service as courses_service
@@ -186,11 +186,11 @@ async def create(payload: ExamCreate, user: User, db: AsyncSession) -> dict:
         Exam(
             id=exam_id,
             owner_id=user.id,
-            is_shared=user.role == UserRole.INSTRUCTOR,
+            is_shared=user.role in STAFF_ROLES,
             # Instructor exams default to assessment-only; a student's own exams
             # are study material. Either owner can flip it afterwards.
             allow_practice=(
-                payload.allow_practice if payload.allow_practice is not None else user.role != UserRole.INSTRUCTOR
+                payload.allow_practice if payload.allow_practice is not None else user.role not in STAFF_ROLES
             ),
             title=title,
             course_id=payload.course_id,
@@ -279,10 +279,16 @@ async def set_time_limit(exam_id: str, minutes: int | None, user: User, db: Asyn
 
 async def delete_exam(exam_id: str, user: User, db: AsyncSession) -> None:
     exam = await get_owned_exam_or_404(exam_id, user, db)
+    await _delete(exam, db)
+
+
+async def _delete(exam: Exam, db: AsyncSession) -> None:
+    """Shared by the owner's delete and the admin's, so the image cleanup cannot
+    drift between them."""
     # Read the paths before the cascade removes the rows, but only unlink after
     # the commit succeeds — otherwise a failed commit leaves an exam whose
     # images are already gone.
-    images = await _image_urls_for_exam(exam_id, db)
+    images = await _image_urls_for_exam(exam.id, db)
     await db.delete(exam)
     await db.commit()
     await run_in_threadpool(remove_upload_files, images)
@@ -291,6 +297,109 @@ async def delete_exam(exam_id: str, user: User, db: AsyncSession) -> None:
 async def _image_urls_for_exam(exam_id: str, db: AsyncSession) -> list[str]:
     stmt = select(Question.image).where(Question.exam_id == exam_id)
     # Single column, so .scalars() is correct here.
+    return [url for url in (await db.execute(stmt)).scalars().all() if url]
+
+
+# ── Administration ────────────────────────────────────────────────
+#
+# Cross-owner reads and writes, named `_unscoped` like their counterparts in
+# `attempts.service`. Their only callers sit behind the admin gate in
+# `platform_admin.router`; nothing here applies `visible()` or an ownership
+# filter, which is exactly why the suffix is in the name.
+
+
+def _admin_filters(query: str | None, owner_id: str | None, shared: bool | None) -> list:
+    filters = []
+    if owner_id:
+        filters.append(Exam.owner_id == owner_id)
+    if shared is not None:
+        filters.append(Exam.is_shared.is_(shared))
+    if query and (needle := query.strip().lower()):
+        filters.append(func.lower(Exam.title).like(f"%{needle}%"))
+    return filters
+
+
+async def list_all_unscoped(
+    db: AsyncSession,
+    query: str | None = None,
+    owner_id: str | None = None,
+    shared: bool | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[Exam]:
+    stmt = (
+        select(Exam)
+        .options(joinedload(Exam.course))
+        .where(*_admin_filters(query, owner_id, shared))
+        .order_by(Exam.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    return list((await db.execute(stmt)).scalars().unique().all())
+
+
+async def count_all_unscoped(
+    db: AsyncSession, query: str | None = None, owner_id: str | None = None, shared: bool | None = None
+) -> int:
+    stmt = select(func.count(Exam.id)).where(*_admin_filters(query, owner_id, shared))
+    return await db.scalar(stmt) or 0
+
+
+async def count_all(db: AsyncSession) -> int:
+    return await db.scalar(select(func.count(Exam.id))) or 0
+
+
+async def question_counts_by_exam_ids(exam_ids, db: AsyncSession) -> dict[str, int]:
+    """Just the counts, for a listing that shows size but not composition.
+
+    `_type_count_rows` pulls every question's `options` JSONB to classify them,
+    which is a lot of payload when the page only prints a number.
+    """
+    ids = list(exam_ids)
+    if not ids:
+        return {}
+    stmt = select(Question.exam_id, func.count(Question.id)).where(Question.exam_id.in_(ids)).group_by(Question.exam_id)
+    return dict((await db.execute(stmt)).all())
+
+
+async def get_or_404_unscoped(exam_id: str, db: AsyncSession) -> Exam:
+    stmt = select(Exam).options(joinedload(Exam.course)).where(Exam.id == exam_id)
+    exam = (await db.execute(stmt)).scalars().unique().one_or_none()
+    if not exam:
+        raise ExamNotFound()
+    return exam
+
+
+async def set_shared_unscoped(exam: Exam, is_shared: bool, db: AsyncSession) -> Exam:
+    """The one place `is_shared` is writable after creation, and only for an admin.
+
+    Creation freezes it from the author's role precisely so promoting a student
+    never publishes their drafts; unpublishing something already shared is the
+    moderation action that has no other route.
+    """
+    exam.is_shared = is_shared
+    await db.commit()
+    return exam
+
+
+async def transfer_owner_unscoped(exam: Exam, owner_id: str, db: AsyncSession) -> Exam:
+    exam.owner_id = owner_id
+    await db.commit()
+    return exam
+
+
+async def delete_unscoped(exam: Exam, db: AsyncSession) -> None:
+    await _delete(exam, db)
+
+
+async def image_urls_for_owner_unscoped(owner_id: str, db: AsyncSession) -> list[str]:
+    """Every question image belonging to one user's exams.
+
+    Deleting an account cascades the exam and question rows away, so the files
+    have to be collected before that happens or they are orphaned on the volume
+    with nothing left pointing at them.
+    """
+    stmt = select(Question.image).join(Exam, Question.exam_id == Exam.id).where(Exam.owner_id == owner_id)
     return [url for url in (await db.execute(stmt)).scalars().all() if url]
 
 

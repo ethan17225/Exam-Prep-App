@@ -1,0 +1,194 @@
+.page-note {
+  margin: -0.5rem 0 1rem;
+  font-size: 0.8rem;
+  color: #888;
+  line-height: 1.5;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.filter-chip {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid #e2e2e2;
+  border-radius: 999px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: #555;
+  cursor: pointer;
+
+  &:hover {
+    border-color: #111;
+    color: #111;
+  }
+
+  &.selected {
+    background: #111;
+    border-color: #111;
+    color: #fff;
+  }
+}
+
+.page-size {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #888;
+
+  select {
+    min-width: 4.5rem;
+  }
+}
+
+// ── Table ──
+.table-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.83rem;
+
+  th,
+  td {
+    padding: 0.65rem 0.75rem;
+    text-align: left;
+    vertical-align: top;
+    border: 1px solid #e8e8e8;
+  }
+
+  th {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #999;
+    white-space: nowrap;
+    background: #fafafa;
+  }
+
+  // A 3px colour rail is enough to scan a page by area without a badge per row.
+  tbody tr td:first-child {
+    border-left-width: 3px;
+    border-left-color: #ddd;
+  }
+
+  tbody tr.area-user td:first-child {
+    border-left-color: #4361ee;
+  }
+
+  tbody tr.area-instructor td:first-child {
+    border-left-color: #0a7;
+  }
+
+  tbody tr.area-content td:first-child {
+    border-left-color: #e5a00d;
+  }
+
+  tbody tr.area-danger td:first-child {
+    border-left-color: #c00;
+  }
+}
+
+.cell-when,
+.cell-actor {
+  white-space: nowrap;
+  color: #666;
+}
+
+.action-label {
+  display: block;
+  font-weight: 600;
+}
+
+.target-type {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #aaa;
+}
+
+.cell-target {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell-detail {
+  font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.72rem;
+  color: #777;
+  max-width: 18rem;
+}
+
+// ── Pager ──
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.pager-label {
+  flex: 1 1 auto;
+  font-size: 0.78rem;
+  color: #888;
+}
+
+.btn-sm {
+  flex: 0 0 auto;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.78rem;
+}
+
+@media (max-width: 640px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-bar {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  .filter-chip {
+    flex: 0 0 auto;
+    min-height: 34px;
+  }
+
+  .page-size {
+    justify-content: flex-end;
+  }
+}

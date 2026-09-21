@@ -1,0 +1,232 @@
+<h1 class="page-title">Content</h1>
+<app-admin-tabs />
+
+<div class="switch-bar">
+  <button
+    type="button"
+    class="switch"
+    [class.selected]="tab() === 'exams'"
+    (click)="switchTab('exams')"
+  >
+    Exams
+  </button>
+  <button
+    type="button"
+    class="switch"
+    [class.selected]="tab() === 'courses'"
+    (click)="switchTab('courses')"
+  >
+    Courses
+  </button>
+</div>
+
+<div class="toolbar">
+  <input
+    type="text"
+    class="toolbar-search"
+    [placeholder]="tab() === 'exams' ? 'Search exam titles...' : 'Search course names...'"
+    aria-label="Search content"
+    [ngModel]="search()"
+    (ngModelChange)="search.set($event)"
+    (keyup.enter)="applyFilters()"
+  />
+  <button type="button" class="btn btn-secondary" (click)="applyFilters()">Search</button>
+</div>
+
+@if (tab() === 'exams') {
+  <div class="filter-bar">
+    <span class="filter-label">Visibility</span>
+    <button
+      type="button"
+      class="filter-chip"
+      [class.selected]="sharedFilter() === ''"
+      (click)="setSharedFilter('')"
+    >
+      All
+    </button>
+    <button
+      type="button"
+      class="filter-chip"
+      [class.selected]="sharedFilter() === 'shared'"
+      (click)="setSharedFilter('shared')"
+    >
+      Shared
+    </button>
+    <button
+      type="button"
+      class="filter-chip"
+      [class.selected]="sharedFilter() === 'private'"
+      (click)="setSharedFilter('private')"
+    >
+      Private
+    </button>
+  </div>
+}
+
+@if (loadError()) {
+  <div class="empty-state">
+    <p>{{ loadError() }}</p>
+    <button class="btn btn-primary" (click)="load()">Retry</button>
+  </div>
+} @else if (loading()) {
+  <p class="empty-state">Loading...</p>
+} @else if (tab() === 'exams') {
+  @if (exams().length === 0) {
+    <p class="empty-state">No exams match this search.</p>
+  } @else {
+    <div class="content-list">
+      @for (e of exams(); track e.id) {
+        <div class="card content-card">
+          <div class="content-head">
+            <div class="content-identity">
+              <span class="content-title">{{ e.title }}</span>
+              <span class="content-sub">
+                {{ e.owner_name || 'Unknown owner' }} · {{ e.course_name || 'Unfiled' }} ·
+                {{ e.total_questions }} questions · pass {{ e.pass_grade }}%
+                @if (e.time_limit_minutes) {
+                  · {{ e.time_limit_minutes }} min
+                }
+              </span>
+            </div>
+            <div class="content-badges">
+              <span
+                class="badge"
+                [class.badge-shared]="e.is_shared"
+                [class.badge-private]="!e.is_shared"
+              >
+                {{ e.is_shared ? 'Shared' : 'Private' }}
+              </span>
+              @if (e.allow_practice) {
+                <span class="badge badge-practice">Practice</span>
+              }
+            </div>
+          </div>
+
+          <div class="content-actions">
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              [disabled]="rowBusy()[e.id]"
+              (click)="toggleExamShared(e)"
+            >
+              {{ e.is_shared ? 'Unpublish' : 'Publish' }}
+            </button>
+            <select
+              class="owner-select"
+              [ngModel]="''"
+              (ngModelChange)="transferExam(e, $event)"
+              [disabled]="rowBusy()[e.id]"
+              [attr.aria-label]="'Transfer ' + e.title"
+            >
+              <option value="">Transfer to...</option>
+              @for (i of instructors(); track i.instructor_id) {
+                @if (i.instructor_id !== e.owner_id) {
+                  <option [value]="i.instructor_id">{{ i.display_name || i.email }}</option>
+                }
+              }
+            </select>
+            <button
+              type="button"
+              class="btn btn-danger btn-sm"
+              [disabled]="rowBusy()[e.id]"
+              (click)="deleteExam(e)"
+            >
+              Delete
+            </button>
+            <span class="content-date">{{ formatDate(e.created_at) }}</span>
+          </div>
+
+          @if (rowError()[e.id]) {
+            <p class="row-error">{{ rowError()[e.id] }}</p>
+          }
+        </div>
+      }
+    </div>
+  }
+} @else {
+  @if (courses().length === 0) {
+    <p class="empty-state">No courses match this search.</p>
+  } @else {
+    <div class="content-list">
+      @for (c of courses(); track c.id) {
+        <div class="card content-card">
+          <div class="content-head">
+            <div class="content-identity">
+              <span class="content-title">{{ c.name }}</span>
+              <span class="content-sub">{{ c.owner_name || 'Unknown owner' }}</span>
+            </div>
+            <div class="content-badges">
+              <span
+                class="badge"
+                [class.badge-shared]="c.is_shared"
+                [class.badge-private]="!c.is_shared"
+              >
+                {{ c.is_shared ? 'Shared' : 'Private' }}
+              </span>
+            </div>
+          </div>
+
+          <div class="content-actions">
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              [disabled]="rowBusy()[c.id]"
+              (click)="toggleCourseShared(c)"
+            >
+              {{ c.is_shared ? 'Unpublish' : 'Publish' }}
+            </button>
+            <select
+              class="owner-select"
+              [ngModel]="''"
+              (ngModelChange)="transferCourse(c, $event)"
+              [disabled]="rowBusy()[c.id]"
+              [attr.aria-label]="'Transfer ' + c.name"
+            >
+              <option value="">Transfer to...</option>
+              @for (i of instructors(); track i.instructor_id) {
+                @if (i.instructor_id !== c.owner_id) {
+                  <option [value]="i.instructor_id">{{ i.display_name || i.email }}</option>
+                }
+              }
+            </select>
+            <button
+              type="button"
+              class="btn btn-danger btn-sm"
+              [disabled]="rowBusy()[c.id]"
+              (click)="deleteCourse(c)"
+            >
+              Delete
+            </button>
+            <span class="content-date">{{ formatDate(c.created_at) }}</span>
+          </div>
+
+          @if (rowError()[c.id]) {
+            <p class="row-error">{{ rowError()[c.id] }}</p>
+          }
+        </div>
+      }
+    </div>
+  }
+}
+
+@if (!loading() && !loadError() && total() > 0) {
+  <div class="pager">
+    <span class="pager-label">Showing {{ rangeStart() }}-{{ rangeEnd() }} of {{ total() }}</span>
+    <button
+      type="button"
+      class="btn btn-secondary btn-sm"
+      [disabled]="offset() === 0"
+      (click)="page(-1)"
+    >
+      Previous
+    </button>
+    <button
+      type="button"
+      class="btn btn-secondary btn-sm"
+      [disabled]="rangeEnd() >= total()"
+      (click)="page(1)"
+    >
+      Next
+    </button>
+  </div>
+}

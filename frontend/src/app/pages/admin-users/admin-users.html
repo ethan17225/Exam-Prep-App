@@ -1,0 +1,447 @@
+<h1 class="page-title">Users</h1>
+<app-admin-tabs />
+
+<div class="toolbar">
+  <input
+    type="text"
+    class="toolbar-search"
+    placeholder="Search by email or name..."
+    aria-label="Search accounts"
+    [ngModel]="search()"
+    (ngModelChange)="search.set($event)"
+    (keyup.enter)="applyFilters()"
+  />
+  <button type="button" class="btn btn-secondary" (click)="applyFilters()">Search</button>
+  <button type="button" class="btn btn-primary" (click)="toggleCreate()">
+    {{ showCreate() ? 'Cancel' : 'New account' }}
+  </button>
+</div>
+
+<div class="filter-bar">
+  <span class="filter-label">Role</span>
+  <button
+    type="button"
+    class="filter-chip"
+    [class.selected]="roleFilter() === ''"
+    (click)="setRoleFilter('')"
+  >
+    All
+  </button>
+  @for (role of roles; track role) {
+    <button
+      type="button"
+      class="filter-chip"
+      [class.selected]="roleFilter() === role"
+      (click)="setRoleFilter(role)"
+    >
+      {{ formatRole(role) }}
+    </button>
+  }
+</div>
+
+@if (showCreate()) {
+  <form class="card create-card" (ngSubmit)="create()">
+    <h2 class="create-title">New account</h2>
+    <p class="create-note">
+      No invite code needed — this is the only way to create an admin. Setting a name lets the
+      account skip onboarding.
+    </p>
+
+    <div class="create-grid">
+      <label class="field">
+        <span>Email</span>
+        <input
+          type="email"
+          required
+          autocomplete="off"
+          [ngModel]="draft().email"
+          (ngModelChange)="patchDraft({ email: $event })"
+          name="email"
+        />
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input
+          type="password"
+          required
+          minlength="8"
+          autocomplete="new-password"
+          [ngModel]="draft().password"
+          (ngModelChange)="patchDraft({ password: $event })"
+          name="password"
+        />
+      </label>
+      <label class="field">
+        <span>Name (optional)</span>
+        <input
+          type="text"
+          [ngModel]="draft().display_name"
+          (ngModelChange)="patchDraft({ display_name: $event })"
+          name="display_name"
+        />
+      </label>
+      <label class="field">
+        <span>Role</span>
+        <select [ngModel]="draft().role" (ngModelChange)="patchDraft({ role: $event })" name="role">
+          @for (role of roles; track role) {
+            <option [value]="role">{{ formatRole(role) }}</option>
+          }
+        </select>
+      </label>
+      @if (draft().role === 'student') {
+        <label class="field field-wide">
+          <span>Enrol with</span>
+          <select
+            required
+            [ngModel]="draft().instructor_id"
+            (ngModelChange)="patchDraft({ instructor_id: $event })"
+            name="instructor_id"
+          >
+            <option value="">Choose an instructor...</option>
+            @for (i of instructors(); track i.instructor_id) {
+              <option [value]="i.instructor_id">
+                {{ i.display_name || i.email }} ({{ i.students }} students)
+              </option>
+            }
+          </select>
+        </label>
+      }
+    </div>
+
+    @if (createError()) {
+      <p class="row-error">{{ createError() }}</p>
+    }
+    <button type="submit" class="btn btn-primary" [disabled]="creating()">
+      {{ creating() ? 'Creating...' : 'Create account' }}
+    </button>
+  </form>
+}
+
+@if (loadError()) {
+  <div class="empty-state">
+    <p>{{ loadError() }}</p>
+    <button class="btn btn-primary" (click)="load()">Retry</button>
+  </div>
+} @else if (loading()) {
+  <p class="empty-state">Loading...</p>
+} @else if (users().length === 0) {
+  <p class="empty-state">No accounts match this search.</p>
+} @else {
+  <div class="card table-card">
+    <div class="table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Account</th>
+            <th>Role</th>
+            <th>Students</th>
+            <th>Attempts</th>
+            <th>Open</th>
+            <th class="col-toggle"><span class="sr-only">Expand</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (u of users(); track u.id) {
+            <tr
+              class="click-row"
+              role="button"
+              tabindex="0"
+              [class.expanded]="expandedId() === u.id"
+              [attr.aria-expanded]="expandedId() === u.id"
+              (click)="toggle(u)"
+              (keydown.enter)="toggle(u)"
+            >
+              <td>
+                <div class="account-cell">
+                  <span class="user-avatar">
+                    @if (u.avatar) {
+                      <img [src]="u.avatar" alt="" />
+                    } @else {
+                      {{ initialsOf(u) }}
+                    }
+                  </span>
+                  <span class="user-identity">
+                    <span class="user-name">
+                      {{ u.display_name || 'Unnamed' }}
+                      @if (isSelf(u)) {
+                        <span class="you-tag">you</span>
+                      }
+                    </span>
+                    <span class="user-email">{{ u.email }}</span>
+                  </span>
+                </div>
+              </td>
+              <td>
+                <span
+                  class="badge"
+                  [class.badge-admin]="u.role === 'admin'"
+                  [class.badge-instructor]="u.role === 'instructor'"
+                  [class.badge-student]="u.role === 'student'"
+                  >{{ formatRole(u.role) }}</span
+                >
+                @if (!u.display_name) {
+                  <span class="badge badge-pending">onboarding</span>
+                }
+              </td>
+              <td>{{ u.role === 'student' ? '—' : u.student_count }}</td>
+              <td>{{ u.attempts }}</td>
+              <td>
+                <span [class.metric-live]="u.in_progress_count > 0">{{ u.in_progress_count }}</span>
+              </td>
+              <td class="col-toggle">{{ expandedId() === u.id ? '▲' : '▼' }}</td>
+            </tr>
+            @if (expandedId() === u.id) {
+              <tr class="detail-row" (click)="$event.stopPropagation()">
+                <td colspan="6">
+                  <div class="user-detail">
+                    @if (rowError()[u.id]) {
+                      <p class="row-error">{{ rowError()[u.id] }}</p>
+                    }
+                    @if (rowNotice()[u.id]) {
+                      <p class="row-notice">{{ rowNotice()[u.id] }}</p>
+                    }
+
+                    <!-- ── Actions ── -->
+                    <div class="action-grid">
+                      <div class="action">
+                        <span class="action-label">Role</span>
+                        <select
+                          [ngModel]="u.role"
+                          (ngModelChange)="changeRole(u, $event)"
+                          [disabled]="rowBusy()[u.id] || isSelf(u)"
+                          [attr.aria-label]="'Role for ' + u.email"
+                        >
+                          @for (role of roles; track role) {
+                            <option [value]="role">{{ formatRole(role) }}</option>
+                          }
+                        </select>
+                        @if (isSelf(u)) {
+                          <span class="action-hint">You cannot change your own role.</span>
+                        } @else {
+                          <span class="action-hint">Signs them out everywhere.</span>
+                        }
+                      </div>
+
+                      @if (u.role === 'student') {
+                        <div class="action">
+                          <span class="action-label">Enrolled with</span>
+                          <select
+                            [ngModel]="u.instructor_id"
+                            (ngModelChange)="enrolWith(u, $event)"
+                            [disabled]="rowBusy()[u.id]"
+                            [attr.aria-label]="'Instructor for ' + u.email"
+                          >
+                            @for (i of instructors(); track i.instructor_id) {
+                              <option [value]="i.instructor_id">
+                                {{ i.display_name || i.email }}
+                              </option>
+                            }
+                          </select>
+                          <span class="action-hint">{{ u.instructor_name || 'Nobody' }}</span>
+                        </div>
+                      } @else {
+                        <div class="action">
+                          <span class="action-label">Enrolment code</span>
+                          <div class="action-row">
+                            <code class="code-pill">{{ u.invite_code || '—' }}</code>
+                            <button
+                              type="button"
+                              class="btn btn-secondary btn-sm"
+                              [disabled]="rowBusy()[u.id]"
+                              (click)="rotateCode(u)"
+                            >
+                              Rotate
+                            </button>
+                          </div>
+                          <span class="action-hint"
+                            >Students already enrolled keep their link.</span
+                          >
+                        </div>
+
+                        @if (u.student_count > 0) {
+                          <div class="action">
+                            <span class="action-label">Move all students to</span>
+                            <select
+                              [ngModel]="''"
+                              (ngModelChange)="reassign(u, $event)"
+                              [disabled]="rowBusy()[u.id]"
+                              [attr.aria-label]="'Move students of ' + u.email"
+                            >
+                              <option value="">Choose an instructor...</option>
+                              @for (i of instructors(); track i.instructor_id) {
+                                @if (i.instructor_id !== u.id) {
+                                  <option [value]="i.instructor_id">
+                                    {{ i.display_name || i.email }}
+                                  </option>
+                                }
+                              }
+                            </select>
+                            <span class="action-hint">Moves {{ u.student_count }} student(s).</span>
+                          </div>
+                        }
+                      }
+
+                      <div class="action">
+                        <span class="action-label">Set a new password</span>
+                        <div class="action-row">
+                          <input
+                            type="password"
+                            autocomplete="new-password"
+                            placeholder="At least 8 characters"
+                            [ngModel]="passwordDrafts()[u.id] || ''"
+                            (ngModelChange)="setPasswordDraft(u.id, $event)"
+                            [attr.aria-label]="'New password for ' + u.email"
+                          />
+                          <button
+                            type="button"
+                            class="btn btn-secondary btn-sm"
+                            [disabled]="rowBusy()[u.id]"
+                            (click)="resetPassword(u)"
+                          >
+                            Reset
+                          </button>
+                        </div>
+                        <span class="action-hint"
+                          >No current password needed. Revokes their sessions.</span
+                        >
+                      </div>
+
+                      <div class="action">
+                        <span class="action-label">Sessions</span>
+                        <div class="action-row">
+                          <button
+                            type="button"
+                            class="btn btn-secondary btn-sm"
+                            [disabled]="rowBusy()[u.id]"
+                            (click)="revokeSessions(u)"
+                          >
+                            Sign out everywhere
+                          </button>
+                        </div>
+                        <span class="action-hint">Kills every token immediately.</span>
+                      </div>
+
+                      <div class="action">
+                        <span class="action-label">Danger zone</span>
+                        <div class="action-row">
+                          <button
+                            type="button"
+                            class="btn btn-danger btn-sm"
+                            [disabled]="rowBusy()[u.id] || isSelf(u)"
+                            (click)="remove(u)"
+                          >
+                            Delete account
+                          </button>
+                        </div>
+                        <span class="action-hint">
+                          @if (isSelf(u)) {
+                            You cannot delete your own account.
+                          } @else {
+                            Deletes their content and marks too.
+                          }
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- ── Drill-down ── -->
+                    @if (detailError()) {
+                      <p class="detail-empty">{{ detailError() }}</p>
+                    } @else if (detailLoading()) {
+                      <p class="detail-empty">Loading...</p>
+                    } @else if (detail(); as d) {
+                      <div class="detail-facts">
+                        <span
+                          ><strong>{{ d.rollup.exam_attempts }}</strong> exams ·
+                          <strong>{{ d.rollup.practice_attempts }}</strong> practice</span
+                        >
+                        <span
+                          >Average <strong>{{ d.rollup.average_score }}%</strong></span
+                        >
+                        <span
+                          >Pass rate <strong>{{ d.rollup.pass_rate }}%</strong></span
+                        >
+                        <span
+                          >Time <strong>{{ formatDuration(d.rollup.total_seconds) }}</strong></span
+                        >
+                        <span
+                          >Owns <strong>{{ d.owned_exams }}</strong> exams,
+                          <strong>{{ d.owned_courses }}</strong> courses</span
+                        >
+                        <span>Joined {{ formatDate(d.user.created_at) }}</span>
+                      </div>
+
+                      <div class="detail-cols">
+                        <section class="detail-col">
+                          <h3 class="detail-title">Recent attempts</h3>
+                          @if (d.recent_attempts.length === 0) {
+                            <p class="detail-empty">No attempts yet.</p>
+                          } @else {
+                            <ul class="attempt-list">
+                              @for (a of d.recent_attempts; track a.id) {
+                                <li class="attempt-row">
+                                  <span class="attempt-title">{{ a.exam_title }}</span>
+                                  <span class="attempt-meta">
+                                    <span class="attempt-score">{{ a.score }}%</span>
+                                    <span
+                                      class="badge"
+                                      [class.badge-pass]="a.passed"
+                                      [class.badge-fail]="!a.passed"
+                                      >{{ a.passed ? 'PASS' : 'FAIL' }}</span
+                                    >
+                                  </span>
+                                  <span class="attempt-date">{{ formatDate(a.taken_at) }}</span>
+                                </li>
+                              }
+                            </ul>
+                          }
+                        </section>
+
+                        @if (d.user.role !== 'student') {
+                          <section class="detail-col">
+                            <h3 class="detail-title">Roster ({{ d.students.length }})</h3>
+                            @if (d.students.length === 0) {
+                              <p class="detail-empty">Nobody has enrolled with this account yet.</p>
+                            } @else {
+                              <ul class="roster-list">
+                                @for (s of d.students; track s.id) {
+                                  <li class="roster-row">
+                                    <span class="roster-name">{{ s.display_name || s.email }}</span>
+                                    <span class="roster-meta">{{ s.attempts }} attempts</span>
+                                  </li>
+                                }
+                              </ul>
+                            }
+                          </section>
+                        }
+                      </div>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="pager">
+    <span class="pager-label"> Showing {{ rangeStart() }}-{{ rangeEnd() }} of {{ total() }} </span>
+    <button
+      type="button"
+      class="btn btn-secondary btn-sm"
+      [disabled]="offset() === 0"
+      (click)="page(-1)"
+    >
+      Previous
+    </button>
+    <button
+      type="button"
+      class="btn btn-secondary btn-sm"
+      [disabled]="rangeEnd() >= total()"
+      (click)="page(1)"
+    >
+      Next
+    </button>
+  </div>
+}

@@ -23,7 +23,7 @@
           <strong class="profile-name">{{ user.display_name || 'Unnamed' }}</strong>
           <span class="profile-email">{{ user.email }}</span>
           <span class="badge badge-other profile-role">
-            {{ user.role === 'instructor' ? 'Instructor' : 'Student' }}
+            {{ formatRole(user.role) }}
           </span>
         </div>
       </div>

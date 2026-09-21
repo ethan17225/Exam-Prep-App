@@ -2,6 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { AuthService, CurrentUser, initialsOf } from '../../services/auth.service';
+import { formatRole } from '../../services/exam.service';
 
 @Component({
   selector: 'app-account',
@@ -13,6 +14,7 @@ export class AccountPage implements OnInit {
   me = signal<CurrentUser | null>(null);
   loading = signal(true);
   loadError = signal('');
+  readonly formatRole = formatRole;
 
   // ── Preferred name ──
   nameDraft = signal('');

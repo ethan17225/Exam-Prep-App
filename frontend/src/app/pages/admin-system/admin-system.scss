@@ -1,0 +1,123 @@
+.panel {
+  margin-bottom: 0.75rem;
+  padding: 1rem 1.1rem 1.1rem;
+}
+
+.panel-title {
+  margin: 0 0 0.85rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.panel-note {
+  margin: 0.85rem 0 0;
+  font-size: 0.76rem;
+  color: #999;
+  line-height: 1.55;
+}
+
+.panel-warn {
+  margin: 0.85rem 0 0;
+  padding: 0.6rem 0.75rem;
+  background: #fff8e6;
+  border-left: 3px solid #e5a00d;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  color: #7a5200;
+  line-height: 1.5;
+}
+
+// ── Fact lists ──
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem 1.25rem;
+  margin: 0;
+}
+
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+
+  dt {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #aaa;
+  }
+
+  dd {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    margin: 0;
+    font-size: 0.85rem;
+    // min-width: 0 lets a long backup filename ellipsize inside its column.
+    min-width: 0;
+  }
+}
+
+.fact-sub {
+  font-size: 0.72rem;
+  color: #aaa;
+}
+
+.fact-warn {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.78rem;
+}
+
+.badge-prod {
+  background: #e6f9ed;
+  color: #0a7;
+}
+
+// ── Row counts ──
+.count-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 0.75rem;
+}
+
+.count {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.count-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.count-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #aaa;
+}
+
+.refresh-row {
+  margin-top: 1rem;
+}
+
+@media (max-width: 640px) {
+  .facts {
+    grid-template-columns: 1fr;
+  }
+
+  .count-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

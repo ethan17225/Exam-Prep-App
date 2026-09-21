@@ -17,6 +17,8 @@ export class TrackingPage implements OnInit, OnDestroy {
   items = signal<AdminDashboardItem[]>([]);
   loading = signal(true);
   loadError = signal('');
+  resetError = signal<Record<string, string>>({});
+  resetting = signal<Record<string, boolean>>({});
   private pollInterval: ReturnType<typeof setInterval> | null = null;
   private localTimerInterval: ReturnType<typeof setInterval> | null = null;
   localSeconds = signal<Map<string, number>>(new Map());
@@ -78,5 +80,43 @@ export class TrackingPage implements OnInit, OnDestroy {
     const localIdle = this.localSeconds().get(item.id) ?? item.seconds_since_last_answer;
     const elapsed = item.seconds_since_start + (localIdle - item.seconds_since_last_answer);
     return formatDuration(elapsed);
+  }
+
+  /**
+   * Discard a student's open attempt so they can start the exam again.
+   *
+   * Instructors go through `/api/admin`. Admins are not instructors and do not
+   * open this page; their audited reset lives under `/api/platform`.
+   */
+  resetLiveAttempt(item: AdminDashboardItem): void {
+    const who = item.student_name || item.student_email || 'this student';
+    if (
+      !confirm(
+        `Discard ${who}'s attempt at "${item.exam_title}"?\n\n` +
+          `Their answers so far are lost and the attempt is not graded. ` +
+          `They can then start the exam again.`,
+      )
+    ) {
+      return;
+    }
+
+    this.resetting.set({ ...this.resetting(), [item.id]: true });
+    this.resetError.set({ ...this.resetError(), [item.id]: '' });
+
+    const request = this.examService.resetStudentAttempt(item.id);
+
+    request.subscribe({
+      next: () => {
+        this.resetting.set({ ...this.resetting(), [item.id]: false });
+        this.load();
+      },
+      error: (err) => {
+        this.resetting.set({ ...this.resetting(), [item.id]: false });
+        this.resetError.set({
+          ...this.resetError(),
+          [item.id]: err?.error?.detail || 'Reset failed.',
+        });
+      },
+    });
   }
 }

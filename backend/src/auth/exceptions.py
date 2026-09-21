@@ -23,6 +23,11 @@ class InstructorRequired(DetailedHTTPException):
     DETAIL = "Instructor access required"
 
 
+class AdminRequired(DetailedHTTPException):
+    STATUS_CODE = 403
+    DETAIL = "Administrator access required"
+
+
 class RegistrationClosed(DetailedHTTPException):
     STATUS_CODE = 403
     DETAIL = "Registration is closed"

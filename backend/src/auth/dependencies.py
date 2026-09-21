@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 
 from src.auth import service
 from src.auth.constants import UserRole
-from src.auth.exceptions import InstructorRequired, InvalidToken, NotAuthenticated
+from src.auth.exceptions import AdminRequired, InstructorRequired, InvalidToken, NotAuthenticated
 from src.auth.models import User
 from src.auth.utils import bearer_token, static_mount_token
 from src.database import SessionDep
@@ -28,12 +28,30 @@ CurrentUserDep = Annotated[User, Depends(get_current_user)]
 async def require_instructor(user: CurrentUserDep) -> User:
     # async despite doing no I/O: a sync dependency would be dispatched to the
     # threadpool on every instructor route for nothing.
+    #
+    # Exact role: an admin is not an instructor. Teaching routes are a class
+    # view; the platform console is the admin's equivalent, behind AdminDep.
+    # Equality, not identity: `user.role` is a String(10) column, so after a
+    # round-trip through Postgres it is the str "instructor", not the enum
+    # member. `is not UserRole.INSTRUCTOR` 403s every real instructor.
     if user.role != UserRole.INSTRUCTOR:
         raise InstructorRequired()
     return user
 
 
 InstructorDep = Annotated[User, Depends(require_instructor)]
+
+
+async def require_admin(user: CurrentUserDep) -> User:
+    """Gate for `/api/platform/*` — the only surface that can mutate another
+    user's account, role or content. Exact equality: an instructor must not
+    reach it."""
+    if user.role != UserRole.ADMIN:
+        raise AdminRequired()
+    return user
+
+
+AdminDep = Annotated[User, Depends(require_admin)]
 
 
 def make_static_mount_guard(prefixes: Iterable[str]):

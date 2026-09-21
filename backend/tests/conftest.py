@@ -57,6 +57,19 @@ def instructor() -> User:
     )
 
 
+@pytest.fixture
+def admin() -> User:
+    return User(
+        id="u3",
+        email="admin@example.com",
+        password_hash="",
+        role=UserRole.ADMIN,
+        display_name="Admin Three",
+        invite_code="admincode",
+        created_at=datetime.now(),
+    )
+
+
 @pytest_asyncio.fixture
 async def anon() -> AsyncClient:
     """Unauthenticated client."""
@@ -72,6 +85,22 @@ async def as_student(student: User) -> AsyncClient:
     FastAPI — do not "fix" it to an async def.
     """
     app.dependency_overrides[get_current_user] = lambda: student
+    async with _client() as client:
+        yield client
+    app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def as_instructor(instructor: User) -> AsyncClient:
+    app.dependency_overrides[get_current_user] = lambda: instructor
+    async with _client() as client:
+        yield client
+    app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def as_admin(admin: User) -> AsyncClient:
+    app.dependency_overrides[get_current_user] = lambda: admin
     async with _client() as client:
         yield client
     app.dependency_overrides.clear()

@@ -1,6 +1,19 @@
 from pydantic import BaseModel
 
-from src.schemas import ISODateTime
+# These three are shared with `platform_admin`, so they live in src/schemas.py —
+# a response shape is declared exactly once.
+from src.schemas import DailyPointOut, ISODateTime, StudentAttemptOut, TopicStatOut
+
+__all__ = [
+    "DailyPointOut",
+    "DashboardItemOut",
+    "ExamRollupOut",
+    "InstructorOverviewOut",
+    "StudentAttemptOut",
+    "StudentDetailOut",
+    "StudentItemOut",
+    "TopicStatOut",
+]
 
 
 class DashboardItemOut(BaseModel):
@@ -48,32 +61,6 @@ class StudentItemOut(BaseModel):
     joined_at: ISODateTime
 
 
-class TopicStatOut(BaseModel):
-    topic: str
-    total: int
-    correct: int
-    score: int
-
-
-class StudentAttemptOut(BaseModel):
-    """An attempt as it appears in the instructor's drill-down. Deliberately
-    without the `results` blob — listing those is what made the student-facing
-    history endpoint a multi-megabyte response."""
-
-    id: str
-    exam_id: str
-    exam_title: str
-    score: float
-    correct: int
-    total: int
-    passed: bool
-    pass_grade: int
-    mode: str
-    over_time: bool
-    time_spent_seconds: int
-    taken_at: ISODateTime
-
-
 class StudentDetailOut(BaseModel):
     student: StudentItemOut
     recent_attempts: list[StudentAttemptOut]
@@ -89,12 +76,6 @@ class ExamRollupOut(BaseModel):
     average_score: float
     pass_rate: int
     last_attempt_at: ISODateTime | None
-
-
-class DailyPointOut(BaseModel):
-    day: str
-    attempts: int
-    average_score: float
 
 
 class InstructorOverviewOut(BaseModel):

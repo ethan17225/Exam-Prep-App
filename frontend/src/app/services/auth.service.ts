@@ -2,7 +2,8 @@ import { Injectable, computed, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 
-export type UserRole = 'student' | 'instructor';
+/** Three distinct roles. Admin is neither a teacher nor a student. */
+export type UserRole = 'student' | 'instructor' | 'admin';
 
 export interface AuthUser {
   id: string;
@@ -11,7 +12,7 @@ export interface AuthUser {
   /** The preferred name. Null until onboarding sets it — that is the gate. */
   display_name: string | null;
   avatar: string | null;
-  /** An instructor's own enrolment code. Always null for a student. */
+  /** An instructor's own enrolment code. Null for a student or an admin. */
   invite_code: string | null;
 }
 
@@ -37,7 +38,9 @@ export class AuthService {
   private token = signal<string | null>(null);
   user = signal<AuthUser | null>(null);
   isLoggedIn = computed(() => this.user() !== null);
+  isStudent = computed(() => this.user()?.role === 'student');
   isInstructor = computed(() => this.user()?.role === 'instructor');
+  isAdmin = computed(() => this.user()?.role === 'admin');
 
   /**
    * A signed-in account that has not chosen a preferred name yet. `onboardingGuard`

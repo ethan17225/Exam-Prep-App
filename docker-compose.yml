@@ -63,6 +63,10 @@ services:
       # Course PDFs/HTML used to live only in the image layer and were destroyed
       # on every rebuild.
       - docs:/app/Docs
+      # Read-only, and only so the admin System page can report what the backup
+      # sidecar has written. The endpoint reads names, sizes and mtimes — never
+      # contents — because a dump holds every password hash and answer key.
+      - ./backups:/app/backups:ro
     depends_on:
       db:
         condition: service_healthy
@@ -126,12 +130,12 @@ services:
     # LAST command, so without it a failed pg_dump still produced a valid empty
     # .gz, logged success, and the prune below then deleted the good backups.
     # The prune only runs after a dump has been verified.
+    # Keep the if-condition on one line: Alpine's busybox ash rejects a
+    # newline before && (bash allows it). pipefail needs ash from Alpine 3.19+.
     command: >
       sh -c 'umask 077; set -o pipefail; while true; do
         f=/backups/mcq_app_$$(date +%Y%m%d_%H%M%S).sql.gz;
-        if pg_dump -h db -U ${POSTGRES_USER:-postgres} ${POSTGRES_DB:-mcq_app} | gzip > $$f
-           && gzip -t $$f
-           && [ "$$(stat -c%s $$f)" -gt 1000 ]; then
+        if pg_dump -h db -U ${POSTGRES_USER:-postgres} ${POSTGRES_DB:-mcq_app} | gzip > $$f && gzip -t $$f && [ "$$(stat -c%s $$f)" -gt 1000 ]; then
           echo "backup ok: $$f ($$(stat -c%s $$f) bytes)";
           find /backups -name "mcq_app_*.sql.gz" -mtime +14 -delete;
         else

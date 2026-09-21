@@ -13,5 +13,6 @@ from src.attempts.models import History, InProgressExam
 from src.auth.models import User
 from src.courses.models import Course
 from src.exams.models import Exam, Question
+from src.platform_admin.models import AdminAuditLog
 
-__all__ = ["Course", "Exam", "History", "InProgressExam", "Question", "User"]
+__all__ = ["AdminAuditLog", "Course", "Exam", "History", "InProgressExam", "Question", "User"]

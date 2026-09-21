@@ -1,0 +1,163 @@
+<h1 class="page-title">System</h1>
+<app-admin-tabs />
+
+@if (loadError()) {
+  <div class="empty-state">
+    <p>{{ loadError() }}</p>
+    <button class="btn btn-primary" (click)="load()">Retry</button>
+  </div>
+} @else if (loading()) {
+  <p class="empty-state">Loading...</p>
+} @else if (info(); as i) {
+  <!-- ── Deployment ── -->
+  <section class="card panel">
+    <h2 class="panel-title">Deployment</h2>
+    <dl class="facts">
+      <div class="fact">
+        <dt>Environment</dt>
+        <dd>
+          <span class="badge" [class.badge-prod]="i.environment === 'production'">{{
+            i.environment
+          }}</span>
+        </dd>
+      </div>
+      <div class="fact">
+        <dt>Log level</dt>
+        <dd>{{ i.log_level }}</dd>
+      </div>
+      <div class="fact">
+        <dt>API docs</dt>
+        <dd>
+          {{ i.api_docs_enabled ? 'Served at /docs' : 'Disabled' }}
+        </dd>
+      </div>
+      <div class="fact">
+        <dt>PostgreSQL</dt>
+        <dd>{{ i.postgres_version }}</dd>
+      </div>
+      <div class="fact">
+        <dt>Database size</dt>
+        <dd>{{ formatBytes(i.database_bytes) }}</dd>
+      </div>
+    </dl>
+    @if (i.api_docs_enabled && i.environment === 'production') {
+      <p class="panel-warn">
+        The OpenAPI schema is being served in production. It is disabled for any environment outside
+        local and staging, so this suggests ENVIRONMENT is misconfigured.
+      </p>
+    }
+  </section>
+
+  <!-- ── Data ── -->
+  <section class="card panel">
+    <h2 class="panel-title">Data</h2>
+    <div class="count-grid">
+      <div class="count">
+        <span class="count-value">{{ i.counts.users }}</span>
+        <span class="count-label">Accounts</span>
+      </div>
+      <div class="count">
+        <span class="count-value">{{ i.counts.courses }}</span>
+        <span class="count-label">Courses</span>
+      </div>
+      <div class="count">
+        <span class="count-value">{{ i.counts.exams }}</span>
+        <span class="count-label">Exams</span>
+      </div>
+      <div class="count">
+        <span class="count-value">{{ i.counts.questions }}</span>
+        <span class="count-label">Questions</span>
+      </div>
+      <div class="count">
+        <span class="count-value">{{ i.counts.attempts }}</span>
+        <span class="count-label">Graded attempts</span>
+      </div>
+      <div class="count">
+        <span class="count-value">{{ i.counts.in_progress }}</span>
+        <span class="count-label">Open attempts</span>
+      </div>
+      <div class="count">
+        <span class="count-value">{{ i.counts.audit_entries }}</span>
+        <span class="count-label">Audit entries</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Storage ── -->
+  <section class="card panel">
+    <h2 class="panel-title">Storage</h2>
+    <dl class="facts">
+      <div class="fact">
+        <dt>Uploads</dt>
+        <dd>{{ i.uploads.files }} files · {{ formatBytes(i.uploads.bytes) }}</dd>
+      </div>
+      <div class="fact">
+        <dt>Documents</dt>
+        <dd>{{ i.documents.files }} files · {{ formatBytes(i.documents.bytes) }}</dd>
+      </div>
+    </dl>
+    <p class="panel-note">
+      Both are Docker volumes, so they survive a rebuild. Question images and avatars live in
+      uploads; course PDFs and their HTML live in documents.
+    </p>
+  </section>
+
+  <!-- ── Backups ── -->
+  <section class="card panel">
+    <h2 class="panel-title">Backups</h2>
+    @if (!i.backups.available) {
+      <p class="panel-note">
+        The backups directory is not mounted into the API container, so there is nothing to report
+        here. The backup sidecar may still be running — check
+        <code>docker compose logs backup</code>.
+      </p>
+    } @else if (i.backups.files === 0) {
+      <p class="panel-warn">
+        No dumps found. The sidecar writes one per day and prunes past 14 days, so an empty
+        directory means it has never completed a run.
+      </p>
+    } @else {
+      <dl class="facts">
+        <div class="fact">
+          <dt>Latest</dt>
+          <dd>
+            <code class="mono">{{ i.backups.latest_name }}</code>
+          </dd>
+        </div>
+        <div class="fact">
+          <dt>Taken</dt>
+          <dd>
+            @if (i.backups.latest_at) {
+              <span [class.fact-warn]="backupIsStale(i.backups.latest_at)">
+                {{ backupAge(i.backups.latest_at) }}
+              </span>
+              <span class="fact-sub">{{ formatDate(i.backups.latest_at) }}</span>
+            }
+          </dd>
+        </div>
+        <div class="fact">
+          <dt>Size</dt>
+          <dd>{{ formatBytes(i.backups.latest_bytes || 0) }}</dd>
+        </div>
+        <div class="fact">
+          <dt>Retained</dt>
+          <dd>{{ i.backups.files }} dumps · {{ formatBytes(i.backups.bytes) }}</dd>
+        </div>
+      </dl>
+      @if (i.backups.latest_at && backupIsStale(i.backups.latest_at)) {
+        <p class="panel-warn">
+          The newest dump is more than a day and a half old. The sidecar runs every 24 hours, so it
+          has probably stopped — it keeps existing backups rather than pruning when a dump fails.
+        </p>
+      }
+      <p class="panel-note">
+        Reported by name, size and time only. A dump contains every password hash and answer key in
+        the deployment, so the API has no route that reads one.
+      </p>
+    }
+  </section>
+
+  <div class="refresh-row">
+    <button type="button" class="btn btn-secondary" (click)="load()">Refresh</button>
+  </div>
+}

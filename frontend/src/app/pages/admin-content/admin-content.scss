@@ -1,0 +1,237 @@
+// ── Exams / Courses switch ──
+.switch-bar {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-bottom: 0.85rem;
+  padding: 0.2rem;
+  background: #f2f2f2;
+  border-radius: 8px;
+}
+
+.switch {
+  padding: 0.35rem 0.9rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+
+  &:hover {
+    color: #111;
+  }
+
+  &.selected {
+    background: #fff;
+    color: #111;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  }
+}
+
+// ── Toolbar ──
+.toolbar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.toolbar-search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+}
+
+.filter-label {
+  margin-right: 0.15rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #999;
+}
+
+.filter-chip {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid #e2e2e2;
+  border-radius: 999px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: #555;
+  cursor: pointer;
+
+  &:hover {
+    border-color: #111;
+    color: #111;
+  }
+
+  &.selected {
+    background: #111;
+    border-color: #111;
+    color: #fff;
+  }
+}
+
+// ── Rows ──
+.content-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.content-card {
+  padding: 0.85rem 1rem;
+}
+
+.content-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.7rem;
+}
+
+.content-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  // min-width: 0 lets a long title ellipsize rather than pushing the badges out.
+  min-width: 0;
+}
+
+.content-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.content-sub {
+  font-size: 0.74rem;
+  color: #999;
+}
+
+.content-badges {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.3rem;
+}
+
+.badge-shared {
+  background: #e6f9ed;
+  color: #0a7;
+}
+
+.badge-private {
+  background: #f2f2f2;
+  color: #777;
+}
+
+.badge-practice {
+  background: #eef;
+  color: #44c;
+}
+
+.content-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.btn-sm {
+  flex: 0 0 auto;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.78rem;
+}
+
+.owner-select {
+  flex: 0 1 200px;
+  min-width: 0;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.content-date {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  color: #bbb;
+}
+
+.row-error {
+  margin: 0.6rem 0 0;
+  font-size: 0.8rem;
+  color: #c00;
+}
+
+// ── Pager ──
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.pager-label {
+  flex: 1 1 auto;
+  font-size: 0.78rem;
+  color: #888;
+}
+
+// ── Mobile ──
+@media (max-width: 640px) {
+  .toolbar {
+    flex-wrap: wrap;
+  }
+
+  .toolbar-search {
+    flex: 1 1 100%;
+  }
+
+  .filter-bar {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  .filter-chip {
+    flex: 0 0 auto;
+    min-height: 34px;
+  }
+
+  .content-head {
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  // Three controls in a row do not fit: they wrap, and the date moves to its
+  // own line rather than being pushed off the edge.
+  .content-actions {
+    flex-wrap: wrap;
+  }
+
+  .owner-select {
+    flex: 1 1 100%;
+    min-height: 44px;
+  }
+
+  .content-date {
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+}

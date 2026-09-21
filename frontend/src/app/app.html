@@ -1,25 +1,30 @@
 @if (auth.isLoggedIn()) {
   <nav class="nav">
-    <app-user-menu />
     <span class="nav-brand">Exam Prep</span>
     <div class="nav-links">
       <a routerLink="/overview" routerLinkActive="active">Overview</a>
+      @if (auth.isAdmin()) {
+        <a routerLink="/admin/users" routerLinkActive="active">Admin</a>
+      }
       @if (auth.isInstructor()) {
         <a routerLink="/students" routerLinkActive="active">Students</a>
       }
-      <a routerLink="/exams" routerLinkActive="active">Exams</a>
-      <!-- An instructor takes no exams of their own, so their attempt history and
-           unfinished attempts are always empty. They track students instead. -->
-      @if (!auth.isInstructor()) {
+      @if (!auth.isAdmin()) {
+        <a routerLink="/exams" routerLinkActive="active">Exams</a>
+      }
+      @if (auth.isStudent()) {
         <a routerLink="/in-progress" routerLinkActive="active">In Progress</a>
         <a routerLink="/history" routerLinkActive="active">History</a>
       }
-      <a routerLink="/documents" routerLinkActive="active">Documents</a>
-      <a routerLink="/upload" routerLinkActive="active">Upload</a>
+      @if (!auth.isAdmin()) {
+        <a routerLink="/documents" routerLinkActive="active">Documents</a>
+        <a routerLink="/upload" routerLinkActive="active">Upload</a>
+      }
       @if (auth.isInstructor()) {
         <a routerLink="/tracking" routerLinkActive="active">Tracking</a>
       }
     </div>
+    <app-user-menu />
   </nav>
 }
 <main class="main" [class.main-plain]="!auth.isLoggedIn()">

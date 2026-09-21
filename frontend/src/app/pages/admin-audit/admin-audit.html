@@ -1,0 +1,98 @@
+<h1 class="page-title">Audit Log</h1>
+<app-admin-tabs />
+
+<p class="page-note">
+  Every administrative change, newest first. Append-only — nothing in the app edits or removes an
+  entry. Only the current page is fetched.
+</p>
+
+<div class="toolbar">
+  <div class="filter-bar">
+    @for (f of filters; track f.prefix) {
+      <button
+        type="button"
+        class="filter-chip"
+        [class.selected]="filter() === f.prefix"
+        (click)="setFilter(f.prefix)"
+      >
+        {{ f.label }}
+      </button>
+    }
+  </div>
+  <label class="page-size">
+    <span>Rows</span>
+    <select [ngModel]="pageSize()" (ngModelChange)="setPageSize($event)" aria-label="Rows per page">
+      @for (size of pageSizes; track size) {
+        <option [ngValue]="size">{{ size }}</option>
+      }
+    </select>
+  </label>
+</div>
+
+@if (loadError()) {
+  <div class="empty-state">
+    <p>{{ loadError() }}</p>
+    <button class="btn btn-primary" (click)="load()">Retry</button>
+  </div>
+} @else if (loading()) {
+  <p class="empty-state">Loading...</p>
+} @else if (entries().length === 0) {
+  <p class="empty-state">
+    @if (filter()) {
+      No entries in this category yet.
+    } @else {
+      Nothing recorded yet. Entries appear here as soon as an admin changes an account or some
+      content.
+    }
+  </p>
+} @else {
+  <div class="card table-card">
+    <div class="table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Actor</th>
+            <th>Action</th>
+            <th>Target</th>
+            <th>Detail</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (e of entries(); track e.id) {
+            <tr [class]="areaClass(e.action)">
+              <td class="cell-when">{{ formatDate(e.created_at) }}</td>
+              <td class="cell-actor">{{ e.actor_email }}</td>
+              <td>
+                <span class="action-label">{{ formatAuditAction(e.action) }}</span>
+                <span class="target-type">{{ e.target_type }}</span>
+              </td>
+              <td class="cell-target">{{ e.target_label || e.target_id || '—' }}</td>
+              <td class="cell-detail">{{ formatDetail(e.detail) || '—' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="pager">
+    <span class="pager-label">Showing {{ rangeStart() }}-{{ rangeEnd() }} of {{ total() }}</span>
+    <button
+      type="button"
+      class="btn btn-secondary btn-sm"
+      [disabled]="offset() === 0"
+      (click)="page(-1)"
+    >
+      Previous
+    </button>
+    <button
+      type="button"
+      class="btn btn-secondary btn-sm"
+      [disabled]="rangeEnd() >= total()"
+      (click)="page(1)"
+    >
+      Next
+    </button>
+  </div>
+}

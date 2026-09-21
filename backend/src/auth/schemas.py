@@ -1,6 +1,6 @@
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from src.auth.constants import UserRole
+from src.auth.constants import REGISTRABLE_ROLES, UserRole
 from src.auth.models import DISPLAY_NAME_MAX
 
 
@@ -13,6 +13,22 @@ class RegisterIn(BaseModel):
     # for an instructor it is AUTH_INSTRUCTOR_INVITE_CODE.
     invite_code: str = Field(max_length=200)
     role: UserRole = UserRole.STUDENT
+
+    @field_validator("role")
+    @classmethod
+    def _must_be_registrable(cls, value: UserRole) -> UserRole:
+        """Reject `admin` at the edge, as a 422.
+
+        Typed as the full `UserRole` rather than a narrower enum so the rest of
+        the app keeps one role type, which makes this validator load-bearing:
+        `register`'s student branch stores whatever role it is given, so without
+        it any holder of an instructor's enrolment code could mint an admin.
+        `service.register` repeats the check — this is the escalation path, so it
+        does not rest on one layer.
+        """
+        if value not in REGISTRABLE_ROLES:
+            raise ValueError("role must be 'student' or 'instructor'")
+        return value
 
 
 class LoginIn(BaseModel):

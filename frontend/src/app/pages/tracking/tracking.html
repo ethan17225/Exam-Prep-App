@@ -89,6 +89,22 @@
             <span class="time-value elapsed">{{ getElapsedDuration(item) }}</span>
           </div>
         </div>
+
+        <!-- The escape hatch for an abandoned attempt: a student cannot discard a
+             graded one themselves, so otherwise it locks them out of the exam. -->
+        <div class="dash-actions">
+          <button
+            type="button"
+            class="btn btn-danger btn-sm"
+            [disabled]="resetting()[item.id]"
+            (click)="resetLiveAttempt(item)"
+          >
+            {{ resetting()[item.id] ? 'Resetting...' : 'Reset attempt' }}
+          </button>
+          @if (resetError()[item.id]) {
+            <span class="dash-error">{{ resetError()[item.id] }}</span>
+          }
+        </div>
       </div>
     }
   </div>

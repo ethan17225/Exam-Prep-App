@@ -14,13 +14,14 @@
   font-weight: 700;
   font-size: 1.1rem;
   letter-spacing: -0.02em;
-  // Pushes the links away from the brand and the avatar without a spacer element.
   margin-right: 1rem;
 }
 
 .nav-links {
   display: flex;
   gap: 0.25rem;
+  // Pushes the avatar to the right edge without a spacer element.
+  margin-right: auto;
 
   a {
     display: inline-block;
@@ -65,7 +66,7 @@
     top: auto;
     left: 0;
     right: 0;
-    // The avatar and the tab strip share one row, with the avatar pinned left.
+    // The avatar and the tab strip share one row, with the avatar pinned right.
     gap: 0;
     padding: 0;
     padding-bottom: env(safe-area-inset-bottom);
@@ -81,9 +82,10 @@
 
   .nav-links {
     // min-width: 0 lets the scrollable strip shrink beside the fixed avatar
-    // instead of forcing the avatar off the left edge.
+    // instead of forcing the avatar off the right edge.
     flex: 1;
     min-width: 0;
+    margin-right: 0;
     gap: 0;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;

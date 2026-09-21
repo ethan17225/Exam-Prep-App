@@ -1,0 +1,182 @@
+<h1 class="page-title">Platform Dashboard</h1>
+<app-admin-tabs />
+
+@if (loadError()) {
+  <div class="empty-state">
+    <p>{{ loadError() }}</p>
+    <button class="btn btn-primary" (click)="load()">Retry</button>
+  </div>
+} @else if (loading()) {
+  <p class="empty-state">Loading...</p>
+} @else if (data(); as d) {
+  <!-- ── Accounts ── -->
+  <h2 class="section-title">Accounts</h2>
+  <div class="kpi-grid">
+    <button type="button" class="card kpi kpi-action" (click)="openUsers('')">
+      <span class="kpi-value">{{ d.user_count }}</span>
+      <span class="kpi-label">Total accounts</span>
+      <span class="kpi-sub">Manage all</span>
+    </button>
+    <button type="button" class="card kpi kpi-action" (click)="openUsers('student')">
+      <span class="kpi-value">{{ d.student_count }}</span>
+      <span class="kpi-label">Students</span>
+    </button>
+    <button type="button" class="card kpi kpi-action" (click)="openUsers('instructor')">
+      <span class="kpi-value">{{ d.instructor_count }}</span>
+      <span class="kpi-label">Instructors</span>
+    </button>
+    <button type="button" class="card kpi kpi-action" (click)="openUsers('admin')">
+      <span class="kpi-value">{{ d.admin_count }}</span>
+      <span class="kpi-label">Admins</span>
+    </button>
+    <div class="card kpi">
+      <span class="kpi-value" [class.kpi-warn]="d.pending_onboarding > 0">{{
+        d.pending_onboarding
+      }}</span>
+      <span class="kpi-label">Awaiting onboarding</span>
+      <span class="kpi-sub">Registered, never named</span>
+    </div>
+  </div>
+
+  <!-- ── Activity ── -->
+  <h2 class="section-title">Activity</h2>
+  <div class="kpi-grid">
+    <div class="card kpi">
+      <span class="kpi-value">{{ d.attempts }}</span>
+      <span class="kpi-label">Attempts</span>
+      <span class="kpi-sub">{{ d.recent_attempts }} in the last 30 days</span>
+    </div>
+    <div class="card kpi">
+      <span class="kpi-value">{{ d.average_score }}%</span>
+      <span class="kpi-label">Average score</span>
+    </div>
+    <div class="card kpi">
+      <span
+        class="kpi-value"
+        [class.kpi-good]="d.pass_rate >= 70"
+        [class.kpi-warn]="d.attempts > 0 && d.pass_rate < 70"
+        >{{ d.pass_rate }}%</span
+      >
+      <span class="kpi-label">Pass rate</span>
+    </div>
+    <div class="card kpi">
+      <span class="kpi-value" [class.kpi-live]="d.live_now > 0">{{ d.live_now }}</span>
+      <span class="kpi-label">In progress now</span>
+    </div>
+    <button type="button" class="card kpi kpi-action" (click)="openContent()">
+      <span class="kpi-value">{{ d.exam_count }}</span>
+      <span class="kpi-label">Exams</span>
+      <span class="kpi-sub">{{ d.course_count }} courses · {{ studyTime() }} studied</span>
+    </button>
+  </div>
+
+  @if (hasNoAttempts()) {
+    <div class="card">
+      <p class="empty-state">
+        {{ d.user_count }} account(s) registered, but nobody has submitted an attempt yet. The
+        charts appear once the first exam is graded.
+      </p>
+    </div>
+  } @else {
+    <!-- ── Charts ── -->
+    <div class="chart-grid">
+      <div class="card chart-card chart-wide">
+        <h2 class="chart-title">Activity — last 14 days</h2>
+        <div class="chart-box chart-box-tall"><canvas id="platformActivityChart"></canvas></div>
+      </div>
+      <div class="card chart-card">
+        <h2 class="chart-title">Pass / fail</h2>
+        <div class="chart-box"><canvas id="platformOutcomeChart"></canvas></div>
+      </div>
+      <div class="card chart-card">
+        <h2 class="chart-title">Score distribution</h2>
+        <div class="chart-box"><canvas id="platformBucketChart"></canvas></div>
+      </div>
+    </div>
+  }
+
+  <!-- ── Per-instructor rollup ── -->
+  <section class="card rollup-card">
+    <h2 class="chart-title">By instructor</h2>
+    @if (d.instructor_rollups.length === 0) {
+      <p class="empty-state">No instructors yet.</p>
+    } @else {
+      <div class="table-scroll">
+        <table class="rollup-table">
+          <thead>
+            <tr>
+              <th>Instructor</th>
+              <th>Role</th>
+              <th>Students</th>
+              <th>Attempts</th>
+              <th>Average</th>
+              <th>Pass rate</th>
+              <th>Last attempt</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of d.instructor_rollups; track row.instructor_id) {
+              <tr>
+                <td class="rollup-name">
+                  <span>{{ row.display_name || 'Unnamed' }}</span>
+                  <span class="rollup-sub">{{ row.email }}</span>
+                </td>
+                <td>
+                  <span class="badge" [class.badge-admin]="row.role === 'admin'">{{
+                    row.role
+                  }}</span>
+                </td>
+                <td>{{ row.students }}</td>
+                <td>{{ row.attempts }}</td>
+                <td>{{ row.average_score }}%</td>
+                <td>
+                  @if (row.attempts === 0) {
+                    <span class="rollup-muted">—</span>
+                  } @else {
+                    <span
+                      class="badge"
+                      [class.badge-pass]="row.pass_rate >= 70"
+                      [class.badge-fail]="row.pass_rate < 70"
+                      >{{ row.pass_rate }}%</span
+                    >
+                  }
+                </td>
+                <td class="rollup-date">
+                  {{ row.last_attempt_at ? formatDate(row.last_attempt_at) : '—' }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+
+  <!-- ── Weakest topics platform-wide ── -->
+  <section class="card rollup-card">
+    <h2 class="chart-title">Weakest topics platform-wide</h2>
+    @if (d.topic_stats.length === 0) {
+      <p class="empty-state">No topic data yet.</p>
+    } @else {
+      <ul class="topic-list">
+        @for (t of d.topic_stats; track t.topic) {
+          <li class="topic-row">
+            <span class="topic-row-top">
+              <span class="topic-row-name">{{ t.topic || 'Untitled' }}</span>
+              <span
+                class="topic-row-score"
+                [class.metric-good]="t.score >= masteryThreshold"
+                [class.metric-warn]="t.score < masteryThreshold"
+                >{{ t.score }}%</span
+              >
+            </span>
+            <span class="topic-track">
+              <span class="topic-fill" [style.width.%]="t.score"></span>
+            </span>
+            <span class="topic-row-meta">{{ t.correct }} of {{ t.total }} correct</span>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+}

@@ -4,7 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 
 /**
- * The avatar button at the left of the nav, and the Account / Sign out popover it
+ * The avatar button at the right of the nav, and the Account / Sign out popover it
  * opens. Signing out lives here rather than as its own tab so the nav has one
  * place for everything about the current account.
  */

@@ -177,6 +177,23 @@
   }
 }
 
+.dash-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.btn-sm {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.78rem;
+}
+
+.dash-error {
+  font-size: 0.78rem;
+  color: #c00;
+}
+
 // ── Mobile ──────────────────────────────────────────────────────
 @media (max-width: 640px) {
   .stats-row {
