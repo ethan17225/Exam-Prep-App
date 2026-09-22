@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 
 import { AdminTabsComponent } from '../../components/admin-tabs/admin-tabs';
 import {
+  httpErrorDetail,
   AuditEntry,
   ExamService,
   formatAuditAction,
@@ -74,7 +75,7 @@ export class AdminAuditPage implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.detail || 'Failed to load the audit log.');
+        this.loadError.set(httpErrorDetail(err) || 'Failed to load the audit log.');
       },
     });
   }

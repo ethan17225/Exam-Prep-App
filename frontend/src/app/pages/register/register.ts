@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
 import { AuthService, UserRole } from '../../services/auth.service';
+import { httpErrorDetail } from '../../services/exam.service';
 
 @Component({
   selector: 'app-register',
@@ -69,7 +70,7 @@ export class RegisterPage implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
-        this.error.set(err?.error?.detail || 'Registration failed.');
+        this.error.set(httpErrorDetail(err) || 'Registration failed.');
       },
     });
   }

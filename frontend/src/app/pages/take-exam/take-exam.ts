@@ -13,6 +13,7 @@ import { map, of, switchMap } from 'rxjs';
 import { QuestionSectionsComponent } from '../../components/question-sections/question-sections';
 import { AuthService, PROGRESS_KEY_PREFIX } from '../../services/auth.service';
 import {
+  httpErrorDetail,
   ExamService,
   Question,
   AnswerSubmission,
@@ -255,7 +256,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
               allowEmpty: true,
               onError: (err) =>
                 this.loadError.set(
-                  err?.error?.detail ||
+                  httpErrorDetail(err) ||
                     'Could not start this attempt. Check your connection and try again — ' +
                       'do not begin answering until it starts.',
                 ),
@@ -270,7 +271,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
                   error: (err) => {
                     this.loading.set(false);
                     this.loadError.set(
-                      err?.error?.detail ||
+                      httpErrorDetail(err) ||
                         'The attempt started but the questions could not be loaded.',
                     );
                   },
@@ -310,7 +311,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
         error: (err) => {
           this.loading.set(false);
           this.loadError.set(
-            err?.error?.detail || 'Failed to load the exam. Check your connection and try again.',
+            httpErrorDetail(err) || 'Failed to load the exam. Check your connection and try again.',
           );
         },
       });
@@ -323,7 +324,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
       if (remaining <= 1) {
         this.remainingSeconds.set(0);
         if (this.timerInterval) clearInterval(this.timerInterval);
-        if (this.mode() === 'exam' && !this.submitting()) this.submit();
+        if (this.mode() === 'exam' && !this.submitting()) this.submit({ skipConfirm: true });
         return;
       }
       this.remainingSeconds.update((v) => v - 1);
@@ -848,13 +849,14 @@ export class TakeExamPage implements OnInit, OnDestroy {
 
   // ── Submit ──────────────────────────────────────────────────
 
-  submit(): void {
+  submit(opts?: { skipConfirm?: boolean }): void {
     if (this.submitting()) return;
 
-    const unanswered = this.totalQuestions() - this.answeredCount();
-    if (unanswered > 0) {
-      const confirmed = confirm(`You have ${unanswered} unanswered question(s). Submit anyway?`);
-      if (!confirmed) return;
+    // Count questions that are actually blank, not Map keys left over from
+    // autosave. A student may hand in an incomplete exam; we only ask first.
+    const unanswered = this.questions().filter((q) => !this.isFullyAnswered(q)).length;
+    if (!opts?.skipConfirm && unanswered > 0) {
+      if (!confirm('Are you sure you want to submit the test?')) return;
     }
 
     this.submitting.set(true);
@@ -892,14 +894,14 @@ export class TakeExamPage implements OnInit, OnDestroy {
           if (err?.status === 409) {
             // Already submitted, or the attempt was reset. Nothing to retry.
             this.clearLocalProgress();
-            alert(err?.error?.detail || 'This attempt is no longer open.');
+            alert(httpErrorDetail(err) || 'This attempt is no longer open.');
             this.router.navigate(['/history']);
             return;
           }
           // Otherwise the local mirror is deliberately left in place: reopening
           // the exam restores these answers rather than losing them.
           alert(
-            err?.error?.detail ||
+            httpErrorDetail(err) ||
               'Submission failed. Your answers are saved on this device — sign in again and reopen the exam to retry.',
           );
         },

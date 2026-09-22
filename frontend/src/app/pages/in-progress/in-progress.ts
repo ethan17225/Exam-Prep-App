@@ -2,6 +2,7 @@ import { Component, OnInit, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import {
+  httpErrorDetail,
   ExamService,
   InProgressExam,
   formatDate,
@@ -51,7 +52,7 @@ export class InProgressPage implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.detail || 'Failed to load in-progress exams.');
+        this.loadError.set(httpErrorDetail(err) || 'Failed to load in-progress exams.');
       },
     });
   }
@@ -70,7 +71,7 @@ export class InProgressPage implements OnInit {
       error: (err) => {
         this.deleteError.set({
           ...this.deleteError(),
-          [id]: err?.error?.detail || 'Discard failed.',
+          [id]: httpErrorDetail(err) || 'Discard failed.',
         });
       },
     });

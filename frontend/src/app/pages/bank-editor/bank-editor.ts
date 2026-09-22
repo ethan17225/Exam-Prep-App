@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, signal, WritableSignal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { ExamService } from '../../services/exam.service';
+import { httpErrorDetail, ExamService } from '../../services/exam.service';
 import { QuestionEditorCardComponent } from '../../components/question-editor/question-editor-card';
 import {
   DEFAULT_MCQ_PAYLOAD,
@@ -87,7 +87,7 @@ export class BankEditorPage implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.detail || 'Could not load this bank.');
+        this.loadError.set(httpErrorDetail(err) || 'Could not load this bank.');
       },
     });
   }
@@ -126,7 +126,7 @@ export class BankEditorPage implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.addingSection.set(false);
-        this.loadError.set(err?.error?.detail || 'Could not add a section.');
+        this.loadError.set(httpErrorDetail(err) || 'Could not add a section.');
       },
     });
   }
@@ -137,7 +137,7 @@ export class BankEditorPage implements OnInit, OnDestroy {
     this.examService.renameBankSection(this.bankId, section.id, name).subscribe({
       next: () => this.patchSection(section.id, { name, renaming: false, nameDraft: name }),
       error: (err) => {
-        this.loadError.set(err?.error?.detail || 'Could not rename the section.');
+        this.loadError.set(httpErrorDetail(err) || 'Could not rename the section.');
       },
     });
   }
@@ -147,7 +147,7 @@ export class BankEditorPage implements OnInit, OnDestroy {
     this.examService.deleteBankSection(this.bankId, section.id).subscribe({
       next: () => this.sections.update((list) => list.filter((s) => s.id !== section.id)),
       error: (err) => {
-        this.deleteError.set(err?.error?.detail || 'Could not delete the section.');
+        this.deleteError.set(httpErrorDetail(err) || 'Could not delete the section.');
       },
     });
   }
@@ -174,7 +174,7 @@ export class BankEditorPage implements OnInit, OnDestroy {
       next: () => this.load(),
       error: (err) => {
         this.patchSection(section.id, {
-          pasteError: err?.error?.detail || 'Could not add those questions.',
+          pasteError: httpErrorDetail(err) || 'Could not add those questions.',
         });
       },
     });
@@ -189,7 +189,7 @@ export class BankEditorPage implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.addingQuestion.set({ ...this.addingQuestion(), [section.id]: false });
-        alert(err?.error?.detail || 'Could not add a question.');
+        alert(httpErrorDetail(err) || 'Could not add a question.');
       },
     });
   }
@@ -257,7 +257,7 @@ export class BankEditorPage implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.setFlag(this.saving, d.id, false);
-          this.setError(d.id, err?.error?.detail || 'Save failed.');
+          this.setError(d.id, httpErrorDetail(err) || 'Save failed.');
         },
       });
   }
@@ -271,7 +271,7 @@ export class BankEditorPage implements OnInit, OnDestroy {
         this.patchSection(section.id, {
           drafts: section.drafts.filter((x) => x.id !== d.id),
         }),
-      error: (err) => this.setError(d.id, err?.error?.detail || 'Delete failed.'),
+      error: (err) => this.setError(d.id, httpErrorDetail(err) || 'Delete failed.'),
     });
   }
 
@@ -286,7 +286,7 @@ export class BankEditorPage implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.setFlag(this.uploading, questionId, false);
-        this.setError(questionId, err?.error?.detail || 'Image upload failed.');
+        this.setError(questionId, httpErrorDetail(err) || 'Image upload failed.');
       },
     });
   }

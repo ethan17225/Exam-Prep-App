@@ -1,7 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { ExamService, QuestionBankSummary } from '../../services/exam.service';
+import { httpErrorDetail, ExamService, QuestionBankSummary } from '../../services/exam.service';
 
 @Component({
   selector: 'app-banks',
@@ -37,7 +37,7 @@ export class BanksPage implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.detail || 'Failed to load question banks.');
+        this.loadError.set(httpErrorDetail(err) || 'Failed to load question banks.');
       },
     });
   }
@@ -54,7 +54,7 @@ export class BanksPage implements OnInit {
       next: (bank) => this.router.navigate(['/banks', bank.id]),
       error: (err) => {
         this.creating.set(false);
-        this.createError.set(err?.error?.detail || 'Could not create the bank.');
+        this.createError.set(httpErrorDetail(err) || 'Could not create the bank.');
       },
     });
   }
@@ -75,7 +75,7 @@ export class BanksPage implements OnInit {
       error: (err) => {
         this.deleteError.set({
           ...this.deleteError(),
-          [bank.id]: err?.error?.detail || 'Delete failed.',
+          [bank.id]: httpErrorDetail(err) || 'Delete failed.',
         });
       },
     });

@@ -2,7 +2,7 @@ import { Component, OnInit, signal, computed } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
-import { ExamService, ExamSummary, Course, KindCount } from '../../services/exam.service';
+import { httpErrorDetail, ExamService, ExamSummary, Course, KindCount } from '../../services/exam.service';
 
 @Component({
   selector: 'app-exams',
@@ -101,7 +101,7 @@ export class ExamsPage implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.detail || 'Failed to load exams.');
+        this.loadError.set(httpErrorDetail(err) || 'Failed to load exams.');
       },
     });
   }
@@ -131,7 +131,7 @@ export class ExamsPage implements OnInit {
       error: (err) => {
         this.deleteError.set({
           ...this.deleteError(),
-          [exam.id]: err?.error?.detail || 'Could not change practice mode.',
+          [exam.id]: httpErrorDetail(err) || 'Could not change practice mode.',
         });
       },
     });
@@ -188,7 +188,7 @@ export class ExamsPage implements OnInit {
         this.loadingRename.set({ ...this.loadingRename(), [exam.id]: false });
         this.renameError.set({
           ...this.renameError(),
-          [exam.id]: err?.error?.detail || 'Rename failed.',
+          [exam.id]: httpErrorDetail(err) || 'Rename failed.',
         });
       },
     });
@@ -222,7 +222,7 @@ export class ExamsPage implements OnInit {
       error: (err) => {
         this.deleteError.set({
           ...this.deleteError(),
-          [exam.id]: err?.error?.detail || 'Delete failed.',
+          [exam.id]: httpErrorDetail(err) || 'Delete failed.',
         });
       },
     });

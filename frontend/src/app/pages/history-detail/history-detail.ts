@@ -2,6 +2,7 @@ import { Component, OnInit, signal, computed } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AnswerReviewComponent } from '../../components/answer-review/answer-review';
 import {
+  httpErrorDetail,
   ExamService,
   ExamResult,
   QuestionResult,
@@ -61,7 +62,7 @@ export class HistoryDetailPage implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.detail || 'Failed to load this record.');
+        this.loadError.set(httpErrorDetail(err) || 'Failed to load this record.');
       },
     });
   }

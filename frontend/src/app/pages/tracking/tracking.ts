@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy, signal } from '@angular/core';
 import {
+  httpErrorDetail,
   ExamService,
   AdminDashboardItem,
   formatClock,
@@ -56,7 +57,7 @@ export class TrackingPage implements OnInit, OnDestroy {
         // A transient poll failure with data already on screen shouldn't blank the
         // dashboard — only surface the error when there is nothing to show.
         if (this.items().length === 0) {
-          this.loadError.set(err?.error?.detail || 'Failed to load the dashboard.');
+          this.loadError.set(httpErrorDetail(err) || 'Failed to load the dashboard.');
         }
       },
     });
@@ -114,7 +115,7 @@ export class TrackingPage implements OnInit, OnDestroy {
         this.resetting.set({ ...this.resetting(), [item.id]: false });
         this.resetError.set({
           ...this.resetError(),
-          [item.id]: err?.error?.detail || 'Reset failed.',
+          [item.id]: httpErrorDetail(err) || 'Reset failed.',
         });
       },
     });

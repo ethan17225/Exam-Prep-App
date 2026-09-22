@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 
 import { AdminTabsComponent } from '../../components/admin-tabs/admin-tabs';
 import {
+  httpErrorDetail,
   AdminCourse,
   AdminExam,
   AdminInstructor,
@@ -79,7 +80,7 @@ export class AdminContentPage implements OnInit {
         },
         error: (err) => {
           this.loading.set(false);
-          this.loadError.set(err?.error?.detail || 'Failed to load exams.');
+          this.loadError.set(httpErrorDetail(err) || 'Failed to load exams.');
         },
       });
       return;
@@ -93,7 +94,7 @@ export class AdminContentPage implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.detail || 'Failed to load courses.');
+        this.loadError.set(httpErrorDetail(err) || 'Failed to load courses.');
       },
     });
   }
@@ -196,7 +197,7 @@ export class AdminContentPage implements OnInit {
         this.rowBusy.set({ ...this.rowBusy(), [id]: false });
         this.rowError.set({
           ...this.rowError(),
-          [id]: err?.error?.detail || 'That action failed.',
+          [id]: httpErrorDetail(err) || 'That action failed.',
         });
       },
     });

@@ -272,6 +272,68 @@ export function formatAnswerForDisplay(
 
 // ── Shared page helpers ─────────────────────────────────────────
 
+/**
+ * Unwrap an Angular HttpErrorResponse / FastAPI body into a display string.
+ * `detail` is a string for domain errors and a list of `{loc, msg}` objects
+ * for 422s — interpolating the list is what printed `[object Object]`.
+ */
+export function httpErrorDetail(err: unknown): string {
+  if (err == null) return '';
+  if (typeof err === 'string') return scrubObjectString(err);
+  if (typeof err !== 'object') return '';
+
+  const boxed = err as { error?: unknown; detail?: unknown; message?: unknown };
+  const body = boxed.error;
+  const detail =
+    body && typeof body === 'object' && body !== null && 'detail' in body
+      ? (body as { detail: unknown }).detail
+      : boxed.detail;
+  const fromDetail = formatHttpDetail(detail);
+  if (fromDetail) return fromDetail;
+  if (typeof body === 'string') return scrubObjectString(body);
+  if (typeof boxed.message === 'string') return scrubObjectString(boxed.message);
+  return '';
+}
+
+function scrubObjectString(value: string): string {
+  const t = value.trim();
+  return t === '' || t === '[object Object]' ? '' : t;
+}
+
+function formatHttpDetail(detail: unknown): string {
+  if (detail == null) return '';
+  if (typeof detail === 'string') return scrubObjectString(detail);
+  if (typeof detail === 'number' || typeof detail === 'boolean') return String(detail);
+  if (Array.isArray(detail)) {
+    return detail.map(formatHttpDetailItem).filter(Boolean).join(' ');
+  }
+  if (typeof detail === 'object') return formatHttpDetailItem(detail);
+  return '';
+}
+
+function formatHttpDetailItem(item: unknown): string {
+  if (item == null) return '';
+  if (typeof item === 'string') return scrubObjectString(item);
+  if (typeof item !== 'object') return String(item);
+  if (Array.isArray(item)) return item.map(formatHttpDetailItem).filter(Boolean).join(' ');
+  const o = item as Record<string, unknown>;
+  if (typeof o['msg'] === 'string') {
+    const loc = formatErrorLoc(o['loc']);
+    return loc ? `${loc}: ${o['msg']}` : o['msg'];
+  }
+  if (typeof o['message'] === 'string') return o['message'];
+  if (typeof o['detail'] === 'string') return o['detail'];
+  return '';
+}
+
+function formatErrorLoc(loc: unknown): string {
+  if (!Array.isArray(loc)) return '';
+  return loc
+    .filter((part) => part !== 'body' && part !== 'query' && part !== 'path')
+    .map(String)
+    .join('.');
+}
+
 /** One date format app-wide: locale date + time. */
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleString();

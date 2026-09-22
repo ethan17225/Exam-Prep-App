@@ -5,6 +5,7 @@ import { Observable } from 'rxjs';
 
 import { AdminTabsComponent } from '../../components/admin-tabs/admin-tabs';
 import {
+  httpErrorDetail,
   AdminInstructor,
   AdminUser,
   AdminUserCreate,
@@ -102,7 +103,7 @@ export class AdminUsersPage implements OnInit {
         },
         error: (err) => {
           this.loading.set(false);
-          this.loadError.set(err?.error?.detail || 'Failed to load accounts.');
+          this.loadError.set(httpErrorDetail(err) || 'Failed to load accounts.');
         },
       });
   }
@@ -185,7 +186,7 @@ export class AdminUsersPage implements OnInit {
         },
         error: (err) => {
           this.creating.set(false);
-          this.createError.set(err?.error?.detail || 'Failed to create the account.');
+          this.createError.set(httpErrorDetail(err) || 'Failed to create the account.');
         },
       });
   }
@@ -212,7 +213,7 @@ export class AdminUsersPage implements OnInit {
       error: (err) => {
         if (this.expandedId() !== user.id) return;
         this.detailLoading.set(false);
-        this.detailError.set(err?.error?.detail || 'Failed to load this account.');
+        this.detailError.set(httpErrorDetail(err) || 'Failed to load this account.');
       },
     });
   }
@@ -334,7 +335,7 @@ export class AdminUsersPage implements OnInit {
       },
       error: (err: { error?: { detail?: string } }) => {
         this.setRowBusy(userId, false);
-        this.setRowError(userId, err?.error?.detail || 'That action failed.');
+        this.setRowError(userId, httpErrorDetail(err) || 'That action failed.');
       },
     });
   }

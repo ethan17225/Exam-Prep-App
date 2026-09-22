@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { Course, ExamService, QuestionBankDetail } from '../../services/exam.service';
+import { httpErrorDetail, Course, ExamService, QuestionBankDetail } from '../../services/exam.service';
 import { allocateSectionDraws } from '../../components/question-editor/question-draft';
 
 const DEFAULT_PASS_GRADE = 72;
@@ -96,7 +96,7 @@ export class CreateExamFromBankPage implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.detail || 'Could not load this bank.');
+        this.loadError.set(httpErrorDetail(err) || 'Could not load this bank.');
       },
     });
   }
@@ -166,7 +166,7 @@ export class CreateExamFromBankPage implements OnInit {
         next: () => this.router.navigate(['/exams']),
         error: (err) => {
           this.submitting.set(false);
-          this.error.set(err?.error?.detail || 'Failed to create exam.');
+          this.error.set(httpErrorDetail(err) || 'Failed to create exam.');
         },
       });
   }

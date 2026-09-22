@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, computed, signal, WritableSignal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { ExamService, SectionShare } from '../../services/exam.service';
+import { httpErrorDetail, ExamService, SectionShare } from '../../services/exam.service';
 import { QuestionEditorCardComponent } from '../../components/question-editor/question-editor-card';
 import {
   DEFAULT_MCQ_PAYLOAD,
@@ -103,7 +103,7 @@ export class EditExamPage implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.detail || 'Could not load this exam.');
+        this.loadError.set(httpErrorDetail(err) || 'Could not load this exam.');
       },
     });
   }
@@ -186,7 +186,7 @@ export class EditExamPage implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.savingSettings.set(false);
-          this.settingsError.set(err?.error?.detail || 'Could not save settings.');
+          this.settingsError.set(httpErrorDetail(err) || 'Could not save settings.');
         },
       });
   }
@@ -222,7 +222,7 @@ export class EditExamPage implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.setFlag(this.uploading, questionId, false);
-        this.setError(questionId, err?.error?.detail || 'Image upload failed.');
+        this.setError(questionId, httpErrorDetail(err) || 'Image upload failed.');
       },
     });
   }
@@ -273,7 +273,7 @@ export class EditExamPage implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.setFlag(this.saving, d.id, false);
-          this.setError(d.id, err?.error?.detail || 'Save failed.');
+          this.setError(d.id, httpErrorDetail(err) || 'Save failed.');
         },
       });
   }
@@ -285,7 +285,7 @@ export class EditExamPage implements OnInit, OnDestroy {
         this.drafts.update((list) => list.filter((x) => x.id !== d.id));
         this.totalQuestions.set(Math.max(0, this.totalQuestions() - 1));
       },
-      error: (err) => this.setError(d.id, err?.error?.detail || 'Delete failed.'),
+      error: (err) => this.setError(d.id, httpErrorDetail(err) || 'Delete failed.'),
     });
   }
 
@@ -301,7 +301,7 @@ export class EditExamPage implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.addingQuestion.set(false);
-        alert(err?.error?.detail || 'Could not add a question.');
+        alert(httpErrorDetail(err) || 'Could not add a question.');
       },
     });
   }

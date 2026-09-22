@@ -2,6 +2,7 @@ import { Component, OnInit, signal, computed } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AnswerReviewComponent } from '../../components/answer-review/answer-review';
 import {
+  httpErrorDetail,
   ExamService,
   ExamResult,
   countQuestionTypes,
@@ -45,7 +46,7 @@ export class ResultsPage implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.detail || 'Failed to load the results.');
+        this.loadError.set(httpErrorDetail(err) || 'Failed to load the results.');
       },
     });
   }

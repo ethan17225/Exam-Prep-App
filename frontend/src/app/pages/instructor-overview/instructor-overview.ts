@@ -17,6 +17,7 @@ import {
 } from 'chart.js';
 
 import {
+  httpErrorDetail,
   ExamService,
   InstructorOverview,
   TOPIC_MASTERY_THRESHOLD,
@@ -101,7 +102,7 @@ export class InstructorOverviewPage implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.detail || 'Failed to load your dashboard.');
+        this.loadError.set(httpErrorDetail(err) || 'Failed to load your dashboard.');
       },
     });
   }

@@ -18,6 +18,7 @@ import {
 
 import { AdminTabsComponent } from '../../components/admin-tabs/admin-tabs';
 import {
+  httpErrorDetail,
   ExamService,
   PlatformOverview,
   TOPIC_MASTERY_THRESHOLD,
@@ -95,7 +96,7 @@ export class AdminOverviewPage implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.detail || 'Failed to load the platform dashboard.');
+        this.loadError.set(httpErrorDetail(err) || 'Failed to load the platform dashboard.');
       },
     });
   }

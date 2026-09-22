@@ -2,6 +2,7 @@ import { Component, OnInit, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import {
+  httpErrorDetail,
   ExamService,
   StudentDetail,
   StudentItem,
@@ -78,7 +79,7 @@ export class StudentsPage implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.detail || 'Failed to load your students.');
+        this.loadError.set(httpErrorDetail(err) || 'Failed to load your students.');
       },
     });
   }
@@ -120,7 +121,7 @@ export class StudentsPage implements OnInit {
       error: (err) => {
         if (this.expandedId() !== student.id) return;
         this.detailLoading.set(false);
-        this.detailError.set(err?.error?.detail || 'Failed to load this student.');
+        this.detailError.set(httpErrorDetail(err) || 'Failed to load this student.');
       },
     });
   }

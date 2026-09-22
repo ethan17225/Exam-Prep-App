@@ -1,7 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 
 import { AdminTabsComponent } from '../../components/admin-tabs/admin-tabs';
-import { ExamService, SystemInfo, formatBytes, formatDate } from '../../services/exam.service';
+import { httpErrorDetail, ExamService, SystemInfo, formatBytes, formatDate } from '../../services/exam.service';
 
 /**
  * Deployment status: environment, database, disk and backups.
@@ -40,7 +40,7 @@ export class AdminSystemPage implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.detail || 'Failed to load system status.');
+        this.loadError.set(httpErrorDetail(err) || 'Failed to load system status.');
       },
     });
   }

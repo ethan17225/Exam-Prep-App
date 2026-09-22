@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 import {
+  httpErrorDetail,
   ExamService,
   ExamResultSummary,
   TOPIC_MASTERY_THRESHOLD,
@@ -129,7 +130,7 @@ export class OverviewPage implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.detail || 'Failed to load your progress.');
+        this.loadError.set(httpErrorDetail(err) || 'Failed to load your progress.');
       },
     });
   }

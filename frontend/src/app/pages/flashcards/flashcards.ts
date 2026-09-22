@@ -6,6 +6,7 @@ import {
   Question,
   classifyQuestionType,
   formatAnswerForDisplay,
+  httpErrorDetail,
   shuffle,
 } from '../../services/exam.service';
 
@@ -67,9 +68,9 @@ export class FlashcardsPage implements OnInit {
         this.questions.set(list);
         this.loading.set(false);
       },
-      error: () => {
+      error: (err) => {
         this.loading.set(false);
-        this.error.set('Could not load this exam.');
+        this.error.set(httpErrorDetail(err) || 'Could not load this exam.');
       },
     });
   }

@@ -4,6 +4,7 @@ import {
   classifyQuestionType,
   formatClock,
   formatDuration,
+  httpErrorDetail,
   isAnswerCorrect,
   kindFromType,
   progressPercent,
@@ -186,5 +187,33 @@ describe('formatting helpers', () => {
     const out = applyOptionOrder(questions, { '2': ['D', 'C'] });
     expect(out[0]!.options).toEqual(['A', 'B']);
     expect(out[1]!.options).toEqual(['D', 'C']);
+  });
+});
+
+describe('httpErrorDetail', () => {
+  it('reads a FastAPI string detail', () => {
+    expect(httpErrorDetail({ error: { detail: 'Exam not found' } })).toBe('Exam not found');
+  });
+
+  it('joins Pydantic 422 loc/msg objects instead of printing [object Object]', () => {
+    expect(
+      httpErrorDetail({
+        error: {
+          detail: [
+            { loc: ['body', 'password'], msg: 'String should have at least 8 characters' },
+            { loc: ['body', 'email'], msg: 'value is not a valid email address' },
+          ],
+        },
+      }),
+    ).toBe(
+      'password: String should have at least 8 characters email: value is not a valid email address',
+    );
+  });
+
+  it('falls back to empty so callers can supply their own message', () => {
+    expect(httpErrorDetail({ error: { detail: [{ loc: ['body'] }] } }) || 'Sign in failed.').toBe(
+      'Sign in failed.',
+    );
+    expect(httpErrorDetail(undefined)).toBe('');
   });
 });

@@ -2,6 +2,7 @@ import { Component, OnInit, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import {
+  httpErrorDetail,
   ExamService,
   ExamResultSummary,
   formatDate,
@@ -49,7 +50,7 @@ export class HistoryPage implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.detail || 'Failed to load test history.');
+        this.loadError.set(httpErrorDetail(err) || 'Failed to load test history.');
       },
     });
   }
@@ -65,7 +66,7 @@ export class HistoryPage implements OnInit {
       error: (err) => {
         this.deleteError.set({
           ...this.deleteError(),
-          [id]: err?.error?.detail || 'Delete failed.',
+          [id]: httpErrorDetail(err) || 'Delete failed.',
         });
       },
     });

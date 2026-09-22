@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../../services/auth.service';
+import { httpErrorDetail } from '../../services/exam.service';
 
 @Component({
   selector: 'app-login',
@@ -52,7 +53,7 @@ export class LoginPage implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
-        this.error.set(err?.error?.detail || 'Sign in failed.');
+        this.error.set(httpErrorDetail(err) || 'Sign in failed.');
       },
     });
   }

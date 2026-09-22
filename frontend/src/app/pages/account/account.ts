@@ -2,7 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { AuthService, CurrentUser, initialsOf } from '../../services/auth.service';
-import { formatRole } from '../../services/exam.service';
+import { httpErrorDetail, formatRole } from '../../services/exam.service';
 
 @Component({
   selector: 'app-account',
@@ -55,7 +55,7 @@ export class AccountPage implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.detail || 'Could not load your account.');
+        this.loadError.set(httpErrorDetail(err) || 'Could not load your account.');
       },
     });
   }
@@ -81,7 +81,7 @@ export class AccountPage implements OnInit {
       },
       error: (err) => {
         this.savingName.set(false);
-        this.nameError.set(err?.error?.detail || 'Could not save your name.');
+        this.nameError.set(httpErrorDetail(err) || 'Could not save your name.');
       },
     });
   }
@@ -102,7 +102,7 @@ export class AccountPage implements OnInit {
       },
       error: (err) => {
         this.savingAvatar.set(false);
-        this.avatarError.set(err?.error?.detail || 'Could not upload that image.');
+        this.avatarError.set(httpErrorDetail(err) || 'Could not upload that image.');
       },
     });
   }
@@ -117,7 +117,7 @@ export class AccountPage implements OnInit {
       },
       error: (err) => {
         this.savingAvatar.set(false);
-        this.avatarError.set(err?.error?.detail || 'Could not remove your image.');
+        this.avatarError.set(httpErrorDetail(err) || 'Could not remove your image.');
       },
     });
   }
@@ -154,7 +154,7 @@ export class AccountPage implements OnInit {
       },
       error: (err) => {
         this.savingPassword.set(false);
-        this.passwordError.set(err?.error?.detail || 'Could not change your password.');
+        this.passwordError.set(httpErrorDetail(err) || 'Could not change your password.');
       },
     });
   }

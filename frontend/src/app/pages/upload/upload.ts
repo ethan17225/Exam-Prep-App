@@ -2,7 +2,7 @@ import { Component, OnInit, computed, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
-import { Course, ExamService } from '../../services/exam.service';
+import { httpErrorDetail, Course, ExamService } from '../../services/exam.service';
 import { EXAMPLE_TYPES, buildExampleJson } from './upload.examples';
 
 /** Whether questions come from a pasted array or get added one at a time. */
@@ -59,7 +59,7 @@ export class UploadPage implements OnInit {
       // A course is required to submit, so a failed load must not look like "no courses yet".
       error: (err) =>
         this.courseError.set(
-          err?.error?.detail || 'Failed to load courses — reload the page to retry.',
+          httpErrorDetail(err) || 'Failed to load courses — reload the page to retry.',
         ),
     });
   }
@@ -100,7 +100,7 @@ export class UploadPage implements OnInit {
       },
       error: (err) => {
         this.courseLoading.set(false);
-        this.courseError.set(err?.error?.detail || 'Failed to create course.');
+        this.courseError.set(httpErrorDetail(err) || 'Failed to create course.');
       },
     });
   }
@@ -231,7 +231,7 @@ export class UploadPage implements OnInit {
         },
         error: (err) => {
           this.loading.set(false);
-          this.error.set(err?.error?.detail || 'Failed to create exam.');
+          this.error.set(httpErrorDetail(err) || 'Failed to create exam.');
         },
       });
   }

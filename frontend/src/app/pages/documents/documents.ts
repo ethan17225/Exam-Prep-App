@@ -1,6 +1,6 @@
 import { Component, HostListener, OnInit, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ExamService, Course, DocumentItem } from '../../services/exam.service';
+import { httpErrorDetail, ExamService, Course, DocumentItem } from '../../services/exam.service';
 
 @Component({
   selector: 'app-documents',
@@ -70,7 +70,7 @@ export class DocumentsPage implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
-        this.loadError.set(err?.error?.detail || 'Failed to load documents.');
+        this.loadError.set(httpErrorDetail(err) || 'Failed to load documents.');
       },
     });
   }

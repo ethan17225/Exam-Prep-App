@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
 import { AuthService, initialsOf } from '../../services/auth.service';
+import { httpErrorDetail } from '../../services/exam.service';
 
 @Component({
   selector: 'app-onboarding',
@@ -75,7 +76,7 @@ export class OnboardingPage implements OnInit, OnDestroy {
       next: () => this.uploadThenFinish(),
       error: (err) => {
         this.saving.set(false);
-        this.error.set(err?.error?.detail || 'Could not save your name.');
+        this.error.set(httpErrorDetail(err) || 'Could not save your name.');
       },
     });
   }
@@ -96,7 +97,7 @@ export class OnboardingPage implements OnInit, OnDestroy {
         this.saving.set(false);
         this.pending = null;
         this.avatarError.set(
-          err?.error?.detail || 'Your name was saved, but the image could not be uploaded.',
+          httpErrorDetail(err) || 'Your name was saved, but the image could not be uploaded.',
         );
       },
     });
