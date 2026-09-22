@@ -6,6 +6,11 @@
 } @else if (loading()) {
   <p class="empty-state">Loading exam...</p>
 } @else {
+  @if (timeExpired()) {
+    <div class="time-expired-banner" role="status">
+      Time is up for this attempt. Answers are no longer saved — submit when you are ready.
+    </div>
+  }
   <!-- Sticky exam header -->
   <div class="exam-header-sticky">
     <!-- Top bar -->

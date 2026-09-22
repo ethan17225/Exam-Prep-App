@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { map, of, switchMap } from 'rxjs';
+import { map, switchMap } from 'rxjs';
 import { QuestionSectionsComponent } from '../../components/question-sections/question-sections';
 import { AuthService, PROGRESS_KEY_PREFIX } from '../../services/auth.service';
 import {
@@ -102,6 +102,8 @@ export class TakeExamPage implements OnInit, OnDestroy {
   remainingSeconds = signal(0);
   /** Elapsed seconds for untimed attempts — count-up, not a fake countdown. */
   elapsedSeconds = signal(0);
+  /** True when a resumed attempt is already past its deadline — no auto-submit. */
+  timeExpired = signal(false);
   currentPage = signal(0);
   readonly questionsPerPage = 20;
 
@@ -232,6 +234,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
   load(): void {
     this.loading.set(true);
     this.loadError.set('');
+    this.timeExpired.set(false);
 
     const practice = this.mode() === 'practice';
 
@@ -240,13 +243,24 @@ export class TakeExamPage implements OnInit, OnDestroy {
       // key in the browser — it is one devtools panel away from the student.
       .getExam(this.examId, practice, this.mode())
       .pipe(
-        switchMap((exam) =>
-          this.resumeId
-            ? this.examService
-                .getInProgress(this.resumeId)
-                .pipe(map((saved) => ({ exam, saved: saved as InProgressExam | null })))
-            : of({ exam, saved: null as InProgressExam | null }),
-        ),
+        switchMap((exam) => {
+          if (this.resumeId) {
+            return this.examService
+              .getInProgress(this.resumeId)
+              .pipe(map((saved) => ({ exam, saved: saved as InProgressExam | null })));
+          }
+          // Clicking Exam again must resume the open row for this exam+mode.
+          // Otherwise the start handshake POSTs /in-progress, hits the existing
+          // unique key, and a past deadline returns 409 AttemptExpired while the
+          // questions GET (which already froze the paper) looked fine.
+          return this.examService.listInProgress().pipe(
+            map((rows) => {
+              const saved =
+                rows.find((r) => r.exam_id === this.examId && r.mode === this.mode()) ?? null;
+              return { exam, saved };
+            }),
+          );
+        }),
       )
       .subscribe({
         next: ({ exam, saved }) => {
@@ -269,6 +283,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
           this.timeLimitSeconds.set(limit);
 
           if (saved) {
+            this.resumeId = saved.id;
             this.restoreProgress(exam.questions, saved);
             this.loading.set(false);
             this.startTimer();
@@ -319,10 +334,11 @@ export class TakeExamPage implements OnInit, OnDestroy {
             // fails there is nothing to submit into later, so block rather than
             // let someone sit a whole paper they cannot hand in.
             this.persistProgress({
-              onError: () =>
+              onError: (err) =>
                 this.loadError.set(
-                  'Could not start this attempt. Check your connection and try again — ' +
-                    'do not begin answering until it starts.',
+                  httpErrorDetail(err) ||
+                    'Could not start this attempt. Check your connection and try again — ' +
+                      'do not begin answering until it starts.',
                 ),
               onSuccess: () => {
                 this.loading.set(false);
@@ -356,6 +372,17 @@ export class TakeExamPage implements OnInit, OnDestroy {
 
   private startTimer(): void {
     if (this.timerInterval) clearInterval(this.timerInterval);
+
+    // Resuming an attempt that already hit the deadline: show 00:00 and let the
+    // student submit manually. Starting the interval would fire skipConfirm
+    // submit on the first tick and dump them on Results at 0%.
+    if (this.hasTimeLimit() && this.remainingSeconds() <= 0) {
+      this.remainingSeconds.set(0);
+      this.timeExpired.set(true);
+      return;
+    }
+
+    this.timeExpired.set(false);
     this.timerInterval = setInterval(() => {
       if (!this.hasTimeLimit()) {
         if (this.attemptStartedAtMs != null) {
@@ -371,6 +398,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
       const remaining = this.remainingSeconds();
       if (remaining <= 1) {
         this.remainingSeconds.set(0);
+        this.timeExpired.set(true);
         if (this.timerInterval) clearInterval(this.timerInterval);
         if (this.mode() === 'exam' && !this.submitting()) this.submit({ skipConfirm: true });
         return;
