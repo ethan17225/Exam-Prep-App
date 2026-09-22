@@ -33,7 +33,12 @@
     @for (bank of banks(); track bank.id) {
       <div class="card exam-card bank-row">
         <div class="exam-body">
-          <h2 class="exam-title">{{ bank.title }}</h2>
+          <div class="exam-heading">
+            <h2 class="exam-title">{{ bank.title }}</h2>
+            @if (bank.is_collaborator) {
+              <span class="origin-badge origin-shared">Shared with me</span>
+            }
+          </div>
           <p class="exam-meta">
             <span>{{ bank.section_count }} sections</span>
             <span class="meta-sep" aria-hidden="true">·</span>
@@ -49,7 +54,9 @@
         </div>
         <div class="exam-actions">
           <button class="btn btn-primary btn-sm" (click)="open(bank)">Edit</button>
-          <button class="btn btn-danger btn-sm" (click)="remove(bank)">Delete</button>
+          @if (bank.is_owner !== false) {
+            <button class="btn btn-danger btn-sm" (click)="remove(bank)">Delete</button>
+          }
         </div>
       </div>
     }

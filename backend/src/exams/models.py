@@ -46,6 +46,25 @@ class Exam(Base):
         back_populates="exam",
         cascade="all, delete-orphan",
     )
+    collaborators = relationship(
+        "ExamCollaborator",
+        back_populates="exam",
+        cascade="all, delete-orphan",
+    )
+
+
+class ExamCollaborator(Base):
+    """Instructor granted write access to another instructor's exam."""
+
+    __tablename__ = "exam_collaborator"
+    __table_args__ = (Index(None, "user_id"),)
+
+    exam_id = Column(String(ID_LENGTH), ForeignKey("exam.id", ondelete="CASCADE"), primary_key=True)
+    user_id = Column(String(ID_LENGTH), ForeignKey("user.id", ondelete="CASCADE"), primary_key=True)
+    invited_by = Column(String(ID_LENGTH), ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False)
+
+    exam = relationship("Exam", back_populates="collaborators")
 
 
 class ExamSectionShare(Base):

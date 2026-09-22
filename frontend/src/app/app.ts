@@ -3,6 +3,7 @@ import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 
 import { UserMenuComponent } from './components/user-menu/user-menu';
 import { AuthService } from './services/auth.service';
+import { httpErrorDetail } from './services/exam.service';
 
 @Component({
   selector: 'app-root',
@@ -11,7 +12,13 @@ import { AuthService } from './services/auth.service';
   styleUrl: './app.scss',
 })
 export class App {
-  // Signing out moved into the user menu, which is why this class has no logic
-  // left beyond exposing auth to the template.
   constructor(public auth: AuthService) {}
+
+  exitImpersonation(): void {
+    this.auth.endImpersonation().subscribe({
+      error: (err) => {
+        alert(httpErrorDetail(err) || 'Could not end impersonation.');
+      },
+    });
+  }
 }

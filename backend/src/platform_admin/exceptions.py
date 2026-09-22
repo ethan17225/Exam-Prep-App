@@ -34,6 +34,26 @@ class SelfActionRefused(DetailedHTTPException):
     DETAIL = "You cannot change your own role or delete your own account"
 
 
+class ImpersonateSelfRefused(DetailedHTTPException):
+    STATUS_CODE = 409
+    DETAIL = "You cannot impersonate your own account"
+
+
+class ImpersonateAdminRefused(DetailedHTTPException):
+    STATUS_CODE = 403
+    DETAIL = "You cannot impersonate another admin"
+
+
+class AlreadyImpersonating(DetailedHTTPException):
+    STATUS_CODE = 409
+    DETAIL = "End the current impersonation session before starting another"
+
+
+class NotImpersonating(DetailedHTTPException):
+    STATUS_CODE = 409
+    DETAIL = "You are not currently impersonating anyone"
+
+
 class StudentHasNoInstructor(DetailedHTTPException):
     STATUS_CODE = 422
     DETAIL = "A student must be enrolled with an instructor"

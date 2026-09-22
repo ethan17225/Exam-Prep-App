@@ -8,11 +8,23 @@ from typing import Annotated
 
 from pydantic import BaseModel, PlainSerializer
 
-# One datetime convention for the whole API. Timestamps are naive local time
-# (see the `datetime.now()` convention in the services), and `.isoformat()` on a
-# naive datetime renders exactly what the hand-written serializers produced
-# before — the wire format must not shift.
-ISODateTime = Annotated[datetime, PlainSerializer(lambda v: v.isoformat(), return_type=str)]
+
+def _iso_utc(value: datetime) -> str:
+    """Wire format for API timestamps.
+
+    Services store naive datetimes from `datetime.now()` (UTC in Docker). A
+    bare `.isoformat()` has no offset, so browsers parse it as *local* and shift
+    exam clocks by the client UTC offset. Tag naive values as UTC with `Z`.
+    """
+    if value.tzinfo is not None:
+        return value.isoformat()
+    return value.isoformat() + "Z"
+
+
+# One datetime convention for the whole API. Naive values are UTC; aware values
+# keep their offset. Always go through this annotation — never hand-roll
+# `.isoformat()` in a service.
+ISODateTime = Annotated[datetime, PlainSerializer(_iso_utc, return_type=str)]
 
 
 class DeletedOut(BaseModel):

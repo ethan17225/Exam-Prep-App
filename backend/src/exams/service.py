@@ -3,27 +3,38 @@ from datetime import datetime
 
 from fastapi import UploadFile
 from fastapi.concurrency import run_in_threadpool
-from sqlalchemy import Select, delete, func, or_, select
+from sqlalchemy import Select, and_, delete, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from src.auth.constants import STAFF_ROLES
+from src.auth.constants import STAFF_ROLES, UserRole
 from src.auth.models import User
 from src.authz import visible
 from src.banks import service as banks_service
 from src.banks.exceptions import DuplicateSectionShare, EmptyBankDraw, SectionNotFound
-from src.banks.models import BankSection, QuestionBank
+from src.banks.models import BankCollaborator, BankSection, QuestionBank
 from src.courses import service as courses_service
 from src.exams.exceptions import (
+    AlreadyCollaborator,
     AttemptLargerThanBank,
+    CannotShareWithSelf,
+    CollaboratorNotFound,
     EmptyTitle,
     ExamNotFound,
     ImageTooLarge,
+    InstructorNotFound,
     QuestionNotFound,
     UnsupportedImageType,
 )
-from src.exams.models import Exam, ExamSectionShare, Question
-from src.exams.schemas import ExamCreate, ExamFromBank, ExamQuestionOut, QuestionIn, QuestionUpdate, SectionShareIn
+from src.exams.models import Exam, ExamCollaborator, ExamSectionShare, Question
+from src.exams.schemas import (
+    ExamCreate,
+    ExamFromBank,
+    ExamQuestionOut,
+    QuestionIn,
+    QuestionUpdate,
+    SectionShareIn,
+)
 from src.grading.service import GradableRow, TypeCountRow, question_kind_counts, question_type_counts
 from src.identifiers import new_id
 from src.storage import (
@@ -52,13 +63,33 @@ def _clean_title(title: str) -> str:
 # confirm that an id exists to someone who may not see it.
 
 
+def is_exam_collaborator(user_id: str):
+    """Correlated EXISTS against the outer Exam row."""
+    return exists(
+        select(1).where(
+            ExamCollaborator.exam_id == Exam.id,
+            ExamCollaborator.user_id == user_id,
+        )
+    )
+
+
+def exam_readable(user: User):
+    """Shared classroom visibility, ownership, or peer collaboration."""
+    return or_(visible(Exam, user), is_exam_collaborator(user.id))
+
+
+def exam_writable(user: User):
+    """Owner or collaborator may mutate settings/questions. Delete stays owner-only."""
+    return or_(Exam.owner_id == user.id, is_exam_collaborator(user.id))
+
+
 async def get_visible_exam_or_404(exam_id: str, user: User, db: AsyncSession, with_questions: bool = False) -> Exam:
     """Read access. Deliberately a plain function, not a FastAPI dependency:
     dependencies resolve before the request body is validated, so making this a
     dependency would turn a malformed-payload 422 into a 404."""
     # `course` is eager-loaded unconditionally: every caller ends up rendering
     # course_name, and it is a single row on a many-to-one.
-    stmt: Select = select(Exam).options(joinedload(Exam.course)).where(Exam.id == exam_id, visible(Exam, user))
+    stmt: Select = select(Exam).options(joinedload(Exam.course)).where(Exam.id == exam_id, exam_readable(user))
     if with_questions:
         # Otherwise `exam.questions` lazy-loads, which raises under async.
         stmt = stmt.options(selectinload(Exam.questions))
@@ -69,13 +100,33 @@ async def get_visible_exam_or_404(exam_id: str, user: User, db: AsyncSession, wi
 
 
 async def get_owned_exam_or_404(exam_id: str, user: User, db: AsyncSession) -> Exam:
-    """Write access. Being able to see a shared exam never implies being able to
-    change it, so this is separate from the read predicate."""
+    """Owner-only write access (delete, share management). Seeing or collaborating
+    on an exam never implies being able to delete it or invite others."""
     stmt = select(Exam).options(joinedload(Exam.course)).where(Exam.id == exam_id, Exam.owner_id == user.id)
     exam = (await db.execute(stmt)).scalars().unique().one_or_none()
     if not exam:
         raise ExamNotFound()
     return exam
+
+
+async def get_writable_exam_or_404(exam_id: str, user: User, db: AsyncSession) -> Exam:
+    """Owner or collaborator may change settings and questions."""
+    stmt = select(Exam).options(joinedload(Exam.course)).where(Exam.id == exam_id, exam_writable(user))
+    exam = (await db.execute(stmt)).scalars().unique().one_or_none()
+    if not exam:
+        raise ExamNotFound()
+    return exam
+
+
+async def _is_collaborator(exam_id: str, user_id: str, db: AsyncSession) -> bool:
+    return bool(
+        await db.scalar(
+            select(ExamCollaborator.exam_id).where(
+                ExamCollaborator.exam_id == exam_id,
+                ExamCollaborator.user_id == user_id,
+            )
+        )
+    )
 
 
 async def get_owned_question_or_404(question_id: int, user: User, db: AsyncSession) -> Question:
@@ -87,9 +138,22 @@ async def get_owned_question_or_404(question_id: int, user: User, db: AsyncSessi
         .outerjoin(Exam, Question.exam_id == Exam.id)
         .outerjoin(BankSection, Question.section_id == BankSection.id)
         .outerjoin(QuestionBank, BankSection.bank_id == QuestionBank.id)
+        .outerjoin(
+            ExamCollaborator,
+            and_(ExamCollaborator.exam_id == Exam.id, ExamCollaborator.user_id == user.id),
+        )
+        .outerjoin(
+            BankCollaborator,
+            and_(BankCollaborator.bank_id == QuestionBank.id, BankCollaborator.user_id == user.id),
+        )
         .where(
             Question.id == question_id,
-            or_(Exam.owner_id == user.id, QuestionBank.owner_id == user.id),
+            or_(
+                Exam.owner_id == user.id,
+                QuestionBank.owner_id == user.id,
+                ExamCollaborator.user_id.is_not(None),
+                BankCollaborator.user_id.is_not(None),
+            ),
         )
     )
     question = (await db.execute(stmt)).scalar_one_or_none()
@@ -102,7 +166,7 @@ async def get_owned_question_in_exam_or_404(exam_id: str, question_id: int, user
     stmt = (
         select(Question)
         .join(Exam, Question.exam_id == Exam.id)
-        .where(Question.id == question_id, Question.exam_id == exam_id, Exam.owner_id == user.id)
+        .where(Question.id == question_id, Question.exam_id == exam_id, exam_writable(user))
     )
     question = (await db.execute(stmt)).scalar_one_or_none()
     if not question:
@@ -209,6 +273,7 @@ def _summary(
     counts: list[TypeCountRow],
     user: User,
     total_questions: int | None = None,
+    is_collaborator: bool = False,
 ) -> dict:
     """The one place ExamSummaryOut's computed shape is assembled."""
     mcq, sata, fib, other = question_type_counts(counts)
@@ -223,6 +288,7 @@ def _summary(
         "questions_per_attempt": exam.questions_per_attempt,
         "allow_practice": exam.allow_practice,
         "is_owner": exam.owner_id == user.id,
+        "is_collaborator": is_collaborator,
         "total_questions": len(counts) if total_questions is None else total_questions,
         "mcq_count": mcq,
         "sata_count": sata,
@@ -239,12 +305,15 @@ async def exam_summary(exam: Exam, user: User, db: AsyncSession) -> dict:
     total = None
     if exam.bank_id:
         total = (await _bank_expected_draws([exam.id], db)).get(exam.id, 0)
+    is_collaborator = False
+    if exam.owner_id != user.id:
+        is_collaborator = await _is_collaborator(exam.id, user.id, db)
     # exam.course is eager-loaded by both loaders, so this costs nothing.
-    return _summary(exam, exam.course.name if exam.course else None, counts, user, total)
+    return _summary(exam, exam.course.name if exam.course else None, counts, user, total, is_collaborator)
 
 
 async def list_summaries(user: User, course_id: str | None, db: AsyncSession, limit: int = 200) -> list[dict]:
-    stmt = select(Exam).options(joinedload(Exam.course)).where(visible(Exam, user))
+    stmt = select(Exam).options(joinedload(Exam.course)).where(exam_readable(user))
     if course_id:
         stmt = stmt.where(Exam.course_id == course_id)
     # Bounded: shared exams are visible to everyone, and the count query below
@@ -259,6 +328,20 @@ async def list_summaries(user: User, course_id: str | None, db: AsyncSession, li
 
     bank_ids = [e.id for e in exams if e.bank_id]
     draws = await _bank_expected_draws(bank_ids, db) if bank_ids else {}
+    collab_ids: set[str] = set()
+    if exams:
+        collab_ids = set(
+            (
+                await db.execute(
+                    select(ExamCollaborator.exam_id).where(
+                        ExamCollaborator.user_id == user.id,
+                        ExamCollaborator.exam_id.in_([e.id for e in exams]),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
     return [
         _summary(
             e,
@@ -266,6 +349,7 @@ async def list_summaries(user: User, course_id: str | None, db: AsyncSession, li
             counts[e.id],
             user,
             draws.get(e.id, 0) if e.bank_id else None,
+            e.id in collab_ids,
         )
         for e in exams
     ]
@@ -308,7 +392,7 @@ async def create(payload: ExamCreate, user: User, db: AsyncSession) -> dict:
 
 async def create_from_bank(payload: ExamFromBank, user: User, db: AsyncSession) -> dict:
     title = _clean_title(payload.title)
-    bank = await banks_service.get_owned_or_404(payload.bank_id, user, db)
+    bank = await banks_service.get_writable_or_404(payload.bank_id, user, db)
     if payload.course_id:
         await courses_service.get_visible_or_404(payload.course_id, user, db)
     await _validate_shares(payload.shares, {s.id for s in bank.sections}, db, payload.questions_per_attempt)
@@ -318,8 +402,8 @@ async def create_from_bank(payload: ExamFromBank, user: User, db: AsyncSession) 
         Exam(
             id=exam_id,
             owner_id=user.id,
-            is_shared=user.role == UserRole.INSTRUCTOR,
-            allow_practice=user.role != UserRole.INSTRUCTOR,
+            is_shared=user.role in STAFF_ROLES,
+            allow_practice=user.role not in STAFF_ROLES,
             title=title,
             course_id=payload.course_id,
             time_limit_minutes=payload.time_limit_minutes,
@@ -347,10 +431,13 @@ async def detail(
     exam = await get_visible_exam_or_404(exam_id, user, db, with_questions=True)
 
     # The single gate on answer-key disclosure. An assessment-only exam
-    # (allow_practice=False) never yields its key to anyone but the owner, so
-    # there is no route by which a student can read it before submitting.
+    # (allow_practice=False) never yields its key to anyone but the owner or a
+    # collaborator, so there is no route by which a student can read it before
+    # submitting.
     is_owner = exam.owner_id == user.id
-    include_answers = include_answers and (is_owner or exam.allow_practice)
+    is_collaborator = False if is_owner else await _is_collaborator(exam.id, user.id, db)
+    can_manage = is_owner or is_collaborator
+    include_answers = include_answers and (can_manage or exam.allow_practice)
     bank_backed = exam.bank_id is not None
 
     if bank_backed:
@@ -374,7 +461,7 @@ async def detail(
             row["rationale"] = q.rationale or ""
         questions.append(row)
 
-    shares = await section_shares_for_exam(exam.id, db) if is_owner and bank_backed else None
+    shares = await section_shares_for_exam(exam.id, db) if can_manage and bank_backed else None
 
     return {
         "id": exam.id,
@@ -390,6 +477,7 @@ async def detail(
         "answers_included": include_answers,
         "allow_practice": exam.allow_practice,
         "is_owner": is_owner,
+        "is_collaborator": is_collaborator,
         "questions": questions,
         "bank_id": exam.bank_id,
         "bank_backed": bank_backed,
@@ -404,13 +492,13 @@ async def rename(exam_id: str, title: str, user: User, db: AsyncSession) -> Exam
     that fan-out lives in a domain this one may not import. The router sequences
     the two and `attempts.service.rename_exam` commits both.
     """
-    exam = await get_owned_exam_or_404(exam_id, user, db)
+    exam = await get_writable_exam_or_404(exam_id, user, db)
     exam.title = _clean_title(title)
     return exam
 
 
 async def set_allow_practice(exam_id: str, allow: bool, user: User, db: AsyncSession) -> Exam:
-    exam = await get_owned_exam_or_404(exam_id, user, db)
+    exam = await get_writable_exam_or_404(exam_id, user, db)
     exam.allow_practice = allow
     await db.commit()
     return exam
@@ -419,14 +507,14 @@ async def set_allow_practice(exam_id: str, allow: bool, user: User, db: AsyncSes
 async def set_pass_grade(exam_id: str, pass_grade: int, user: User, db: AsyncSession) -> Exam:
     """Applies to attempts submitted from now on. Past attempts keep the threshold
     they were graded against — History carries its own copy."""
-    exam = await get_owned_exam_or_404(exam_id, user, db)
+    exam = await get_writable_exam_or_404(exam_id, user, db)
     exam.pass_grade = pass_grade
     await db.commit()
     return exam
 
 
 async def set_time_limit(exam_id: str, minutes: int | None, user: User, db: AsyncSession) -> Exam:
-    exam = await get_owned_exam_or_404(exam_id, user, db)
+    exam = await get_writable_exam_or_404(exam_id, user, db)
     # Zero or negative clears the limit rather than storing a nonsensical one.
     exam.time_limit_minutes = minutes if minutes else None
     await db.commit()
@@ -446,7 +534,7 @@ async def set_settings(
     db: AsyncSession,
 ) -> Exam:
     """Applies the edit-portal settings strip in one round trip."""
-    exam = await get_owned_exam_or_404(exam_id, user, db)
+    exam = await get_writable_exam_or_404(exam_id, user, db)
     if set_time_limit:
         exam.time_limit_minutes = time_limit_minutes if time_limit_minutes else None
     if shuffle is not None:
@@ -456,7 +544,7 @@ async def set_settings(
     elif questions_per_attempt is not None:
         exam.questions_per_attempt = questions_per_attempt
     if exam.bank_id and shares is not None:
-        bank = await banks_service.get_owned_or_404(exam.bank_id, user, db)
+        bank = await banks_service.get_writable_or_404(exam.bank_id, user, db)
         await _validate_shares(shares, {s.id for s in bank.sections}, db, exam.questions_per_attempt)
         await db.execute(delete(ExamSectionShare).where(ExamSectionShare.exam_id == exam.id))
         for share in shares:
@@ -477,6 +565,84 @@ async def set_settings(
 async def delete_exam(exam_id: str, user: User, db: AsyncSession) -> None:
     exam = await get_owned_exam_or_404(exam_id, user, db)
     await _delete(exam, db)
+
+
+async def list_collaborators(exam_id: str, user: User, db: AsyncSession) -> list[dict]:
+    await get_owned_exam_or_404(exam_id, user, db)
+    rows = (
+        await db.execute(
+            select(ExamCollaborator, User)
+            .join(User, User.id == ExamCollaborator.user_id)
+            .where(ExamCollaborator.exam_id == exam_id)
+            .order_by(ExamCollaborator.created_at)
+        )
+    ).all()
+    return [
+        {
+            "user_id": collab.user_id,
+            "email": invitee.email,
+            "created_at": collab.created_at,
+        }
+        for collab, invitee in rows
+    ]
+
+
+async def add_collaborator(exam_id: str, email: str, user: User, db: AsyncSession) -> dict:
+    exam = await get_owned_exam_or_404(exam_id, user, db)
+    normalized = email.strip().lower()
+    invitee = (await db.execute(select(User).where(User.email == normalized))).scalar_one_or_none()
+    if not invitee or invitee.role != UserRole.INSTRUCTOR:
+        raise InstructorNotFound()
+    if invitee.id == user.id:
+        raise CannotShareWithSelf()
+    if await _is_collaborator(exam.id, invitee.id, db):
+        raise AlreadyCollaborator()
+
+    collab = ExamCollaborator(
+        exam_id=exam.id,
+        user_id=invitee.id,
+        invited_by=user.id,
+        created_at=datetime.now(),
+    )
+    db.add(collab)
+    if exam.bank_id:
+        await banks_service.grant_collaborator(exam.bank_id, invitee.id, user.id, db)
+    await db.commit()
+    return {
+        "user_id": invitee.id,
+        "email": invitee.email,
+        "created_at": collab.created_at,
+    }
+
+
+async def remove_collaborator(exam_id: str, collaborator_id: str, user: User, db: AsyncSession) -> None:
+    exam = await get_owned_exam_or_404(exam_id, user, db)
+    row = (
+        await db.execute(
+            select(ExamCollaborator).where(
+                ExamCollaborator.exam_id == exam.id,
+                ExamCollaborator.user_id == collaborator_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not row:
+        raise CollaboratorNotFound()
+    await db.delete(row)
+
+    if exam.bank_id:
+        still = await db.scalar(
+            select(ExamCollaborator.exam_id)
+            .join(Exam, Exam.id == ExamCollaborator.exam_id)
+            .where(
+                ExamCollaborator.user_id == collaborator_id,
+                Exam.bank_id == exam.bank_id,
+            )
+            .limit(1)
+        )
+        if not still:
+            await banks_service.revoke_collaborator(exam.bank_id, collaborator_id, db)
+
+    await db.commit()
 
 
 async def _delete(exam: Exam, db: AsyncSession) -> None:
@@ -619,7 +785,7 @@ def _new_question(exam_id: str, payload: QuestionIn) -> Question:
 
 
 async def add_question(exam_id: str, payload: QuestionIn, user: User, db: AsyncSession) -> Question:
-    await get_owned_exam_or_404(exam_id, user, db)
+    await get_writable_exam_or_404(exam_id, user, db)
     question = _new_question(exam_id, payload)
     db.add(question)
     await db.commit()
@@ -883,7 +1049,7 @@ def _new_section_question(section_id: str, payload: QuestionIn) -> Question:
 async def add_questions_to_section(
     bank_id: str, section_id: str, questions: list[QuestionIn], user, db: AsyncSession
 ) -> int:
-    await banks_service.get_owned_section_or_404(bank_id, section_id, user, db)
+    await banks_service.get_writable_section_or_404(bank_id, section_id, user, db)
     for q in questions:
         db.add(_new_section_question(section_id, q))
     await db.commit()
@@ -901,7 +1067,7 @@ async def get_owned_question_in_section_or_404(
             Question.id == question_id,
             Question.section_id == section_id,
             BankSection.bank_id == bank_id,
-            QuestionBank.owner_id == user.id,
+            banks_service.bank_writable(user),
         )
     )
     question = (await db.execute(stmt)).scalar_one_or_none()

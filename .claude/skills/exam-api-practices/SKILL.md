@@ -57,7 +57,7 @@ files per domain; ~32 of those should not exist here. An empty `utils.py` become
 a grab-bag within a month.
 
 **No `src/health/`.** One 6-line readiness probe with no model, schema or
-business logic lives in `main.py`. `/healthz` has **no `/api` prefix** — the
+business logic lives in`main.py` . `/healthz` has **no `/api` prefix** — the
 Dockerfile `HEALTHCHECK` and the frontend's `depends_on: service_healthy` both
 hit that exact path.
 

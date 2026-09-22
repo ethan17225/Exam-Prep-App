@@ -10,15 +10,21 @@ from src.courses.exceptions import CourseNotFound
 from src.database import SessionDep
 from src.exams import service
 from src.exams.exceptions import (
+    AlreadyCollaborator,
     AttemptLargerThanBank,
+    CannotShareWithSelf,
+    CollaboratorNotFound,
     EmptyTitle,
     ExamNotFound,
     ImageTooLarge,
+    InstructorNotFound,
     QuestionNotFound,
     UnsupportedImageType,
 )
 from src.exams.schemas import (
     ExamAllowPracticeUpdate,
+    ExamCollaboratorInvite,
+    ExamCollaboratorOut,
     ExamCreate,
     ExamCreatedOut,
     ExamDetailOut,
@@ -65,7 +71,10 @@ async def create_exam(payload: ExamCreate, user: CurrentUserDep, db: SessionDep)
     "",
     response_model=list[ExamSummaryOut],
     summary="List exams",
-    description="Exams shared by an instructor plus the caller's own, with question-type counts.",
+    description=(
+        "Exams shared by an instructor, the caller's own exams, and exams "
+        "another instructor has invited them to collaborate on."
+    ),
 )
 async def list_exams(
     user: CurrentUserDep,
@@ -223,6 +232,56 @@ async def update_exam_settings(exam_id: str, payload: ExamSettingsUpdate, user: 
 )
 async def delete_exam(exam_id: str, user: CurrentUserDep, db: SessionDep):
     await service.delete_exam(exam_id, user, db)
+    return {"deleted": True}
+
+
+@router.get(
+    "/{exam_id}/collaborators",
+    response_model=list[ExamCollaboratorOut],
+    summary="List exam collaborators",
+    description="Instructors the owner has invited to edit this exam. Owner only.",
+    responses=NO_EXAM,
+)
+async def list_exam_collaborators(exam_id: str, user: InstructorDep, db: SessionDep):
+    return await service.list_collaborators(exam_id, user, db)
+
+
+@router.post(
+    "/{exam_id}/collaborators",
+    response_model=ExamCollaboratorOut,
+    summary="Share an exam with an instructor",
+    description=(
+        "Grants another instructor write access to this exam. If the exam is "
+        "bank-backed, they also get write access to that question bank."
+    ),
+    responses={
+        **NO_EXAM,
+        status.HTTP_404_NOT_FOUND: {"description": InstructorNotFound.DETAIL},
+        status.HTTP_400_BAD_REQUEST: {"description": CannotShareWithSelf.DETAIL},
+        status.HTTP_409_CONFLICT: {"description": AlreadyCollaborator.DETAIL},
+    },
+)
+async def add_exam_collaborator(
+    exam_id: str, payload: ExamCollaboratorInvite, user: InstructorDep, db: SessionDep
+):
+    return await service.add_collaborator(exam_id, payload.email, user, db)
+
+
+@router.delete(
+    "/{exam_id}/collaborators/{user_id}",
+    response_model=DeletedOut,
+    summary="Revoke exam collaborator access",
+    description=(
+        "Removes the invitee's access to this exam. Bank access is dropped only "
+        "when they no longer collaborate on any exam that uses the same bank."
+    ),
+    responses={
+        **NO_EXAM,
+        status.HTTP_404_NOT_FOUND: {"description": CollaboratorNotFound.DETAIL},
+    },
+)
+async def remove_exam_collaborator(exam_id: str, user_id: str, user: InstructorDep, db: SessionDep):
+    await service.remove_collaborator(exam_id, user_id, user, db)
     return {"deleted": True}
 
 

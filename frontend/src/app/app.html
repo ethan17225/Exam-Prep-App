@@ -1,5 +1,22 @@
 @if (auth.isLoggedIn()) {
-  <nav class="nav">
+  @if (auth.isImpersonating()) {
+    <div class="impersonation-banner" role="status">
+      <span class="impersonation-banner-text">
+        Viewing as
+        <strong>{{ auth.user()?.display_name || auth.user()?.email }}</strong>
+        ({{ auth.user()?.role }})
+      </span>
+      <button
+        type="button"
+        class="btn btn-secondary btn-sm"
+        [disabled]="auth.endingImpersonation()"
+        (click)="exitImpersonation()"
+      >
+        {{ auth.endingImpersonation() ? 'Exiting…' : 'Exit impersonation' }}
+      </button>
+    </div>
+  }
+  <nav class="nav" [class.nav-below-banner]="auth.isImpersonating()">
     <span class="nav-brand">Exam Prep</span>
     <div class="nav-links">
       <a routerLink="/overview" routerLinkActive="active">Overview</a>
@@ -13,7 +30,7 @@
       @if (!auth.isAdmin()) {
         <a routerLink="/exams" routerLinkActive="active">Exams</a>
       }
-      @if (auth.isStudent()) {
+      @if (auth.isStudent() || auth.isInstructor()) {
         <a routerLink="/in-progress" routerLinkActive="active">In Progress</a>
         <a routerLink="/history" routerLinkActive="active">History</a>
       }

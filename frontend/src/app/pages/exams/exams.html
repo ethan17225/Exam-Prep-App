@@ -78,13 +78,13 @@
               } @else {
                 <h2 class="exam-title">{{ exam.title }}</h2>
               }
-              @if (!isInstructor()) {
+              @if (!isInstructor() || exam.is_collaborator) {
                 <span
                   class="origin-badge"
                   [class.origin-personal]="exam.is_owner"
                   [class.origin-shared]="!exam.is_owner"
                 >
-                  {{ exam.is_owner ? 'Personal' : 'From instructor' }}
+                  {{ originLabel(exam) }}
                 </span>
               }
               @if (exam.course_name) {
@@ -168,9 +168,14 @@
                       {{ exam.allow_practice ? 'Make Assessment-Only' : 'Allow Practice Mode' }}
                     </button>
                   }
-                  <button class="menu-option menu-option-danger" (mousedown)="remove(exam)">
-                    Delete
-                  </button>
+                  @if (exam.is_owner && isInstructor()) {
+                    <button class="menu-option" (mousedown)="openShare(exam)">Share…</button>
+                  }
+                  @if (exam.is_owner) {
+                    <button class="menu-option menu-option-danger" (mousedown)="remove(exam)">
+                      Delete
+                    </button>
+                  }
                 </div>
               }
             </div>
@@ -178,5 +183,62 @@
         }
       </div>
     }
+  </div>
+}
+
+@if (shareExam(); as exam) {
+  <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
+  <div class="share-overlay" (click)="closeShare()">
+    <div
+      class="share-dialog card"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="share-title"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="share-header">
+        <h2 id="share-title">Share “{{ exam.title }}”</h2>
+        <button type="button" class="btn btn-secondary btn-sm" (click)="closeShare()">Close</button>
+      </div>
+      <p class="share-help">
+        Invite another instructor by email. They can edit this exam
+        @if (exam.bank_id) {
+          and its question bank
+        }
+        , but cannot delete it or invite others.
+      </p>
+      <form class="share-invite" (submit)="$event.preventDefault(); inviteCollaborator()">
+        <input
+          type="email"
+          placeholder="instructor@example.com"
+          aria-label="Instructor email"
+          [ngModel]="shareEmail()"
+          (ngModelChange)="shareEmail.set($event)"
+          name="shareEmail"
+        />
+        <button class="btn btn-primary" type="submit" [disabled]="shareInviteLoading()">
+          {{ shareInviteLoading() ? 'Sharing…' : 'Share' }}
+        </button>
+      </form>
+      @if (shareError()) {
+        <p class="rename-error">{{ shareError() }}</p>
+      }
+      @if (shareLoading()) {
+        <p class="share-empty">Loading collaborators…</p>
+      } @else if (collaborators().length === 0) {
+        <p class="share-empty">Not shared with anyone yet.</p>
+      } @else {
+        <ul class="share-list">
+          @for (row of collaborators(); track row.user_id) {
+            <li>
+              <span>{{ row.email }}</span>
+              <button type="button" class="btn btn-secondary btn-sm" (click)="revokeCollaborator(row)">
+                Remove
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </div>
   </div>
 }

@@ -66,11 +66,20 @@ class UserOut(BaseModel):
     invite_code: str | None
 
 
+class ImpersonatorOut(BaseModel):
+    """The real admin behind an active impersonation session."""
+
+    id: str
+    email: EmailStr
+
+
 class MeOut(UserOut):
-    """Adds the one field that is not a column. Assembled by
+    """Adds the fields that are not columns. Assembled by
     `service.build_me`, which is the only place this shape is built."""
 
     instructor_name: str | None
+    impersonating: bool = False
+    impersonated_by: ImpersonatorOut | None = None
 
 
 class TokenOut(BaseModel):

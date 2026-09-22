@@ -36,7 +36,11 @@ from src.platform_admin.constants import (
 )
 from src.platform_admin.exceptions import (
     AccountNotFound,
+    AlreadyImpersonating,
+    ImpersonateAdminRefused,
+    ImpersonateSelfRefused,
     InstructorNotFound,
+    NotImpersonating,
     OwnerNotStaff,
     ReassignToSameInstructor,
     SelfActionRefused,
@@ -315,6 +319,66 @@ async def revoke_sessions(user_id: str, actor: User, db: AsyncSession) -> None:
     user = await _get_or_404(user_id, db)
     await auth_service.revoke_tokens(user, db)
     await record(actor, AuditAction.USER_SESSIONS_REVOKED, TargetType.USER, user.id, user.email, db)
+
+
+async def start_impersonation(
+    target_id: str,
+    actor: User,
+    db: AsyncSession,
+    *,
+    already_impersonating: bool,
+) -> User:
+    """Validate and audit the start of an impersonation session.
+
+    Does not bump the target's `token_version` — the admin is joining their
+    session view, not signing them out. Returns the target so the router can
+    mint the impersonation JWT.
+    """
+    if already_impersonating:
+        raise AlreadyImpersonating()
+    if target_id == actor.id:
+        raise ImpersonateSelfRefused()
+
+    target = await _get_or_404(target_id, db)
+    if target.role == UserRole.ADMIN:
+        raise ImpersonateAdminRefused()
+
+    await record(
+        actor,
+        AuditAction.USER_IMPERSONATION_STARTED,
+        TargetType.USER,
+        target.id,
+        target.email,
+        db,
+        role=str(target.role),
+    )
+    return target
+
+
+async def end_impersonation(
+    actor: User,
+    effective: User,
+    db: AsyncSession,
+    *,
+    is_impersonating: bool,
+) -> User:
+    """Audit the end of an impersonation session and return the real admin.
+
+    The router mints a fresh normal token for the returned actor.
+    """
+    if not is_impersonating:
+        raise NotImpersonating()
+
+    await record(
+        actor,
+        AuditAction.USER_IMPERSONATION_ENDED,
+        TargetType.USER,
+        effective.id,
+        effective.email,
+        db,
+        role=str(effective.role),
+    )
+    return actor
 
 
 async def delete_user(user_id: str, actor: User, db: AsyncSession) -> None:

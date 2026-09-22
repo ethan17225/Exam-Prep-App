@@ -11,16 +11,18 @@ imports and autogenerate silently starts dropping tables.
 
 from src.attempts.models import History, InProgressExam
 from src.auth.models import User
-from src.banks.models import BankSection, QuestionBank
+from src.banks.models import BankCollaborator, BankSection, QuestionBank
 from src.courses.models import Course
-from src.exams.models import Exam, ExamSectionShare, Question
+from src.exams.models import Exam, ExamCollaborator, ExamSectionShare, Question
 from src.platform_admin.models import AdminAuditLog
 
 __all__ = [
     "AdminAuditLog",
+    "BankCollaborator",
     "BankSection",
     "Course",
     "Exam",
+    "ExamCollaborator",
     "ExamSectionShare",
     "History",
     "InProgressExam",

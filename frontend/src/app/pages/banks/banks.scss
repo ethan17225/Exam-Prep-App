@@ -36,6 +36,32 @@
   font-size: 1.05rem;
 }
 
+.exam-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  margin-bottom: 0.25rem;
+
+  .exam-title {
+    margin: 0;
+  }
+}
+
+.origin-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+
+  &.origin-shared {
+    background: #eef;
+    color: #44c;
+  }
+}
+
 .exam-meta {
   margin: 0;
   font-size: 0.85rem;

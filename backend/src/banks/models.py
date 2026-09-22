@@ -24,6 +24,25 @@ class QuestionBank(Base):
         cascade="all, delete-orphan",
         order_by="BankSection.position",
     )
+    collaborators = relationship(
+        "BankCollaborator",
+        back_populates="bank",
+        cascade="all, delete-orphan",
+    )
+
+
+class BankCollaborator(Base):
+    """Instructor granted write access to another instructor's question bank."""
+
+    __tablename__ = "bank_collaborator"
+    __table_args__ = (Index(None, "user_id"),)
+
+    bank_id = Column(String(ID_LENGTH), ForeignKey("question_bank.id", ondelete="CASCADE"), primary_key=True)
+    user_id = Column(String(ID_LENGTH), ForeignKey("user.id", ondelete="CASCADE"), primary_key=True)
+    invited_by = Column(String(ID_LENGTH), ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False)
+
+    bank = relationship("QuestionBank", back_populates="collaborators")
 
 
 class BankSection(Base):

@@ -273,6 +273,32 @@ export class AdminUsersPage implements OnInit {
     this.run(user.id, this.examService.revokeUserSessions(user.id), 'Signed out everywhere.');
   }
 
+  canImpersonate(user: AdminUser): boolean {
+    return !this.isSelf(user) && user.role !== 'admin';
+  }
+
+  impersonate(user: AdminUser): void {
+    if (!this.canImpersonate(user)) return;
+    const label = user.display_name || user.email;
+    if (
+      !confirm(
+        `View the app as ${label}?\n\n` +
+          `You will see exactly what they see. Actions you take are real and audited.`,
+      )
+    ) {
+      return;
+    }
+    this.setRowBusy(user.id, true);
+    this.setRowError(user.id, '');
+    this.auth.startImpersonation(user.id).subscribe({
+      next: () => this.setRowBusy(user.id, false),
+      error: (err) => {
+        this.setRowBusy(user.id, false);
+        this.setRowError(user.id, httpErrorDetail(err) || 'Could not start impersonation.');
+      },
+    });
+  }
+
   rotateCode(user: AdminUser): void {
     if (!confirm('Issue a new enrolment code? The old one stops working immediately.')) return;
     this.run(user.id, this.examService.rotateInviteCode(user.id), 'New enrolment code issued.');

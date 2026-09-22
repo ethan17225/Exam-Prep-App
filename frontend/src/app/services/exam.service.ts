@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-import { UserRole } from './auth.service';
+import { AuthUser, UserRole } from './auth.service';
 
 /** Structured options for MATRIX questions: a grid of rows x columns. */
 export interface MatrixOptions {
@@ -357,6 +357,22 @@ export function formatClock(seconds: number): string {
   return `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
 }
 
+/**
+ * Parse an API timestamp to epoch ms.
+ *
+ * The backend stores naive UTC (`datetime.now()` in Docker) and serializes
+ * without a `Z`. `Date.parse` then treats the value as *local*, which shifts
+ * the exam clock by the browser's UTC offset (e.g. +4h in EDT) and used to
+ * inflate a 20-minute timer past four hours after the first autosave.
+ */
+export function parseServerDate(iso: string | null | undefined): number {
+  if (!iso) return NaN;
+  const trimmed = iso.trim();
+  if (!trimmed) return NaN;
+  const normalized = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(trimmed) ? trimmed : `${trimmed}Z`;
+  return Date.parse(normalized);
+}
+
 /** Fisher–Yates, non-mutating. */
 export function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -595,6 +611,8 @@ export interface ExamSummary {
   allow_practice: boolean;
   /** Only the owner may rename, edit, delete or re-flag an exam. */
   is_owner: boolean;
+  /** Peer instructor invited to manage this exam (not classroom `is_shared`). */
+  is_collaborator?: boolean;
   total_questions: number;
   mcq_count: number;
   sata_count: number;
@@ -630,10 +648,17 @@ export interface ExamDetail {
   answers_included: boolean;
   allow_practice: boolean;
   is_owner: boolean;
+  is_collaborator?: boolean;
   questions: Question[];
   bank_id?: string | null;
   bank_backed?: boolean;
   section_shares?: SectionShare[] | null;
+}
+
+export interface ExamCollaborator {
+  user_id: string;
+  email: string;
+  created_at: string;
 }
 
 export interface QuestionBankSummary {
@@ -644,6 +669,8 @@ export interface QuestionBankSummary {
   section_count: number;
   question_count: number;
   created_at: string;
+  is_owner?: boolean;
+  is_collaborator?: boolean;
 }
 
 export interface BankSection {
@@ -1203,6 +1230,22 @@ export class ExamService {
     return this.http.patch<ExamSummary>(`${this.base}/exams/${id}/settings`, body);
   }
 
+  listExamCollaborators(examId: string): Observable<ExamCollaborator[]> {
+    return this.http.get<ExamCollaborator[]>(`${this.base}/exams/${examId}/collaborators`);
+  }
+
+  addExamCollaborator(examId: string, email: string): Observable<ExamCollaborator> {
+    return this.http.post<ExamCollaborator>(`${this.base}/exams/${examId}/collaborators`, {
+      email,
+    });
+  }
+
+  removeExamCollaborator(examId: string, userId: string): Observable<{ deleted: boolean }> {
+    return this.http.delete<{ deleted: boolean }>(
+      `${this.base}/exams/${examId}/collaborators/${userId}`,
+    );
+  }
+
   saveProgress(payload: SaveProgressPayload): Observable<InProgressExam> {
     return this.http.post<InProgressExam>(`${this.base}/in-progress`, payload);
   }
@@ -1301,6 +1344,20 @@ export class ExamService {
   revokeUserSessions(userId: string): Observable<{ revoked: boolean }> {
     return this.http.post<{ revoked: boolean }>(
       `${this.base}/platform/users/${userId}/revoke-sessions`,
+      {},
+    );
+  }
+
+  impersonateUser(userId: string): Observable<{ token: string; user: AuthUser }> {
+    return this.http.post<{ token: string; user: AuthUser }>(
+      `${this.base}/platform/users/${userId}/impersonate`,
+      {},
+    );
+  }
+
+  endImpersonation(): Observable<{ token: string; user: AuthUser }> {
+    return this.http.post<{ token: string; user: AuthUser }>(
+      `${this.base}/platform/impersonate/end`,
       {},
     );
   }

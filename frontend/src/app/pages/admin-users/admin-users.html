@@ -322,6 +322,29 @@
                       </div>
 
                       <div class="action">
+                        <span class="action-label">Impersonate</span>
+                        <div class="action-row">
+                          <button
+                            type="button"
+                            class="btn btn-secondary btn-sm"
+                            [disabled]="rowBusy()[u.id] || !canImpersonate(u)"
+                            (click)="impersonate(u)"
+                          >
+                            View as this user
+                          </button>
+                        </div>
+                        <span class="action-hint">
+                          @if (isSelf(u)) {
+                            You cannot impersonate your own account.
+                          } @else if (u.role === 'admin') {
+                            Admins cannot be impersonated.
+                          } @else {
+                            See the app exactly as they do. Actions are real and audited.
+                          }
+                        </span>
+                      </div>
+
+                      <div class="action">
                         <span class="action-label">Danger zone</span>
                         <div class="action-row">
                           <button

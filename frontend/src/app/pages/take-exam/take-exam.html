@@ -35,8 +35,10 @@
       <div class="exam-topbar-right">
         <span
           class="timer"
+          [class.timer-untimed]="!hasTimeLimit()"
           [class.timer-warning]="timerWarning()"
           [class.timer-danger]="timerDanger()"
+          [attr.title]="hasTimeLimit() ? 'Time remaining' : 'Time elapsed (no limit)'"
         >
           {{ formattedTime() }}
         </span>

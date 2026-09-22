@@ -1,3 +1,28 @@
+.impersonation-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  padding: 0.55rem 1.5rem;
+  background: #fff3cd;
+  border-bottom: 1px solid #e6d58a;
+  color: #5c4a00;
+  font-size: 0.875rem;
+  position: sticky;
+  top: 0;
+  z-index: 110;
+
+  .btn-sm {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.8rem;
+  }
+}
+
+.impersonation-banner-text strong {
+  font-weight: 700;
+}
+
 .nav {
   display: flex;
   align-items: center;
@@ -8,6 +33,11 @@
   position: sticky;
   top: 0;
   z-index: 100;
+
+  &.nav-below-banner {
+    // Keep the nav under the sticky impersonation strip on scroll.
+    top: 2.75rem;
+  }
 }
 
 .nav-brand {

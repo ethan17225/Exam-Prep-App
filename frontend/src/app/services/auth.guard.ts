@@ -25,8 +25,9 @@ export const instructorGuard: CanActivateFn = (_route, state) => {
 };
 
 /**
- * Student exam-taking routes. Instructors and admins have no attempts of their
- * own, so these pages are empty for them.
+ * Exam-taking routes (take, results, history, in-progress). Students and
+ * instructors may sit exams — including an instructor's own. Admins oversee
+ * the same material from the platform console and stay off these pages.
  */
 export const studentGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthService);
@@ -34,7 +35,9 @@ export const studentGuard: CanActivateFn = (_route, state) => {
   if (!auth.isLoggedIn()) {
     return router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
   }
-  return auth.isStudent() ? true : router.createUrlTree(['/overview']);
+  return auth.isStudent() || auth.isInstructor()
+    ? true
+    : router.createUrlTree(['/overview']);
 };
 
 /**

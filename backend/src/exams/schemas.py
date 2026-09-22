@@ -139,6 +139,7 @@ class ExamSummaryOut(BaseModel):
     questions_per_attempt: int | None
     allow_practice: bool
     is_owner: bool
+    is_collaborator: bool = False
     total_questions: int
     mcq_count: int
     sata_count: int
@@ -209,6 +210,7 @@ class ExamDetailOut(BaseModel):
     answers_included: bool
     allow_practice: bool
     is_owner: bool
+    is_collaborator: bool = False
     questions: list[ExamQuestionOut]
     bank_id: str | None = None
     bank_backed: bool = False
@@ -217,3 +219,13 @@ class ExamDetailOut(BaseModel):
 
 class ImageOut(BaseModel):
     image: str | None
+
+
+class ExamCollaboratorInvite(BaseModel):
+    email: str = Field(max_length=255)
+
+
+class ExamCollaboratorOut(BaseModel):
+    user_id: str
+    email: str
+    created_at: ISODateTime

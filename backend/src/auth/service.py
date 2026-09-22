@@ -67,6 +67,30 @@ def create_token(user: User) -> str:
     )
 
 
+def create_impersonation_token(actor: User, target: User) -> str:
+    """Mint a token that acts as `target` while retaining the real admin in `act`.
+
+    `sub` / `role` / `ver` are the target's so every teaching and student route
+    sees them as the caller. `act` / `act_ver` are the admin's so `/api/platform/*`
+    can still authenticate the real actor, and so bumping the admin's
+    `token_version` kills the impersonation session even if the target is unchanged.
+    """
+    now = datetime.now(UTC)
+    return jwt.encode(
+        {
+            "sub": target.id,
+            "role": target.role,
+            "ver": target.token_version,
+            "act": actor.id,
+            "act_ver": actor.token_version,
+            "iat": now,
+            "exp": now + TOKEN_TTL,
+        },
+        auth_settings.secret.get_secret_value(),
+        algorithm=JWT_ALGORITHM,
+    )
+
+
 def decode_token(token: str) -> dict | None:
     try:
         return jwt.decode(token, auth_settings.secret.get_secret_value(), algorithms=[JWT_ALGORITHM])
@@ -74,7 +98,29 @@ def decode_token(token: str) -> dict | None:
         return None
 
 
-async def user_from_token(token: str, db: AsyncSession) -> User | None:
+async def resolve_actor_from_payload(payload: dict, db: AsyncSession) -> User | None:
+    """Load the real admin from an impersonation token's `act` claim.
+
+    Returns None when the claim is absent, the actor is missing, is not an admin,
+    or their `token_version` no longer matches `act_ver`.
+    """
+    act = payload.get("act")
+    if not act:
+        return None
+    actor = await get_by_id(act, db)
+    if not actor or actor.role != UserRole.ADMIN:
+        return None
+    if payload.get("act_ver") != actor.token_version:
+        return None
+    return actor
+
+
+async def identities_from_token(token: str, db: AsyncSession) -> tuple[User, User | None] | None:
+    """Resolve the effective user and optional impersonation actor from a bearer.
+
+    Returns None when the token is invalid, expired, revoked, or (for
+    impersonation tokens) the actor claim fails validation.
+    """
     payload = decode_token(token)
     if not payload:
         return None
@@ -85,7 +131,17 @@ async def user_from_token(token: str, db: AsyncSession) -> User | None:
     # dead, even though its signature and expiry are still valid.
     if payload.get("ver") != user.token_version:
         return None
-    return user
+    actor = None
+    if payload.get("act") is not None:
+        actor = await resolve_actor_from_payload(payload, db)
+        if actor is None:
+            return None
+    return user, actor
+
+
+async def user_from_token(token: str, db: AsyncSession) -> User | None:
+    identities = await identities_from_token(token, db)
+    return identities[0] if identities else None
 
 
 async def get_by_id(user_id: str | None, db: AsyncSession) -> User | None:
@@ -173,12 +229,13 @@ async def revoke_tokens(user: User, db: AsyncSession) -> None:
 # ── Profile ───────────────────────────────────────────────────────
 
 
-async def build_me(user: User, db: AsyncSession) -> dict:
+async def build_me(user: User, db: AsyncSession, *, actor: User | None = None) -> dict:
     """The one place MeOut's computed shape is assembled.
 
-    `instructor_name` is the only non-column field, and resolving it costs a
-    single keyed lookup — which is why login and register return the plain
-    UserOut instead of paying for it on every sign-in.
+    `instructor_name` is the only non-column field normally, and resolving it
+    costs a single keyed lookup — which is why login and register return the
+    plain UserOut instead of paying for it on every sign-in. When `actor` is
+    set, the response also advertises an active impersonation session.
     """
     instructor_name = None
     if user.instructor_id:
@@ -189,6 +246,10 @@ async def build_me(user: User, db: AsyncSession) -> dict:
     return {
         **UserOut.model_validate(user).model_dump(),
         "instructor_name": instructor_name,
+        "impersonating": actor is not None,
+        "impersonated_by": (
+            {"id": actor.id, "email": actor.email} if actor is not None else None
+        ),
     }
 
 
@@ -434,8 +495,7 @@ async def delete_account(user: User, db: AsyncSession) -> None:
     await run_in_threadpool(remove_upload_file, avatar)
 
 
-def login_response(user: User) -> JSONResponse:
-    token = create_token(user)
+def _token_response(token: str, user: User) -> JSONResponse:
     # mode="json" so the role StrEnum and any future non-primitive renders the
     # same way it would through a response_model.
     body = TokenOut(token=token, user=UserOut.model_validate(user)).model_dump(mode="json")
@@ -453,3 +513,12 @@ def login_response(user: User) -> JSONResponse:
         path="/",
     )
     return response
+
+
+def login_response(user: User) -> JSONResponse:
+    return _token_response(create_token(user), user)
+
+
+def impersonation_login_response(actor: User, target: User) -> JSONResponse:
+    """Same shape as login, but the bearer acts as `target` with `act` = admin."""
+    return _token_response(create_impersonation_token(actor, target), target)

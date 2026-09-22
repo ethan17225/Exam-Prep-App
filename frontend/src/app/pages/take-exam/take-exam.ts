@@ -28,6 +28,7 @@ import {
   classifyQuestionType,
   formatAnswerForDisplay,
   formatClock,
+  parseServerDate,
   isAnswerCorrect,
   shuffle,
   shuffleQuestionOptions,
@@ -96,8 +97,11 @@ export class TakeExamPage implements OnInit, OnDestroy {
   autoSaveStatus = signal<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   mode = signal<'exam' | 'practice'>('exam');
-  timeLimitSeconds = signal(180 * 60);
-  remainingSeconds = signal(180 * 60);
+  /** Null means the exam has no time limit (unlimited). */
+  timeLimitSeconds = signal<number | null>(null);
+  remainingSeconds = signal(0);
+  /** Elapsed seconds for untimed attempts — count-up, not a fake countdown. */
+  elapsedSeconds = signal(0);
   currentPage = signal(0);
   readonly questionsPerPage = 20;
 
@@ -111,6 +115,8 @@ export class TakeExamPage implements OnInit, OnDestroy {
   private resumeId: string | null = null;
   private selectedQuestionCount: number | null = null;
   private shuffleEnabled = false;
+  /** Wall-clock start used to keep the untimed elapsed display honest across ticks. */
+  private attemptStartedAtMs: number | null = null;
 
   totalQuestions = computed(() => this.questions().length);
   typeChips = computed<TypeChipVm[]>(() =>
@@ -186,10 +192,21 @@ export class TakeExamPage implements OnInit, OnDestroy {
     }));
   });
 
-  formattedTime = computed(() => formatClock(this.remainingSeconds()));
+  hasTimeLimit = computed(() => this.timeLimitSeconds() != null);
 
-  timerWarning = computed(() => this.remainingSeconds() <= 300 && this.remainingSeconds() > 60);
-  timerDanger = computed(() => this.remainingSeconds() <= 60);
+  formattedTime = computed(() =>
+    this.hasTimeLimit()
+      ? formatClock(this.remainingSeconds())
+      : formatClock(this.elapsedSeconds()),
+  );
+
+  timerWarning = computed(
+    () =>
+      this.hasTimeLimit() &&
+      this.remainingSeconds() <= 300 &&
+      this.remainingSeconds() > 60,
+  );
+  timerDanger = computed(() => this.hasTimeLimit() && this.remainingSeconds() <= 60);
 
   constructor(
     private route: ActivatedRoute,
@@ -242,7 +259,13 @@ export class TakeExamPage implements OnInit, OnDestroy {
           this.examTitle.set(exam.title);
           this.shuffleEnabled = !!exam.shuffle;
 
-          const limit = exam.time_limit_minutes ? exam.time_limit_minutes * 60 : 180 * 60;
+          // Null/0 time_limit_minutes means unlimited — do not invent a fake
+          // 180-minute countdown (that desynced with started_at and produced
+          // negative time_spent_seconds on submit → 422).
+          const limit =
+            exam.time_limit_minutes && exam.time_limit_minutes > 0
+              ? exam.time_limit_minutes * 60
+              : null;
           this.timeLimitSeconds.set(limit);
 
           if (saved) {
@@ -251,7 +274,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
             this.startTimer();
           } else if (exam.bank_backed) {
             this.questions.set([]);
-            this.remainingSeconds.set(limit);
+            this.initClock(limit, null);
             this.persistProgress({
               allowEmpty: true,
               onError: (err) =>
@@ -291,7 +314,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
               ? Math.min(Math.max(configured, 1), pool.length)
               : pool.length;
             this.questions.set(this.withShuffledOptions(pool.slice(0, takeCount)));
-            this.remainingSeconds.set(limit);
+            this.initClock(limit, null);
             // The first save is what creates the attempt server-side. If it
             // fails there is nothing to submit into later, so block rather than
             // let someone sit a whole paper they cannot hand in.
@@ -317,9 +340,34 @@ export class TakeExamPage implements OnInit, OnDestroy {
       });
   }
 
+  private initClock(limitSeconds: number | null, startedAt: string | null): void {
+    const startedMs = parseServerDate(startedAt);
+    this.attemptStartedAtMs = Number.isFinite(startedMs) ? startedMs : Date.now();
+    const elapsed = Math.max(0, Math.round((Date.now() - this.attemptStartedAtMs) / 1000));
+    this.elapsedSeconds.set(elapsed);
+    if (limitSeconds != null) {
+      // Never above the exam limit: a skewed started_at used to push remaining
+      // to limit + UTC offset (e.g. 20 min → ~4h20m after the first autosave).
+      this.remainingSeconds.set(Math.max(0, Math.min(limitSeconds, limitSeconds - elapsed)));
+    } else {
+      this.remainingSeconds.set(0);
+    }
+  }
+
   private startTimer(): void {
     if (this.timerInterval) clearInterval(this.timerInterval);
     this.timerInterval = setInterval(() => {
+      if (!this.hasTimeLimit()) {
+        if (this.attemptStartedAtMs != null) {
+          this.elapsedSeconds.set(
+            Math.max(0, Math.round((Date.now() - this.attemptStartedAtMs) / 1000)),
+          );
+        } else {
+          this.elapsedSeconds.update((v) => v + 1);
+        }
+        return;
+      }
+
       const remaining = this.remainingSeconds();
       if (remaining <= 1) {
         this.remainingSeconds.set(0);
@@ -328,6 +376,10 @@ export class TakeExamPage implements OnInit, OnDestroy {
         return;
       }
       this.remainingSeconds.update((v) => v - 1);
+      const limit = this.timeLimitSeconds();
+      if (limit != null) {
+        this.elapsedSeconds.set(Math.max(0, limit - this.remainingSeconds()));
+      }
     }, 1000);
   }
 
@@ -353,8 +405,16 @@ export class TakeExamPage implements OnInit, OnDestroy {
     }
     this.answers.set(restoredAnswers);
     this.flagged.set(new Set(source.flagged));
-    this.remainingSeconds.set(source.remaining_seconds);
     this.currentPage.set(source.current_page);
+
+    // Prefer the server's started_at for the clock — remaining_seconds from the
+    // browser is student-writable. parseServerDate tags naive UTC correctly.
+    this.initClock(this.timeLimitSeconds(), saved.started_at);
+    if (this.hasTimeLimit() && !saved.started_at) {
+      const limit = this.timeLimitSeconds()!;
+      this.remainingSeconds.set(Math.max(0, Math.min(limit, source.remaining_seconds)));
+      this.elapsedSeconds.set(Math.max(0, limit - this.remainingSeconds()));
+    }
   }
 
   private withShuffledOptions(questions: Question[]): Question[] {
@@ -787,7 +847,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
       flagged: [...this.flagged()],
       question_order: this.questions().map((q) => q.id),
       option_order: optionOrder,
-      remaining_seconds: this.remainingSeconds(),
+      remaining_seconds: this.hasTimeLimit() ? this.remainingSeconds() : this.elapsedSeconds(),
       current_page: this.currentPage(),
     };
 
@@ -800,15 +860,13 @@ export class TakeExamPage implements OnInit, OnDestroy {
     }
 
     this.examService.saveProgress(payload).subscribe({
-      next: (saved) => {
+      next: () => {
         this.autoSaveStatus.set('saved');
-        // Re-sync the countdown from the server's started_at. The local mirror
-        // is student-writable, so it must not be what decides how much time is
-        // left on a graded attempt.
-        if (this.mode() === 'exam' && saved?.started_at) {
-          const elapsed = (Date.now() - new Date(saved.started_at).getTime()) / 1000;
-          this.remainingSeconds.set(Math.max(0, Math.round(this.timeLimitSeconds() - elapsed)));
-        }
+        // Do not rewrite remainingSeconds from saved.started_at here. Naive API
+        // timestamps used to parse as local time and jump a 20-minute countdown
+        // to ~4h20m after the first autosave (and again on Retake). The local
+        // countdown is set at start/resume; the server still enforces the
+        // real deadline on submit.
         setTimeout(() => {
           if (this.autoSaveStatus() === 'saved') this.autoSaveStatus.set('idle');
         }, 2000);
@@ -832,7 +890,7 @@ export class TakeExamPage implements OnInit, OnDestroy {
         savedAt: number;
         payload: SaveProgressPayload;
       };
-      if (serverSavedAt && new Date(serverSavedAt).getTime() >= savedAt) return null;
+      if (serverSavedAt && parseServerDate(serverSavedAt) >= savedAt) return null;
       return payload;
     } catch {
       return null;
@@ -861,7 +919,13 @@ export class TakeExamPage implements OnInit, OnDestroy {
 
     this.submitting.set(true);
     const practice = this.mode() === 'practice';
-    const timeSpent = this.timeLimitSeconds() - this.remainingSeconds();
+    const limit = this.timeLimitSeconds();
+    // Always non-negative: Pydantic rejects ge=0 violations with 422 before the
+    // handler can ignore the field on graded runs.
+    const timeSpent =
+      limit != null
+        ? Math.max(0, limit - this.remainingSeconds())
+        : Math.max(0, this.elapsedSeconds());
     const subs: AnswerSubmission[] = this.questions().map((q) => ({
       question_id: q.id,
       answer: this.answers().get(q.id) ?? (this.kind(q) === 'SATA' ? [] : ''),

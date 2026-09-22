@@ -79,6 +79,117 @@ def test_token_ttl_is_12_hours(instructor_user: User):
     assert payload["exp"] - payload["iat"] == int(timedelta(hours=12).total_seconds())
 
 
+@pytest.fixture
+def admin_user() -> User:
+    return User(
+        id="admin0001",
+        email="admin@example.com",
+        password_hash="",
+        role=UserRole.ADMIN,
+        token_version=3,
+        created_at=datetime.now(),
+    )
+
+
+@pytest.fixture
+def student_user() -> User:
+    return User(
+        id="stu000001",
+        email="student@example.com",
+        password_hash="",
+        role=UserRole.STUDENT,
+        token_version=1,
+        created_at=datetime.now(),
+    )
+
+
+def test_impersonation_token_carries_target_and_actor(admin_user: User, student_user: User):
+    payload = jwt.decode(
+        service.create_impersonation_token(admin_user, student_user),
+        SECRET,
+        algorithms=[JWT_ALGORITHM],
+    )
+    assert payload["sub"] == student_user.id
+    assert payload["role"] == UserRole.STUDENT
+    assert payload["ver"] == student_user.token_version
+    assert payload["act"] == admin_user.id
+    assert payload["act_ver"] == admin_user.token_version
+    assert "act" not in jwt.decode(
+        service.create_token(student_user), SECRET, algorithms=[JWT_ALGORITHM]
+    )
+
+
+async def test_resolve_actor_rejects_stale_act_ver(admin_user: User, student_user: User, monkeypatch):
+    token = service.create_impersonation_token(admin_user, student_user)
+    payload = service.decode_token(token)
+    assert payload is not None
+
+    stale = User(
+        id=admin_user.id,
+        email=admin_user.email,
+        password_hash="",
+        role=UserRole.ADMIN,
+        token_version=admin_user.token_version + 1,
+        created_at=datetime.now(),
+    )
+
+    async def fake_get_by_id(user_id, _db):
+        if user_id == admin_user.id:
+            return stale
+        if user_id == student_user.id:
+            return student_user
+        return None
+
+    monkeypatch.setattr(service, "get_by_id", fake_get_by_id)
+    assert await service.resolve_actor_from_payload(payload, db=None) is None
+    assert await service.user_from_token(token, db=None) is None
+
+
+async def test_resolve_actor_rejects_non_admin_act(admin_user: User, student_user: User, monkeypatch):
+    token = service.create_impersonation_token(admin_user, student_user)
+    payload = service.decode_token(token)
+    assert payload is not None
+
+    demoted = User(
+        id=admin_user.id,
+        email=admin_user.email,
+        password_hash="",
+        role=UserRole.INSTRUCTOR,
+        token_version=admin_user.token_version,
+        created_at=datetime.now(),
+    )
+
+    async def fake_get_by_id(user_id, _db):
+        if user_id == admin_user.id:
+            return demoted
+        if user_id == student_user.id:
+            return student_user
+        return None
+
+    monkeypatch.setattr(service, "get_by_id", fake_get_by_id)
+    assert await service.resolve_actor_from_payload(payload, db=None) is None
+    assert await service.user_from_token(token, db=None) is None
+
+
+async def test_user_from_token_accepts_valid_impersonation(
+    admin_user: User, student_user: User, monkeypatch
+):
+    token = service.create_impersonation_token(admin_user, student_user)
+
+    async def fake_get_by_id(user_id, _db):
+        if user_id == admin_user.id:
+            return admin_user
+        if user_id == student_user.id:
+            return student_user
+        return None
+
+    monkeypatch.setattr(service, "get_by_id", fake_get_by_id)
+    user = await service.user_from_token(token, db=None)
+    assert user is student_user
+    actor = await service.resolve_actor_from_payload(service.decode_token(token), db=None)
+    assert actor is admin_user
+
+
 def test_token_signed_with_another_key_is_rejected():
     forged = jwt.encode({"sub": "abc12345", "role": "instructor"}, "not-the-secret", algorithm="HS256")
     assert not _decodes(forged)

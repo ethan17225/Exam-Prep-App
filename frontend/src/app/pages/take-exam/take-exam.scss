@@ -110,6 +110,10 @@
     background 0.3s,
     color 0.3s;
 
+  &.timer-untimed {
+    color: #555;
+    background: #f0f0f0;
+  }
   &.timer-warning {
     background: #fff3e0;
     color: #e65100;

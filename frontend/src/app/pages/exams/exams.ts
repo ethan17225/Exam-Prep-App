@@ -2,7 +2,14 @@ import { Component, OnInit, signal, computed } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
-import { httpErrorDetail, ExamService, ExamSummary, Course, KindCount } from '../../services/exam.service';
+import {
+  httpErrorDetail,
+  ExamService,
+  ExamSummary,
+  ExamCollaborator,
+  Course,
+  KindCount,
+} from '../../services/exam.service';
 
 @Component({
   selector: 'app-exams',
@@ -23,6 +30,13 @@ export class ExamsPage implements OnInit {
   loading = signal(true);
   loadError = signal('');
   deleteError = signal<Record<string, string>>({});
+
+  shareExam = signal<ExamSummary | null>(null);
+  collaborators = signal<ExamCollaborator[]>([]);
+  shareEmail = signal('');
+  shareLoading = signal(false);
+  shareError = signal('');
+  shareInviteLoading = signal(false);
 
   filteredExams = computed(() => {
     const courseId = this.selectedCourseId();
@@ -53,9 +67,15 @@ export class ExamsPage implements OnInit {
     return this.auth.isInstructor();
   }
 
-  /** Students only get the ⋮ menu on exams they own; instructor-shared ones are take-only. */
+  /** Owners and peer collaborators get the manage menu; take-only shared exams do not. */
   showMenu(exam: ExamSummary): boolean {
-    return exam.is_owner;
+    return exam.is_owner || !!exam.is_collaborator;
+  }
+
+  originLabel(exam: ExamSummary): string {
+    if (exam.is_owner) return 'Personal';
+    if (exam.is_collaborator) return 'Shared with me';
+    return 'From instructor';
   }
 
   kindCounts(exam: ExamSummary): KindCount[] {
@@ -149,6 +169,67 @@ export class ExamsPage implements OnInit {
   editExamSettings(exam: ExamSummary): void {
     this.menuOpen.set(null);
     this.router.navigate(['/exams', exam.id, 'edit']);
+  }
+
+  openShare(exam: ExamSummary): void {
+    this.menuOpen.set(null);
+    this.shareExam.set(exam);
+    this.shareEmail.set('');
+    this.shareError.set('');
+    this.collaborators.set([]);
+    this.shareLoading.set(true);
+    this.examService.listExamCollaborators(exam.id).subscribe({
+      next: (rows) => {
+        this.collaborators.set(rows);
+        this.shareLoading.set(false);
+      },
+      error: (err) => {
+        this.shareLoading.set(false);
+        this.shareError.set(httpErrorDetail(err) || 'Could not load collaborators.');
+      },
+    });
+  }
+
+  closeShare(): void {
+    this.shareExam.set(null);
+    this.shareError.set('');
+    this.shareEmail.set('');
+  }
+
+  inviteCollaborator(): void {
+    const exam = this.shareExam();
+    const email = this.shareEmail().trim();
+    if (!exam || !email) {
+      this.shareError.set('Enter an instructor email.');
+      return;
+    }
+    this.shareInviteLoading.set(true);
+    this.shareError.set('');
+    this.examService.addExamCollaborator(exam.id, email).subscribe({
+      next: (row) => {
+        this.collaborators.set([...this.collaborators(), row]);
+        this.shareEmail.set('');
+        this.shareInviteLoading.set(false);
+      },
+      error: (err) => {
+        this.shareInviteLoading.set(false);
+        this.shareError.set(httpErrorDetail(err) || 'Could not share the exam.');
+      },
+    });
+  }
+
+  revokeCollaborator(row: ExamCollaborator): void {
+    const exam = this.shareExam();
+    if (!exam) return;
+    if (!confirm(`Remove access for ${row.email}?`)) return;
+    this.examService.removeExamCollaborator(exam.id, row.user_id).subscribe({
+      next: () => {
+        this.collaborators.set(this.collaborators().filter((c) => c.user_id !== row.user_id));
+      },
+      error: (err) => {
+        this.shareError.set(httpErrorDetail(err) || 'Could not revoke access.');
+      },
+    });
   }
 
   openFlashcards(exam: ExamSummary): void {

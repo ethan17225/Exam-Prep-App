@@ -34,3 +34,23 @@ class UnsupportedImageType(DetailedHTTPException):
 class ImageTooLarge(DetailedHTTPException):
     STATUS_CODE = 413
     DETAIL = "Image is too large"
+
+
+class InstructorNotFound(DetailedHTTPException):
+    STATUS_CODE = 404
+    DETAIL = "Instructor not found"
+
+
+class CannotShareWithSelf(DetailedHTTPException):
+    STATUS_CODE = 400
+    DETAIL = "You cannot share an exam with yourself"
+
+
+class AlreadyCollaborator(DetailedHTTPException):
+    STATUS_CODE = 409
+    DETAIL = "That instructor already has access to this exam"
+
+
+class CollaboratorNotFound(DetailedHTTPException):
+    STATUS_CODE = 404
+    DETAIL = "Collaborator not found"

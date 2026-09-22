@@ -7,6 +7,7 @@ import {
   httpErrorDetail,
   isAnswerCorrect,
   kindFromType,
+  parseServerDate,
   progressPercent,
   questionKindCounts,
   shuffle,
@@ -156,6 +157,12 @@ describe('formatting helpers', () => {
   it('formatClock renders HH:MM:SS', () => {
     expect(formatClock(3661)).toBe('01:01:01');
     expect(formatClock(0)).toBe('00:00:00');
+  });
+
+  it('parseServerDate treats naive API timestamps as UTC', () => {
+    expect(parseServerDate('2026-09-22T18:00:00')).toBe(Date.parse('2026-09-22T18:00:00Z'));
+    expect(parseServerDate('2026-09-22T18:00:00Z')).toBe(Date.parse('2026-09-22T18:00:00Z'));
+    expect(Number.isNaN(parseServerDate(null))).toBe(true);
   });
 
   it('progressPercent rounds and survives zero totals', () => {

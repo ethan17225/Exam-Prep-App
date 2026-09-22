@@ -16,13 +16,30 @@ async def get_current_user(request: Request, db: SessionDep) -> User:
     token = bearer_token(request)
     if not token:
         raise NotAuthenticated()
-    user = await service.user_from_token(token, db)
-    if not user:
+    identities = await service.identities_from_token(token, db)
+    if not identities:
         raise InvalidToken()
+    user, actor = identities
+    # Stash for AdminDep / ImpersonationActorDep so they need no second session
+    # — and so dependency_overrides of get_current_user still leave those
+    # gates DB-free in the no-Postgres unit tests.
+    request.state.impersonation_actor = actor
     return user
 
 
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
+
+
+async def get_impersonation_actor(request: Request) -> User | None:
+    """The real admin behind an impersonation JWT, or None for a normal session.
+
+    Reads the value `get_current_user` stashed on the request. Absent when that
+    dependency was overridden (unit tests) or has not run yet.
+    """
+    return getattr(request.state, "impersonation_actor", None)
+
+
+ImpersonationActorDep = Annotated[User | None, Depends(get_impersonation_actor)]
 
 
 async def require_instructor(user: CurrentUserDep) -> User:
@@ -42,10 +59,18 @@ async def require_instructor(user: CurrentUserDep) -> User:
 InstructorDep = Annotated[User, Depends(require_instructor)]
 
 
-async def require_admin(user: CurrentUserDep) -> User:
+async def require_admin(request: Request, user: CurrentUserDep) -> User:
     """Gate for `/api/platform/*` — the only surface that can mutate another
-    user's account, role or content. Exact equality: an instructor must not
-    reach it."""
+    user's account, role or content.
+
+    When the bearer is an impersonation token (`act` claim), the *actor* admin
+    stashed by `get_current_user` is returned so platform routes stay usable
+    without ending the session. Otherwise exact equality on the effective user:
+    an instructor must not reach it.
+    """
+    actor = getattr(request.state, "impersonation_actor", None)
+    if actor is not None:
+        return actor
     if user.role != UserRole.ADMIN:
         raise AdminRequired()
     return user

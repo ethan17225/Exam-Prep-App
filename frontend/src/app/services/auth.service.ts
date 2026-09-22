@@ -1,6 +1,7 @@
 import { Injectable, computed, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
+import { Router } from '@angular/router';
+import { Observable, switchMap, tap } from 'rxjs';
 
 /** Three distinct roles. Admin is neither a teacher nor a student. */
 export type UserRole = 'student' | 'instructor' | 'admin';
@@ -14,6 +15,14 @@ export interface AuthUser {
   avatar: string | null;
   /** An instructor's own enrolment code. Null for a student or an admin. */
   invite_code: string | null;
+  /** Present when the bearer is an impersonation session (from GET /me). */
+  impersonating?: boolean;
+  impersonated_by?: Impersonator | null;
+}
+
+export interface Impersonator {
+  id: string;
+  email: string;
 }
 
 /** `GET /api/auth/me` — AuthUser plus the one field that is not a column. */
@@ -21,13 +30,16 @@ export interface CurrentUser extends AuthUser {
   instructor_name: string | null;
 }
 
-interface AuthResponse {
+export interface AuthResponse {
   token: string;
   user: AuthUser;
 }
 
 const TOKEN_KEY = 'exam_token';
 const USER_KEY = 'exam_user';
+/** sessionStorage: admin credentials while acting as another user. */
+const IMPERSONATION_BACKUP_TOKEN_KEY = 'exam_impersonation_backup_token';
+const IMPERSONATION_BACKUP_USER_KEY = 'exam_impersonation_backup_user';
 /** Prefix of the per-attempt autosave mirror written by take-exam. */
 export const PROGRESS_KEY_PREFIX = 'exam_progress_v2_';
 const LEGACY_PROGRESS_KEY_PREFIX = 'exam_progress_';
@@ -35,6 +47,7 @@ const LEGACY_PROGRESS_KEY_PREFIX = 'exam_progress_';
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private base = '/api/auth';
+  private platformBase = '/api/platform';
 
   private token = signal<string | null>(null);
   user = signal<AuthUser | null>(null);
@@ -42,6 +55,20 @@ export class AuthService {
   isStudent = computed(() => this.user()?.role === 'student');
   isInstructor = computed(() => this.user()?.role === 'instructor');
   isAdmin = computed(() => this.user()?.role === 'admin');
+
+  /**
+   * True when the active bearer is an impersonation JWT. Driven by /me flags
+   * when available, otherwise by the JWT `act` claim so a refresh mid-session
+   * still shows the banner before refreshMe returns.
+   */
+  isImpersonating = computed(() => {
+    const user = this.user();
+    if (user?.impersonating) return true;
+    const token = this.token();
+    return token !== null && hasActClaim(token);
+  });
+
+  endingImpersonation = signal(false);
 
   /**
    * A signed-in account that has not chosen a preferred name yet. `onboardingGuard`
@@ -56,7 +83,10 @@ export class AuthService {
   /** Fallback for the nav when there is no avatar. */
   initials = computed(() => initialsOf(this.user()));
 
-  constructor(private http: HttpClient) {
+  constructor(
+    private http: HttpClient,
+    private router: Router,
+  ) {
     const stored = localStorage.getItem(TOKEN_KEY);
     // Drop an already-expired token at bootstrap, otherwise the first page load
     // fires half a dozen requests that all 401 before the redirect lands.
@@ -141,6 +171,39 @@ export class AuthService {
       .pipe(tap(() => this.patchUser({ avatar: null })));
   }
 
+  /**
+   * Start a full act-as session as `userId`. Stashes the admin token in
+   * sessionStorage so Exit can restore without a second login.
+   */
+  startImpersonation(userId: string): Observable<CurrentUser> {
+    this.backupAdminSession();
+    return this.http
+      .post<AuthResponse>(`${this.platformBase}/users/${userId}/impersonate`, {})
+      .pipe(
+        tap((res) => this.store(res)),
+        switchMap(() => this.refreshMe()),
+        tap(() => void this.router.navigateByUrl('/overview')),
+      );
+  }
+
+  /** End impersonation: fresh admin token from the server, then restore admin UI. */
+  endImpersonation(): Observable<AuthResponse> {
+    this.endingImpersonation.set(true);
+    return this.http.post<AuthResponse>(`${this.platformBase}/impersonate/end`, {}).pipe(
+      tap({
+        next: (res) => {
+          this.clearImpersonationBackup();
+          this.store(res);
+          this.endingImpersonation.set(false);
+          void this.router.navigateByUrl('/admin/users');
+        },
+        error: () => {
+          this.endingImpersonation.set(false);
+        },
+      }),
+    );
+  }
+
   logout(): void {
     // Fire-and-forget: it only clears the cookie used by <img>/<a> requests.
     this.http.post(`${this.base}/logout`, {}).subscribe({ error: () => {} });
@@ -153,6 +216,7 @@ export class AuthService {
     this.user.set(null);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    this.clearImpersonationBackup();
 
     // Also drop every autosave mirror. On a shared machine these otherwise
     // outlive the session, and the next signed-in user resuming the same exam
@@ -160,6 +224,18 @@ export class AuthService {
     for (const key of Object.keys(localStorage)) {
       if (key.startsWith(LEGACY_PROGRESS_KEY_PREFIX)) localStorage.removeItem(key);
     }
+  }
+
+  private backupAdminSession(): void {
+    const token = this.token();
+    const user = this.user();
+    if (token) sessionStorage.setItem(IMPERSONATION_BACKUP_TOKEN_KEY, token);
+    if (user) sessionStorage.setItem(IMPERSONATION_BACKUP_USER_KEY, JSON.stringify(user));
+  }
+
+  private clearImpersonationBackup(): void {
+    sessionStorage.removeItem(IMPERSONATION_BACKUP_TOKEN_KEY);
+    sessionStorage.removeItem(IMPERSONATION_BACKUP_USER_KEY);
   }
 
   private store(res: AuthResponse): void {
@@ -193,13 +269,28 @@ export function initialsOf(user: Pick<AuthUser, 'display_name' | 'email'> | null
 /** Reads `exp` out of a JWT payload. Treats anything unparseable as expired. */
 function isExpired(token: string): boolean {
   try {
-    // JWT payloads are base64url, so restore the standard alphabet before atob —
-    // otherwise a '-' or '_' in the payload throws and a valid token is treated
-    // as expired, intermittently bouncing the user to /login.
-    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    const payload = JSON.parse(atob(b64));
-    return typeof payload.exp !== 'number' || payload.exp * 1000 <= Date.now();
+    const payload = decodeJwtPayload(token);
+    const exp = payload['exp'];
+    return typeof exp !== 'number' || exp * 1000 <= Date.now();
   } catch {
     return true;
   }
+}
+
+function hasActClaim(token: string): boolean {
+  try {
+    const payload = decodeJwtPayload(token);
+    const act = payload['act'];
+    return typeof act === 'string' && act.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function decodeJwtPayload(token: string): Record<string, unknown> {
+  // JWT payloads are base64url, so restore the standard alphabet before atob —
+  // otherwise a '-' or '_' in the payload throws and a valid token is treated
+  // as expired, intermittently bouncing the user to /login.
+  const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+  return JSON.parse(atob(b64)) as Record<string, unknown>;
 }

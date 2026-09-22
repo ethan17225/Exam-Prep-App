@@ -18,7 +18,7 @@ from src.attempts.schemas import HistorySummaryOut
 from src.auth import service as auth_service
 from src.auth.config import auth_settings
 from src.auth.constants import REGISTRABLE_ROLES, STAFF_ROLES, UserRole
-from src.auth.dependencies import require_instructor
+from src.auth.dependencies import get_current_user, require_admin, require_instructor
 from src.auth.exceptions import InstructorRequired, InvalidInviteCode, RegistrationClosed
 from src.auth.schemas import RegisterIn
 from src.constants import MAX_QUESTIONS_PER_EXAM
@@ -28,7 +28,15 @@ from src.exams.schemas import ExamFromBank
 from src.exams.service import allocate_section_draws
 from src.grading.service import grade_question
 from src.identifiers import ID_LENGTH, new_id
+from src.main import app
+from src.platform_admin import service as platform_service
 from src.platform_admin.constants import AUDIT_AREAS, AuditAction
+from src.platform_admin.exceptions import (
+    AlreadyImpersonating,
+    ImpersonateAdminRefused,
+    ImpersonateSelfRefused,
+    NotImpersonating,
+)
 from src.storage import ALLOWED_IMAGE_EXTENSIONS
 
 SRC = Path(__file__).resolve().parent.parent / "src"
@@ -122,6 +130,8 @@ PLATFORM_MUTATIONS = [
     ("patch", "/api/platform/users/u9", {"role": "admin"}),
     ("post", "/api/platform/users/u9/password", {"new_password": "password1"}),
     ("post", "/api/platform/users/u9/revoke-sessions", {}),
+    ("post", "/api/platform/users/u9/impersonate", {}),
+    ("post", "/api/platform/impersonate/end", {}),
     ("delete", "/api/platform/users/u9", None),
     ("post", "/api/platform/instructors/u9/rotate-code", {}),
     ("post", "/api/platform/instructors/u9/reassign-students", {"to_instructor_id": "u2"}),
@@ -169,6 +179,100 @@ async def test_admin_is_blocked_from_instructor_routes(as_admin: AsyncClient, pa
     # Admin is a third role, not a teacher. The class pages stay behind the
     # instructor gate; the platform console is the admin's equivalent.
     assert (await as_admin.get(path)).status_code == 403
+
+
+async def test_platform_reachable_while_impersonating(student, admin, anon: AsyncClient):
+    """An impersonation session keeps `/api/platform/*` open for the real admin.
+
+    Overrides both deps the same way a real JWT would: effective identity is the
+    student, while `require_admin` resolves the actor from the `act` claim.
+    """
+    app.dependency_overrides[get_current_user] = lambda: student
+    app.dependency_overrides[require_admin] = lambda: admin
+    try:
+        # overview hits the DB; the gate is what we care about — anything past
+        # 403 means AdminDep accepted the impersonating session.
+        resp = await anon.get("/api/platform/overview")
+        assert resp.status_code != 403
+        assert resp.status_code != 401
+    finally:
+        app.dependency_overrides.clear()
+
+
+async def test_start_impersonation_refuses_self(admin):
+    with pytest.raises(ImpersonateSelfRefused):
+        await platform_service.start_impersonation(
+            admin.id, admin, db=None, already_impersonating=False
+        )
+
+
+async def test_start_impersonation_refuses_nested(admin, student, monkeypatch):
+    async def fake_get(_user_id, _db):
+        return student
+
+    monkeypatch.setattr(platform_service, "_get_or_404", fake_get)
+    with pytest.raises(AlreadyImpersonating):
+        await platform_service.start_impersonation(
+            student.id, admin, db=None, already_impersonating=True
+        )
+
+
+async def test_start_impersonation_refuses_admin_target(admin, monkeypatch):
+    other_admin = type(admin)(
+        id="u9",
+        email="other@example.com",
+        password_hash="",
+        role=UserRole.ADMIN,
+        display_name="Other",
+        created_at=admin.created_at,
+    )
+
+    async def fake_get(_user_id, _db):
+        return other_admin
+
+    monkeypatch.setattr(platform_service, "_get_or_404", fake_get)
+    with pytest.raises(ImpersonateAdminRefused):
+        await platform_service.start_impersonation(
+            other_admin.id, admin, db=None, already_impersonating=False
+        )
+
+
+async def test_end_impersonation_refuses_when_not_impersonating(admin, student):
+    with pytest.raises(NotImpersonating):
+        await platform_service.end_impersonation(
+            admin, student, db=None, is_impersonating=False
+        )
+
+
+async def test_require_admin_resolves_act_claim_from_real_jwt(admin, student, monkeypatch):
+    """Impersonation JWTs still open the platform gate for the real admin."""
+    from starlette.requests import Request
+
+    admin.token_version = 0
+    student.token_version = 0
+    token = auth_service.create_impersonation_token(admin, student)
+
+    async def fake_get_by_id(user_id, _db):
+        if user_id == admin.id:
+            return admin
+        if user_id == student.id:
+            return student
+        return None
+
+    monkeypatch.setattr(auth_service, "get_by_id", fake_get_by_id)
+
+    request = Request(
+        {
+            "type": "http",
+            "headers": [(b"authorization", f"Bearer {token}".encode())],
+        }
+    )
+    # Mimic get_current_user stashing the actor after a successful token resolve.
+    identities = await auth_service.identities_from_token(token, db=None)
+    assert identities is not None
+    effective, actor = identities
+    request.state.impersonation_actor = actor
+    assert await require_admin(request, effective) is admin
 
 
 async def test_instructor_gate_accepts_the_string_the_column_stores(instructor):

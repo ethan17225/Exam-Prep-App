@@ -15,6 +15,8 @@ class AuditAction(StrEnum):
     USER_PASSWORD_RESET = "user.password_reset"
     USER_SESSIONS_REVOKED = "user.sessions_revoked"
     USER_DELETED = "user.deleted"
+    USER_IMPERSONATION_STARTED = "user.impersonation_started"
+    USER_IMPERSONATION_ENDED = "user.impersonation_ended"
     INVITE_CODE_ROTATED = "instructor.code_rotated"
     STUDENTS_REASSIGNED = "instructor.students_reassigned"
     EXAM_SHARING_CHANGED = "exam.sharing_changed"

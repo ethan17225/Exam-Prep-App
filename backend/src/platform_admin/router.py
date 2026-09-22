@@ -12,9 +12,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 
 from src.attempts.exceptions import RecordNotFound
+from src.auth import service as auth_service
 from src.auth.constants import UserRole
-from src.auth.dependencies import AdminDep, require_admin
+from src.auth.dependencies import AdminDep, CurrentUserDep, ImpersonationActorDep, require_admin
 from src.auth.exceptions import AdminRequired, EmailTaken
+from src.auth.schemas import TokenOut
 from src.courses.exceptions import CourseNameTaken, CourseNotFound
 from src.database import SessionDep
 from src.exams.exceptions import ExamNotFound
@@ -22,7 +24,11 @@ from src.platform_admin import service
 from src.platform_admin.constants import MAX_PAGE_SIZE
 from src.platform_admin.exceptions import (
     AccountNotFound,
+    AlreadyImpersonating,
+    ImpersonateAdminRefused,
+    ImpersonateSelfRefused,
     InstructorNotFound,
+    NotImpersonating,
     OwnerNotStaff,
     ReassignToSameInstructor,
     SelfActionRefused,
@@ -197,6 +203,69 @@ async def reset_password(user_id: str, payload: PasswordResetIn, user: AdminDep,
 async def revoke_sessions(user_id: str, user: AdminDep, db: SessionDep) -> RevokedOut:
     await service.revoke_sessions(user_id, user, db)
     return RevokedOut(revoked=True)
+
+
+@router.post(
+    "/users/{user_id}/impersonate",
+    response_model=TokenOut,
+    summary="Impersonate an account",
+    description=(
+        "Starts a full act-as session as the target student or instructor. The "
+        "returned token carries the target as the effective identity and the "
+        "calling admin in an `act` claim, so platform routes remain available. "
+        "Audited. Refuses self, other admins, and nested impersonation."
+    ),
+    responses={
+        **FORBIDDEN,
+        **NOT_FOUND,
+        status.HTTP_409_CONFLICT: {
+            "description": (
+                f"{ImpersonateSelfRefused.DETAIL} / {AlreadyImpersonating.DETAIL}"
+            )
+        },
+    },
+)
+async def impersonate_user(
+    user_id: str,
+    user: AdminDep,
+    actor: ImpersonationActorDep,
+    db: SessionDep,
+):
+    target = await service.start_impersonation(
+        user_id,
+        user,
+        db,
+        already_impersonating=actor is not None,
+    )
+    return auth_service.impersonation_login_response(user, target)
+
+
+@router.post(
+    "/impersonate/end",
+    response_model=TokenOut,
+    summary="End impersonation",
+    description=(
+        "Ends the current impersonation session and returns a fresh normal token "
+        "for the real admin. Audited. Requires an active impersonation bearer."
+    ),
+    responses={
+        **FORBIDDEN,
+        status.HTTP_409_CONFLICT: {"description": NotImpersonating.DETAIL},
+    },
+)
+async def end_impersonation(
+    user: AdminDep,
+    effective: CurrentUserDep,
+    actor: ImpersonationActorDep,
+    db: SessionDep,
+):
+    admin = await service.end_impersonation(
+        user,
+        effective,
+        db,
+        is_impersonating=actor is not None,
+    )
+    return auth_service.login_response(admin)
 
 
 @router.delete(

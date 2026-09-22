@@ -57,6 +57,6 @@ export class ResultsPage implements OnInit {
 
   retake(): void {
     const r = this.result();
-    if (r) this.router.navigate(['/exam', r.exam_id]);
+    if (r) this.router.navigate(['/exam', r.exam_id], { queryParams: { mode: r.mode || 'exam' } });
   }
 }

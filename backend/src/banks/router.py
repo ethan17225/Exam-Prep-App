@@ -40,7 +40,7 @@ BAD_NAME = {status.HTTP_400_BAD_REQUEST: {"description": EmptySectionName.DETAIL
     "",
     response_model=list[BankSummaryOut],
     summary="List my question banks",
-    description="Instructor-owned banks only. Students never see this list.",
+    description="Banks the caller owns or has been invited to edit. Students never see this list.",
 )
 async def list_banks(user: InstructorDep, db: SessionDep):
     return await service.list_mine(user, db)
@@ -63,6 +63,8 @@ async def create_bank(payload: BankCreate, user: InstructorDep, db: SessionDep):
         "section_count": 0,
         "question_count": 0,
         "created_at": bank.created_at,
+        "is_owner": True,
+        "is_collaborator": False,
     }
 
 
@@ -141,7 +143,7 @@ async def rename_section(bank_id: str, section_id: str, payload: SectionUpdate, 
     responses=NO_SECTION,
 )
 async def delete_section(bank_id: str, section_id: str, user: InstructorDep, db: SessionDep):
-    await service.get_owned_section_or_404(bank_id, section_id, user, db)
+    await service.get_writable_section_or_404(bank_id, section_id, user, db)
     images = await exams_service.image_urls_for_section(section_id, db)
     await service.delete_section(bank_id, section_id, user, db)
     await exams_service.remove_images(images)

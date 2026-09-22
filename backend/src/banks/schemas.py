@@ -36,6 +36,8 @@ class BankSummaryOut(BaseModel):
     section_count: int
     question_count: int
     created_at: ISODateTime
+    is_owner: bool = True
+    is_collaborator: bool = False
 
 
 class BankSectionOut(BaseModel):
@@ -54,6 +56,8 @@ class BankDetailOut(BaseModel):
     course_id: str | None
     course_name: str | None
     created_at: ISODateTime
+    is_owner: bool = True
+    is_collaborator: bool = False
     sections: list[BankSectionOut]
 
 

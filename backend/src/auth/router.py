@@ -5,7 +5,7 @@ from fastapi import APIRouter, File, Response, UploadFile, status
 
 from src.auth import service
 from src.auth.constants import AUTH_COOKIE
-from src.auth.dependencies import CurrentUserDep
+from src.auth.dependencies import CurrentUserDep, ImpersonationActorDep
 from src.auth.exceptions import (
     AvatarTooLarge,
     BadCredentials,
@@ -121,11 +121,12 @@ async def change_password(payload: PasswordChangeIn, user: CurrentUserDep, db: S
     description=(
         "The authenticated user's profile. `display_name` is null until onboarding "
         "completes, `invite_code` is set only for instructors, and "
-        "`instructor_name` only for students."
+        "`instructor_name` only for students. When the bearer is an impersonation "
+        "token, `impersonating` is true and `impersonated_by` names the real admin."
     ),
 )
-async def read_me(user: CurrentUserDep, db: SessionDep):
-    return await service.build_me(user, db)
+async def read_me(user: CurrentUserDep, actor: ImpersonationActorDep, db: SessionDep):
+    return await service.build_me(user, db, actor=actor)
 
 
 @router.patch(
@@ -134,9 +135,14 @@ async def read_me(user: CurrentUserDep, db: SessionDep):
     summary="Update your profile",
     description="Sets the preferred name. This is what completes onboarding.",
 )
-async def update_me(payload: ProfileUpdate, user: CurrentUserDep, db: SessionDep):
+async def update_me(
+    payload: ProfileUpdate,
+    user: CurrentUserDep,
+    actor: ImpersonationActorDep,
+    db: SessionDep,
+):
     await service.set_display_name(user, payload.display_name, db)
-    return await service.build_me(user, db)
+    return await service.build_me(user, db, actor=actor)
 
 
 @router.post(
