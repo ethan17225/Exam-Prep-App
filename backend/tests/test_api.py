@@ -670,6 +670,7 @@ def test_ids_are_wide_enough_and_unique():
         (progress_router, "/api/in-progress/by-exam/{exam_id}", "/api/in-progress/{record_id}"),
         (history_router, "/api/history/topic-stats", "/api/history/{record_id}"),
         (exams_router, "/api/exams/from-bank", "/api/exams/{exam_id}"),
+        (exams_router, "/api/exams/instructors/search", "/api/exams/{exam_id}"),
     ],
 )
 def test_fixed_paths_precede_parameterized_siblings(router, fixed: str, parameterized: str):

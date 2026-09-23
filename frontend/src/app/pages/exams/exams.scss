@@ -443,11 +443,73 @@
 .share-invite {
   display: flex;
   gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.share-autocomplete {
+  position: relative;
+  flex: 1;
+  min-width: 0;
 
   input {
-    flex: 1;
-    min-width: 0;
+    width: 100%;
   }
+}
+
+.share-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.share-dropdown-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.55rem 0.8rem;
+  border: none;
+  background: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: left;
+
+  &:hover,
+  &.active {
+    background: #f5f5f5;
+  }
+}
+
+.share-dropdown-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.share-dropdown-email {
+  font-size: 0.75rem;
+  color: #888;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.share-dropdown-empty {
+  padding: 0.7rem 0.8rem;
+  font-size: 0.82rem;
+  color: #999;
 }
 
 .share-empty {
@@ -471,4 +533,25 @@
     gap: 0.75rem;
     font-size: 0.95rem;
   }
+}
+
+.share-list-person {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.share-list-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-list-email {
+  font-size: 0.78rem;
+  color: #888;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

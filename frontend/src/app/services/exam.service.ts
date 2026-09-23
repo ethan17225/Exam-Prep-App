@@ -658,7 +658,15 @@ export interface ExamDetail {
 export interface ExamCollaborator {
   user_id: string;
   email: string;
+  display_name?: string | null;
   created_at: string;
+}
+
+/** Instructor hit from the share-dialog name typeahead. */
+export interface InstructorSearchHit {
+  id: string;
+  email: string;
+  display_name?: string | null;
 }
 
 export interface QuestionBankSummary {
@@ -1244,6 +1252,13 @@ export class ExamService {
     return this.http.delete<{ deleted: boolean }>(
       `${this.base}/exams/${examId}/collaborators/${userId}`,
     );
+  }
+
+  searchInstructors(query: string, limit = 20): Observable<InstructorSearchHit[]> {
+    const params = new HttpParams().set('q', query).set('limit', String(limit));
+    return this.http.get<InstructorSearchHit[]>(`${this.base}/exams/instructors/search`, {
+      params,
+    });
   }
 
   saveProgress(payload: SaveProgressPayload): Observable<InProgressExam> {

@@ -228,4 +228,13 @@ class ExamCollaboratorInvite(BaseModel):
 class ExamCollaboratorOut(BaseModel):
     user_id: str
     email: str
+    display_name: str | None = None
     created_at: ISODateTime
+
+
+class InstructorSearchHit(BaseModel):
+    """One instructor returned by the share-dialog typeahead."""
+
+    id: str
+    email: str
+    display_name: str | None = None

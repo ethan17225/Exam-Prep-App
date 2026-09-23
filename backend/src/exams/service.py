@@ -567,6 +567,37 @@ async def delete_exam(exam_id: str, user: User, db: AsyncSession) -> None:
     await _delete(exam, db)
 
 
+async def search_instructors(query: str, user: User, db: AsyncSession, *, limit: int = 20) -> list[dict]:
+    """Typeahead for the share dialog: instructors matching name (or email).
+
+    Returns nothing until the query is at least two characters so a single keystroke
+    cannot enumerate the instructor directory. The caller is always excluded.
+    """
+    needle = query.strip().lower()
+    if len(needle) < 2:
+        return []
+    pattern = f"%{needle}%"
+    rows = (
+        await db.execute(
+            select(User)
+            .where(
+                User.role == UserRole.INSTRUCTOR,
+                User.id != user.id,
+                or_(
+                    func.lower(User.display_name).like(pattern),
+                    func.lower(User.email).like(pattern),
+                ),
+            )
+            .order_by(User.display_name.asc().nulls_last(), User.email)
+            .limit(limit)
+        )
+    ).scalars().all()
+    return [
+        {"id": row.id, "email": row.email, "display_name": row.display_name}
+        for row in rows
+    ]
+
+
 async def list_collaborators(exam_id: str, user: User, db: AsyncSession) -> list[dict]:
     await get_owned_exam_or_404(exam_id, user, db)
     rows = (
@@ -581,6 +612,7 @@ async def list_collaborators(exam_id: str, user: User, db: AsyncSession) -> list
         {
             "user_id": collab.user_id,
             "email": invitee.email,
+            "display_name": invitee.display_name,
             "created_at": collab.created_at,
         }
         for collab, invitee in rows
@@ -611,6 +643,7 @@ async def add_collaborator(exam_id: str, email: str, user: User, db: AsyncSessio
     return {
         "user_id": invitee.id,
         "email": invitee.email,
+        "display_name": invitee.display_name,
         "created_at": collab.created_at,
     }
 

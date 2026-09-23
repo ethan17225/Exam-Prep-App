@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal, computed } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
@@ -7,6 +7,7 @@ import {
   ExamService,
   ExamSummary,
   ExamCollaborator,
+  InstructorSearchHit,
   Course,
   KindCount,
 } from '../../services/exam.service';
@@ -17,7 +18,7 @@ import {
   templateUrl: './exams.html',
   styleUrl: './exams.scss',
 })
-export class ExamsPage implements OnInit {
+export class ExamsPage implements OnInit, OnDestroy {
   exams = signal<ExamSummary[]>([]);
   courses = signal<Course[]>([]);
   selectedCourseId = signal<string>('');
@@ -33,10 +34,16 @@ export class ExamsPage implements OnInit {
 
   shareExam = signal<ExamSummary | null>(null);
   collaborators = signal<ExamCollaborator[]>([]);
-  shareEmail = signal('');
+  shareQuery = signal('');
+  shareSelected = signal<InstructorSearchHit | null>(null);
+  shareHits = signal<InstructorSearchHit[]>([]);
+  shareDropdownOpen = signal(false);
+  shareSearchLoading = signal(false);
   shareLoading = signal(false);
   shareError = signal('');
   shareInviteLoading = signal(false);
+
+  private shareSearchTimer: ReturnType<typeof setTimeout> | null = null;
 
   filteredExams = computed(() => {
     const courseId = this.selectedCourseId();
@@ -61,6 +68,10 @@ export class ExamsPage implements OnInit {
   ngOnInit(): void {
     this.loadCourses();
     this.load();
+  }
+
+  ngOnDestroy(): void {
+    this.clearShareSearchTimer();
   }
 
   isInstructor(): boolean {
@@ -174,7 +185,7 @@ export class ExamsPage implements OnInit {
   openShare(exam: ExamSummary): void {
     this.menuOpen.set(null);
     this.shareExam.set(exam);
-    this.shareEmail.set('');
+    this.resetShareSearch();
     this.shareError.set('');
     this.collaborators.set([]);
     this.shareLoading.set(true);
@@ -193,14 +204,57 @@ export class ExamsPage implements OnInit {
   closeShare(): void {
     this.shareExam.set(null);
     this.shareError.set('');
-    this.shareEmail.set('');
+    this.resetShareSearch();
+  }
+
+  onShareQueryInput(value: string): void {
+    this.shareQuery.set(value);
+    this.shareSelected.set(null);
+    this.shareError.set('');
+    const trimmed = value.trim();
+    if (trimmed.length < 2) {
+      this.clearShareSearchTimer();
+      this.shareHits.set([]);
+      this.shareDropdownOpen.set(false);
+      this.shareSearchLoading.set(false);
+      return;
+    }
+    this.shareDropdownOpen.set(true);
+    this.scheduleShareSearch(trimmed);
+  }
+
+  onShareSearchFocus(): void {
+    if (this.shareQuery().trim().length >= 2) {
+      this.shareDropdownOpen.set(true);
+    }
+  }
+
+  closeShareDropdown(): void {
+    this.shareDropdownOpen.set(false);
+  }
+
+  selectShareHit(hit: InstructorSearchHit): void {
+    this.shareSelected.set(hit);
+    this.shareQuery.set(hit.display_name?.trim() || hit.email);
+    this.shareHits.set([]);
+    this.shareDropdownOpen.set(false);
+  }
+
+  instructorLabel(hit: { email: string; display_name?: string | null }): string {
+    const name = hit.display_name?.trim();
+    return name || hit.email;
   }
 
   inviteCollaborator(): void {
     const exam = this.shareExam();
-    const email = this.shareEmail().trim();
+    const selected = this.shareSelected();
+    const email = selected?.email.trim() || this.shareQuery().trim();
     if (!exam || !email) {
-      this.shareError.set('Enter an instructor email.');
+      this.shareError.set('Search for an instructor and pick one from the list.');
+      return;
+    }
+    if (!selected) {
+      this.shareError.set('Pick an instructor from the dropdown before sharing.');
       return;
     }
     this.shareInviteLoading.set(true);
@@ -208,7 +262,7 @@ export class ExamsPage implements OnInit {
     this.examService.addExamCollaborator(exam.id, email).subscribe({
       next: (row) => {
         this.collaborators.set([...this.collaborators(), row]);
-        this.shareEmail.set('');
+        this.resetShareSearch();
         this.shareInviteLoading.set(false);
       },
       error: (err) => {
@@ -221,7 +275,8 @@ export class ExamsPage implements OnInit {
   revokeCollaborator(row: ExamCollaborator): void {
     const exam = this.shareExam();
     if (!exam) return;
-    if (!confirm(`Remove access for ${row.email}?`)) return;
+    const label = this.instructorLabel(row);
+    if (!confirm(`Remove access for ${label}?`)) return;
     this.examService.removeExamCollaborator(exam.id, row.user_id).subscribe({
       next: () => {
         this.collaborators.set(this.collaborators().filter((c) => c.user_id !== row.user_id));
@@ -307,5 +362,46 @@ export class ExamsPage implements OnInit {
         });
       },
     });
+  }
+
+  private resetShareSearch(): void {
+    this.clearShareSearchTimer();
+    this.shareQuery.set('');
+    this.shareSelected.set(null);
+    this.shareHits.set([]);
+    this.shareDropdownOpen.set(false);
+    this.shareSearchLoading.set(false);
+  }
+
+  private scheduleShareSearch(query: string): void {
+    this.clearShareSearchTimer();
+    this.shareSearchLoading.set(true);
+    this.shareSearchTimer = setTimeout(() => this.runShareSearch(query), 200);
+  }
+
+  private runShareSearch(query: string): void {
+    // Ignore stale responses if the field has changed since we scheduled.
+    if (this.shareQuery().trim() !== query) return;
+    this.examService.searchInstructors(query).subscribe({
+      next: (hits) => {
+        if (this.shareQuery().trim() !== query) return;
+        this.shareHits.set(hits);
+        this.shareSearchLoading.set(false);
+        this.shareDropdownOpen.set(true);
+      },
+      error: (err) => {
+        if (this.shareQuery().trim() !== query) return;
+        this.shareHits.set([]);
+        this.shareSearchLoading.set(false);
+        this.shareError.set(httpErrorDetail(err) || 'Could not search instructors.');
+      },
+    });
+  }
+
+  private clearShareSearchTimer(): void {
+    if (this.shareSearchTimer != null) {
+      clearTimeout(this.shareSearchTimer);
+      this.shareSearchTimer = null;
+    }
   }
 }

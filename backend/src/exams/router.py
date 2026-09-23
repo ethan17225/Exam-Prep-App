@@ -35,6 +35,7 @@ from src.exams.schemas import (
     ExamTimeLimitUpdate,
     ExamTitleUpdate,
     ImageOut,
+    InstructorSearchHit,
     QuestionIn,
     QuestionOut,
     QuestionUpdate,
@@ -103,6 +104,25 @@ async def list_exams(
 )
 async def create_exam_from_bank(payload: ExamFromBank, user: InstructorDep, db: SessionDep):
     return await service.create_from_bank(payload, user, db)
+
+
+@router.get(
+    "/instructors/search",
+    response_model=list[InstructorSearchHit],
+    summary="Search instructors by name",
+    description=(
+        "Typeahead for sharing an exam. Matches instructor display names (and "
+        "emails as a fallback). Requires at least two characters; the caller is "
+        "excluded from the results."
+    ),
+)
+async def search_instructors(
+    user: InstructorDep,
+    db: SessionDep,
+    q: Annotated[str, Query(min_length=0, max_length=80)] = "",
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+):
+    return await service.search_instructors(q, user, db, limit=limit)
 
 
 @router.get(

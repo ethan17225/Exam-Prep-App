@@ -201,21 +201,54 @@
         <button type="button" class="btn btn-secondary btn-sm" (click)="closeShare()">Close</button>
       </div>
       <p class="share-help">
-        Invite another instructor by email. They can edit this exam
+        Search for another instructor by name. They can edit this exam
         @if (exam.bank_id) {
           and its question bank
         }
         , but cannot delete it or invite others.
       </p>
       <form class="share-invite" (submit)="$event.preventDefault(); inviteCollaborator()">
-        <input
-          type="email"
-          placeholder="instructor@example.com"
-          aria-label="Instructor email"
-          [ngModel]="shareEmail()"
-          (ngModelChange)="shareEmail.set($event)"
-          name="shareEmail"
-        />
+        <div class="share-autocomplete">
+          <input
+            type="text"
+            placeholder="Type a name to search…"
+            role="combobox"
+            aria-label="Search instructors by name"
+            aria-controls="share-instructor-dropdown"
+            autocomplete="off"
+            [attr.aria-expanded]="shareDropdownOpen()"
+            [ngModel]="shareQuery()"
+            (ngModelChange)="onShareQueryInput($event)"
+            (focus)="onShareSearchFocus()"
+            (blur)="closeShareDropdown()"
+            (keydown.escape)="closeShareDropdown()"
+            name="shareQuery"
+          />
+          @if (shareDropdownOpen()) {
+            <div class="share-dropdown" id="share-instructor-dropdown" role="listbox">
+              @if (shareSearchLoading()) {
+                <div class="share-dropdown-empty">Searching…</div>
+              } @else if (shareHits().length === 0) {
+                <div class="share-dropdown-empty">No instructors match.</div>
+              } @else {
+                @for (hit of shareHits(); track hit.id) {
+                  <button
+                    type="button"
+                    class="share-dropdown-item"
+                    role="option"
+                    [class.active]="shareSelected()?.id === hit.id"
+                    (mousedown)="selectShareHit(hit)"
+                  >
+                    <span class="share-dropdown-name">{{ instructorLabel(hit) }}</span>
+                    @if (hit.display_name?.trim()) {
+                      <span class="share-dropdown-email">{{ hit.email }}</span>
+                    }
+                  </button>
+                }
+              }
+            </div>
+          }
+        </div>
         <button class="btn btn-primary" type="submit" [disabled]="shareInviteLoading()">
           {{ shareInviteLoading() ? 'Sharing…' : 'Share' }}
         </button>
@@ -231,7 +264,12 @@
         <ul class="share-list">
           @for (row of collaborators(); track row.user_id) {
             <li>
-              <span>{{ row.email }}</span>
+              <span class="share-list-person">
+                <span class="share-list-name">{{ instructorLabel(row) }}</span>
+                @if (row.display_name?.trim()) {
+                  <span class="share-list-email">{{ row.email }}</span>
+                }
+              </span>
               <button type="button" class="btn btn-secondary btn-sm" (click)="revokeCollaborator(row)">
                 Remove
               </button>

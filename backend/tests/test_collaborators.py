@@ -22,13 +22,14 @@ from src.exams.exceptions import (
     InstructorNotFound,
 )
 from src.exams.models import Exam, ExamCollaborator
-from src.exams.schemas import ExamCollaboratorInvite, ExamDetailOut, ExamSummaryOut
+from src.exams.schemas import ExamCollaboratorInvite, ExamCollaboratorOut, ExamDetailOut, ExamSummaryOut
 from src.exams.service import (
     add_collaborator,
     exam_readable,
     exam_writable,
     list_collaborators,
     remove_collaborator,
+    search_instructors,
 )
 from src.main import app
 
@@ -68,6 +69,7 @@ async def test_anonymous_collaborator_routes_are_rejected(anon: AsyncClient):
         await anon.post("/api/exams/abc/collaborators", json={"email": "x@y.com"})
     ).status_code == 401
     assert (await anon.delete("/api/exams/abc/collaborators/u1")).status_code == 401
+    assert (await anon.get("/api/exams/instructors/search", params={"q": "ab"})).status_code == 401
 
 
 async def test_student_cannot_manage_collaborators(as_student: AsyncClient):
@@ -76,6 +78,9 @@ async def test_student_cannot_manage_collaborators(as_student: AsyncClient):
         await as_student.post("/api/exams/abc/collaborators", json={"email": "x@y.com"})
     ).status_code == 403
     assert (await as_student.delete("/api/exams/abc/collaborators/u1")).status_code == 403
+    assert (
+        await as_student.get("/api/exams/instructors/search", params={"q": "ab"})
+    ).status_code == 403
 
 
 async def test_collaborator_invite_requires_email(as_instructor: AsyncClient):
@@ -88,6 +93,7 @@ def test_collaborator_routes_are_registered():
     paths = {getattr(r, "path", None) for r in app.routes}
     assert "/api/exams/{exam_id}/collaborators" in paths
     assert "/api/exams/{exam_id}/collaborators/{user_id}" in paths
+    assert "/api/exams/instructors/search" in paths
 
 
 def test_summary_and_detail_schemas_include_collaborator_flag():
@@ -95,6 +101,7 @@ def test_summary_and_detail_schemas_include_collaborator_flag():
     assert "is_collaborator" in ExamDetailOut.model_fields
     invite = ExamCollaboratorInvite(email="peer@example.com")
     assert invite.email == "peer@example.com"
+    assert "display_name" in ExamCollaboratorOut.model_fields
 
 
 # ── Predicates ─────────────────────────────────────────────────────
@@ -214,6 +221,7 @@ async def test_add_collaborator_grants_bank_access(monkeypatch):
     out = await add_collaborator(exam.id, peer.email, owner, db)
     assert out["user_id"] == peer.id
     assert out["email"] == peer.email
+    assert out["display_name"] == peer.display_name
     assert granted == [("bankbankbank", peer.id, owner.id)]
     db.add.assert_called_once()
     assert isinstance(db.add.call_args.args[0], ExamCollaborator)
@@ -303,5 +311,34 @@ async def test_list_collaborators_is_owner_only():
 
     rows = await list_collaborators(exam.id, owner, db)
     assert rows == [
-        {"user_id": peer.id, "email": peer.email, "created_at": collab.created_at},
+        {
+            "user_id": peer.id,
+            "email": peer.email,
+            "display_name": peer.display_name,
+            "created_at": collab.created_at,
+        },
     ]
+
+
+@pytest.mark.asyncio
+async def test_search_instructors_requires_two_characters():
+    owner = _instructor()
+    db = AsyncMock()
+    assert await search_instructors("a", owner, db) == []
+    assert await search_instructors(" ", owner, db) == []
+    db.execute.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_search_instructors_returns_hits():
+    owner = _instructor()
+    peer = _instructor("peer", "peer@example.com")
+    peer.display_name = "Ada Peer"
+    db = AsyncMock()
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = [peer]
+    db.execute = AsyncMock(return_value=result)
+
+    hits = await search_instructors("Ad", owner, db)
+    assert hits == [{"id": peer.id, "email": peer.email, "display_name": "Ada Peer"}]
+    db.execute.assert_awaited_once()
